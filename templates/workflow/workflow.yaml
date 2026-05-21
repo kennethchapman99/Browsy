@@ -1,0 +1,16 @@
+id: template-workflow
+description: Template Browsy workflow.
+auth:
+  mode: manual-save-state
+  storage_state: .auth/template-workflow.json
+runtime:
+  dry_run_default: true
+  headed_default: true
+  pause_at_end_default: true
+targets:
+  start_url: https://example.com
+artifacts:
+  screenshots: true
+  html_snapshot: true
+  page_text_snapshot: true
+  discovered_fields: true
