@@ -1,0 +1,18 @@
+{
+  "dry_run_default": true,
+  "pause_at_end_default": true,
+  "manual_checkpoint_required": true,
+  "blocked_action_text": [
+    "Submit",
+    "Finalize",
+    "Pay",
+    "Purchase",
+    "Release"
+  ],
+  "manual_only_categories": [
+    "legal certification",
+    "payment",
+    "paid extras",
+    "final submission"
+  ]
+}
