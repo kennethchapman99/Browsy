@@ -8,10 +8,12 @@
   },
   "scripts": {
     "smoke": "node scripts/smoke-test.mjs",
+    "validate:request": "node src/cli/index.mjs validate-request",
     "init:workflow": "node src/cli/index.mjs init",
     "auth:save": "node src/cli/index.mjs auth save",
     "auth:check": "node src/cli/index.mjs auth check",
     "discover": "node src/cli/index.mjs discover",
+    "generate:prompt": "node src/cli/index.mjs generate-prompt",
     "run": "node src/cli/index.mjs run"
   },
   "engines": {
