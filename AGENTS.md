@@ -2,7 +2,7 @@
 
 Browsy is a developer-facing browser automation harness factory.
 
-A coding agent should treat `AUTOMATION_REQUEST.md` as the single source of truth for the requested automation. The goal is to generate a safe, inspectable automation harness using the best available mechanism: API first, then Playwright, then OpenClaw or real-browser control when needed.
+A coding agent should treat `AUTOMATION_REQUEST.md` as the single source of truth for the requested automation. The goal is to generate a safe, inspectable automation harness using the best available mechanism: APIs first, then Playwright, then OpenClaw or real-browser control when needed.
 
 ## Operating principles
 
@@ -10,7 +10,7 @@ A coding agent should treat `AUTOMATION_REQUEST.md` as the single source of trut
 2. Use Playwright for deterministic browser steps: fill, select, upload, click safe navigation, screenshot, and logging.
 3. Use OpenClaw or real-browser control for workflows that are too dynamic for selectors or require human-like browser interaction.
 4. Keep final, payment, legal, destructive, or externally-visible actions behind human checkpoints unless the request explicitly allows them and the safety policy permits them.
-5. Dry-run must default to true.
+5. dry-run must default to true for every generated automation.
 6. Every generated workflow must save logs, screenshots, skipped fields, failed fields, and page snapshots.
 7. Never claim success when selectors are missing. Report what was filled, skipped, and failed.
 8. Keep the harness boring and inspectable. No hidden magic.
@@ -84,6 +84,6 @@ For browser auth flows, save state while the session is live. Do not rely only o
 
 - `npm run smoke` passes.
 - Discovery writes readable `discovered-fields.md`.
-- Dry-run does not take dangerous actions.
+- dry-run does not take dangerous actions.
 - Artifacts are saved.
 - The README tells a human exactly how to run and verify the workflow.
