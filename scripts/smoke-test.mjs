@@ -322,7 +322,243 @@ try {
 }
 
 // ---------------------------------------------------------------------------
-// 9. Browser tests (opt-in)
+// 9. Arg-validator security (wizard exec allowlist)
+// ---------------------------------------------------------------------------
+section('Arg-validator security');
+
+try {
+  const { validateExecArgs } = await import('../wizard/arg-validator.mjs');
+
+  // Unknown command rejected
+  let r = validateExecArgs('rm', ['-rf', '/']);
+  if (r.ok) fail('Security: unknown command "rm" must be rejected');
+  else pass('Security: unknown command rejected');
+
+  // --allow-final-action absent from run allowlist
+  r = validateExecArgs('run', ['--workflow', 'my-wf', '--allow-final-action']);
+  if (r.ok) fail('Security: --allow-final-action must be rejected for run');
+  else pass('Security: --allow-final-action blocked from run command');
+
+  // Path traversal in workflow ID blocked
+  r = validateExecArgs('run', ['--workflow', '../../etc/passwd']);
+  if (r.ok) fail('Security: path traversal in --workflow must be rejected');
+  else pass('Security: path traversal in --workflow blocked');
+
+  // file:// URL blocked
+  r = validateExecArgs('discover', ['--workflow', 'my-wf', '--url', 'file:///etc/passwd']);
+  if (r.ok) fail('Security: file:// URL must be rejected');
+  else pass('Security: file:// URL blocked in --url');
+
+  // Unknown flag blocked
+  r = validateExecArgs('promote', ['--workflow', 'my-wf', '--inject', 'evil']);
+  if (r.ok) fail('Security: unknown flag --inject must be rejected for promote');
+  else pass('Security: unknown flag rejected for promote');
+
+  // Null byte in arg value blocked
+  r = validateExecArgs('feedback', ['--workflow', 'my\0wf', '--message', 'hi']);
+  if (r.ok) fail('Security: null byte in --workflow value must be rejected');
+  else pass('Security: null byte in arg value blocked');
+
+  // Absolute path in --manifest blocked
+  r = validateExecArgs('run', ['--workflow', 'my-wf', '--manifest', '/etc/passwd']);
+  if (r.ok) fail('Security: absolute path in --manifest must be rejected');
+  else pass('Security: absolute path in --manifest blocked');
+
+  // auth requires valid subcommand
+  r = validateExecArgs('auth', ['badcmd', '--workflow', 'my-wf', '--url', 'https://x.com']);
+  if (r.ok) fail('Security: invalid auth subcommand must be rejected');
+  else pass('Security: invalid auth subcommand rejected');
+
+  // Valid calls pass through
+  const valid = [
+    ['validate-request', []],
+    ['init', ['--id', 'my-workflow']],
+    ['init', ['--from-request']],
+    ['discover', ['--workflow', 'my-wf', '--url', 'https://example.com', '--candidates']],
+    ['run', ['--workflow', 'my-wf', '--dry-run', '--no-pause']],
+    ['review', ['--workflow', 'my-wf']],
+    ['feedback', ['--workflow', 'my-wf', '--message', 'looks good']],
+    ['promote', ['--workflow', 'my-wf']],
+    ['auth', ['save', '--workflow', 'my-wf', '--url', 'https://example.com']],
+    ['auth', ['check', '--workflow', 'my-wf', '--url', 'https://example.com']],
+  ];
+  for (const [cmd, args] of valid) {
+    const res = validateExecArgs(cmd, args);
+    if (!res.ok) fail(`Security: valid call rejected — ${cmd} ${args.join(' ')}: ${res.reason}`);
+    else pass(`Security: valid call passes — ${cmd}`);
+  }
+} catch (err) {
+  fail('Arg-validator threw: ' + err.message);
+  if (process.env.BROWSY_DEBUG) console.error(err.stack);
+}
+
+// ---------------------------------------------------------------------------
+// 10. CLI lifecycle artifact checks (non-browser)
+// ---------------------------------------------------------------------------
+section('CLI lifecycle artifacts (non-browser)');
+
+const SMOKE_WF = 'browsy-smoke-lc';
+
+try {
+  const { spawnSync } = await import('child_process');
+  const { REPO_ROOT: RR, workflowDir: wfDir, workflowRunDir: runDirFn, ensureDir: ed, writeJson: wj, writeText: wt } = await import('../src/core/paths.mjs');
+
+  // Clean up any prior smoke run
+  const wfPath = join(RR, 'workflows', SMOKE_WF);
+  if (fs.existsSync(wfPath)) fs.rmSync(wfPath, { recursive: true });
+
+  // init
+  const initRes = spawnSync(process.execPath, ['src/cli/index.mjs', 'init', '--id', SMOKE_WF], { cwd: RR, encoding: 'utf8' });
+  if (initRes.status !== 0) { fail('Lifecycle: init failed: ' + initRes.stderr); throw new Error('stop'); }
+  if (!fs.existsSync(join(wfPath, 'workflow.json'))) fail('Lifecycle: workflow.json not created by init');
+  else pass('Lifecycle: init — workflow.json created');
+  if (!fs.existsSync(join(wfPath, 'run.mjs'))) fail('Lifecycle: run.mjs not created by init');
+  else pass('Lifecycle: init — run.mjs created');
+  if (!fs.existsSync(join(wfPath, 'safety-policy.json'))) fail('Lifecycle: safety-policy.json not created by init');
+  else pass('Lifecycle: init — safety-policy.json created');
+
+  // Synthesise a fake run with all expected artifacts
+  const fakeRunDir = join(RR, 'output', 'runs', SMOKE_WF, '2099-01-01T00-00-00-000Z');
+  ed(fakeRunDir);
+  const fakeFilled  = [{ timestamp: new Date().toISOString(), field: 'title', selector: '#title', value: 'Test', masked: false }];
+  const fakeSkipped = [
+    { timestamp: new Date().toISOString(), field: 'submit_btn', selector: '#btn-submit', reason: 'dangerous text' },
+    { timestamp: new Date().toISOString(), field: 'delete_btn', selector: '#btn-delete', reason: 'manual-only: destructive action' },
+  ];
+  const fakeErrors  = [{ timestamp: new Date().toISOString(), field: 'broken_field', selector: '#missing', error: 'Element not found' }];
+  wj(join(fakeRunDir, 'filled-fields.json'),  fakeFilled);
+  wj(join(fakeRunDir, 'skipped-fields.json'), fakeSkipped);
+  wj(join(fakeRunDir, 'errors.json'),         fakeErrors);
+  wj(join(fakeRunDir, 'run-log.json'),        [{ level: 'info', message: 'smoke test run' }]);
+  wt(join(fakeRunDir, 'page-text-snapshot.txt'), 'smoke test page text');
+  wt(join(fakeRunDir, 'html-snapshot.html'), '<html><body>smoke</body></html>');
+  // Note: no screenshot files — intentional to test "incomplete run still useful"
+  pass('Lifecycle: fake run artifacts written');
+
+  // review — should generate run-review.md from existing artifacts
+  const revRes = spawnSync(process.execPath, ['src/cli/index.mjs', 'review', '--workflow', SMOKE_WF], { cwd: RR, encoding: 'utf8' });
+  if (revRes.status !== 0) fail('Lifecycle: review failed: ' + revRes.stderr);
+  else pass('Lifecycle: review command ran successfully');
+
+  const reviewPath = join(fakeRunDir, 'run-review.md');
+  if (!fs.existsSync(reviewPath)) fail('Lifecycle: run-review.md not created by review');
+  else {
+    const reviewText = fs.readFileSync(reviewPath, 'utf8');
+    pass('Lifecycle: run-review.md created');
+    if (!reviewText.includes('Run Review')) fail('Lifecycle: run-review.md missing header');
+    else pass('Lifecycle: run-review.md has expected header');
+    if (!reviewText.includes('What was skipped for safety')) fail('Lifecycle: run-review.md missing skipped section');
+    else pass('Lifecycle: run-review.md has skipped section');
+    if (!reviewText.includes('Artifacts')) fail('Lifecycle: run-review.md missing artifacts section');
+    else pass('Lifecycle: run-review.md has artifacts section');
+    // Verify artifact path is printed in review
+    if (!reviewText.includes('output/runs')) fail('Lifecycle: run-review.md does not print artifact path');
+    else pass('Lifecycle: run-review.md prints artifact path');
+  }
+
+  // Verify skipped-fields.json has blocked buttons
+  const skippedJson = JSON.parse(fs.readFileSync(join(fakeRunDir, 'skipped-fields.json'), 'utf8'));
+  const blockedBtns = skippedJson.filter(s => /submit|delete/i.test(s.field));
+  if (!blockedBtns.length) fail('Lifecycle: skipped-fields.json missing blocked button entries');
+  else pass('Lifecycle: skipped-fields.json has ' + blockedBtns.length + ' blocked button(s)');
+
+  // Verify failed run still has useful artifacts (errors.json non-empty but review still generated)
+  const errJson = JSON.parse(fs.readFileSync(join(fakeRunDir, 'errors.json'), 'utf8'));
+  if (!errJson.length) fail('Lifecycle: errors.json should have entries for failed-run test');
+  else pass('Lifecycle: failed run — errors.json is non-empty');
+  if (!fs.existsSync(reviewPath)) fail('Lifecycle: failed run — run-review.md still missing');
+  else pass('Lifecycle: failed run — run-review.md still generated despite errors');
+
+  // feedback — creates files in workflows/<id>/feedback/
+  const fbRes = spawnSync(
+    process.execPath,
+    ['src/cli/index.mjs', 'feedback', '--workflow', SMOKE_WF, '--message', 'Smoke test feedback note'],
+    { cwd: RR, encoding: 'utf8' }
+  );
+  if (fbRes.status !== 0) fail('Lifecycle: feedback failed: ' + fbRes.stderr);
+  else pass('Lifecycle: feedback command ran successfully');
+
+  const feedbackDir = join(wfPath, 'feedback');
+  if (!fs.existsSync(feedbackDir)) fail('Lifecycle: feedback/ directory not created');
+  else {
+    const fbFiles = fs.readdirSync(feedbackDir);
+    if (fbFiles.length < 2) fail('Lifecycle: feedback/ should have at least 2 files (user-feedback + patch-summary)');
+    else pass('Lifecycle: feedback/ has ' + fbFiles.length + ' file(s)');
+    const userFb = fbFiles.find(f => f.includes('user-feedback'));
+    const patchFb = fbFiles.find(f => f.includes('patch-summary'));
+    if (!userFb) fail('Lifecycle: user-feedback file missing');
+    else pass('Lifecycle: user-feedback file created');
+    if (!patchFb) fail('Lifecycle: patch-summary file missing');
+    else pass('Lifecycle: patch-summary file created');
+  }
+
+  // promote — marks workflow reusable/stable
+  const promRes = spawnSync(
+    process.execPath,
+    ['src/cli/index.mjs', 'promote', '--workflow', SMOKE_WF],
+    { cwd: RR, encoding: 'utf8' }
+  );
+  if (promRes.status !== 0) fail('Lifecycle: promote failed: ' + promRes.stderr);
+  else pass('Lifecycle: promote command ran successfully');
+
+  const promotedPath = join(wfPath, 'PROMOTED');
+  if (!fs.existsSync(promotedPath)) fail('Lifecycle: PROMOTED file not created by promote');
+  else {
+    pass('Lifecycle: PROMOTED file created');
+    const promotedText = fs.readFileSync(promotedPath, 'utf8');
+    if (!promotedText.includes('PROMOTED')) fail('Lifecycle: PROMOTED file missing header');
+    else pass('Lifecycle: PROMOTED file has expected content');
+  }
+
+  const wfConfig = JSON.parse(fs.readFileSync(join(wfPath, 'workflow.json'), 'utf8'));
+  if (!wfConfig.promoted) fail('Lifecycle: workflow.json promoted flag not set');
+  else pass('Lifecycle: workflow.json promoted=true');
+  if (!wfConfig.promoted_at) fail('Lifecycle: workflow.json missing promoted_at timestamp');
+  else pass('Lifecycle: workflow.json has promoted_at');
+
+  // Cleanup
+  fs.rmSync(wfPath, { recursive: true });
+  fs.rmSync(join(RR, 'output', 'runs', SMOKE_WF), { recursive: true, force: true });
+  pass('Lifecycle: temp workflow cleaned up');
+
+} catch (err) {
+  if (err.message !== 'stop') fail('Lifecycle: threw: ' + err.message);
+  if (process.env.BROWSY_DEBUG) console.error(err.stack);
+}
+
+// ---------------------------------------------------------------------------
+// 11. test-form workflow scaffold check
+// ---------------------------------------------------------------------------
+section('test-form workflow scaffold');
+
+try {
+  const tfDir = join(REPO_ROOT, 'workflows', 'test-form');
+  const required = ['workflow.json', 'field-map.local.json', 'manifest.example.json', 'safety-policy.json', 'run.mjs'];
+  for (const f of required) {
+    if (!fs.existsSync(join(tfDir, f))) fail('test-form: missing ' + f);
+    else pass('test-form: ' + f + ' exists');
+  }
+
+  const wf = JSON.parse(fs.readFileSync(join(tfDir, 'workflow.json'), 'utf8'));
+  if (!wf.targets?.start_url?.includes('httpbin')) warn('test-form: start_url does not point at httpbin');
+  else pass('test-form: start_url points at httpbin form');
+
+  const fm = JSON.parse(fs.readFileSync(join(tfDir, 'field-map.local.json'), 'utf8'));
+  const blocked = Object.values(fm.fields || {}).filter(f => f.safety_category === 'final submission');
+  if (!blocked.length) fail('test-form: no final-submission blocked field in field-map');
+  else pass('test-form: submit field has safety_category=final submission');
+
+  const sp = JSON.parse(fs.readFileSync(join(tfDir, 'safety-policy.json'), 'utf8'));
+  if (!(sp.manual_only_categories || []).includes('final submission'))
+    fail('test-form: safety-policy missing final submission in manual_only_categories');
+  else pass('test-form: safety-policy blocks final submission');
+
+} catch (err) {
+  fail('test-form scaffold check threw: ' + err.message);
+}
+
+// ---------------------------------------------------------------------------
+// 12. Browser tests (opt-in)
 // ---------------------------------------------------------------------------
 
 if (withBrowser) {
@@ -399,6 +635,22 @@ async function runBrowserTests() {
     if (!submitBtn?.isDangerous) fail('Browser: submit button not flagged as dangerous');
     else pass('Browser: submit button correctly flagged as dangerous');
 
+    // New fixture elements: Delete, Export, modal
+    const deleteBtn = candidates.candidates.find(c => c.raw.id === 'btn-delete');
+    if (!deleteBtn) warn('Browser: delete button not found in candidates');
+    else if (!deleteBtn.isDangerous) fail('Browser: delete button not flagged as dangerous');
+    else pass('Browser: delete button correctly flagged as dangerous');
+
+    const exportBtn = candidates.candidates.find(c => c.raw.id === 'btn-export');
+    if (!exportBtn) warn('Browser: export button not found in candidates');
+    else if (exportBtn.isDangerous) fail('Browser: export button should NOT be flagged as dangerous');
+    else pass('Browser: export button correctly not flagged as dangerous');
+
+    const modalConfirm = candidates.candidates.find(c => c.raw.id === 'modal-confirm');
+    if (!modalConfirm) warn('Browser: modal-confirm button not found in candidates');
+    else if (!modalConfirm.isDangerous) fail('Browser: modal-confirm should be flagged as dangerous');
+    else pass('Browser: modal-confirm button flagged as dangerous');
+
     // Dry-run fill
     const fieldMap = JSON.parse(fs.readFileSync(fieldMapPath, 'utf8'));
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
@@ -455,33 +707,54 @@ async function runBrowserTests() {
 
     // Verify dangerous fields were skipped
     const skippedNames = skipped.map(s => s.field);
-    const dangerFields = ['paid_mastering', 'legal_certification'];
+    const dangerFields = ['paid_mastering', 'legal_certification', 'delete_button', 'modal_confirm_button'];
     for (const name of dangerFields) {
       if (!skippedNames.includes(name)) fail('Browser dry-run: dangerous field not skipped: ' + name);
       else pass('Browser dry-run: skipped dangerous field: ' + name);
     }
 
-    // Verify submit was never clicked
-    const submitClicked = await page.evaluate(() => {
-      return (window._browsy?.events || []).some(e => e.type === 'click' && e.id === 'btn-submit');
+    // Verify submit and delete were never clicked
+    const dangerClicks = await page.evaluate(() => {
+      return (window._browsy?.events || []).filter(e =>
+        e.type === 'click' && ['btn-submit', 'btn-delete', 'modal-confirm'].includes(e.id)
+      );
     });
-    if (submitClicked) fail('Browser: SUBMIT WAS CLICKED — safety failure');
-    else pass('Browser: Submit was never clicked');
+    if (dangerClicks.length) fail('Browser: DANGEROUS BUTTON CLICKED — ' + JSON.stringify(dangerClicks));
+    else pass('Browser: no dangerous buttons clicked (Submit, Delete, modal-confirm)');
 
     // Save screenshot
     await saveScreenshot(page, runDir, 'screenshot-after-fill.png');
     pass('Browser: screenshot saved');
 
-    // Write artifacts
-    finalizeRun(runDir, { logger, filled, skipped, errors });
+    // Write artifacts — includes run-review.md
+    finalizeRun(runDir, { logger, filled, skipped, errors, workflowId: 'local-form-demo-smoke', dryRun: true });
 
-    // Verify artifacts exist
-    const artifactFiles = ['run-log.json', 'filled-fields.json', 'skipped-fields.json', 'errors.json'];
+    // Verify all expected artifacts exist
+    const artifactFiles = ['run-log.json', 'filled-fields.json', 'skipped-fields.json', 'errors.json', 'run-review.md'];
     for (const f of artifactFiles) {
-      const path = join(runDir, f);
-      if (!fs.existsSync(path)) fail('Browser artifacts: missing ' + f);
+      const p = join(runDir, f);
+      if (!fs.existsSync(p)) fail('Browser artifacts: missing ' + f);
       else pass('Browser artifacts: ' + f + ' written');
     }
+
+    // Verify run-review.md content
+    const reviewMd = fs.readFileSync(join(runDir, 'run-review.md'), 'utf8');
+    if (!reviewMd.includes('Run Review')) fail('Browser: run-review.md missing header');
+    else pass('Browser: run-review.md has expected header');
+    if (!reviewMd.includes('Artifacts')) fail('Browser: run-review.md missing Artifacts section');
+    else pass('Browser: run-review.md Artifacts section present');
+    if (!reviewMd.includes('output/runs')) fail('Browser: run-review.md does not print artifact path');
+    else pass('Browser: run-review.md prints artifact path');
+
+    // Verify discovered-fields.json exists (written earlier in this test)
+    if (!fs.existsSync(join(runDir, 'discovered-fields.json'))) fail('Browser: discovered-fields.json missing');
+    else pass('Browser: discovered-fields.json present');
+
+    // Verify skipped-fields.json has blocked buttons logged
+    const skippedJson = JSON.parse(fs.readFileSync(join(runDir, 'skipped-fields.json'), 'utf8'));
+    const blockedInSkipped = skippedJson.filter(s => s.reason?.includes('manual-only') || s.reason?.includes('dangerous'));
+    if (!blockedInSkipped.length) fail('Browser: skipped-fields.json has no blocked-button entries');
+    else pass('Browser: skipped-fields.json has ' + blockedInSkipped.length + ' blocked-button entry/entries');
 
     // Verify filled-fields has content
     const filledJson = JSON.parse(fs.readFileSync(join(runDir, 'filled-fields.json'), 'utf8'));

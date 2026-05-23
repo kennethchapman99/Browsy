@@ -66,6 +66,33 @@
       "safety_category": "legal certification",
       "redact": false,
       "_note": "Must stay manual — legal attestation"
+    },
+    "export_button": {
+      "selector": "[data-testid='export-button']",
+      "type": "button",
+      "source": null,
+      "required": false,
+      "safety_category": null,
+      "redact": false,
+      "_note": "Safe — may be clicked by automation"
+    },
+    "delete_button": {
+      "selector": "[data-testid='delete-button']",
+      "type": "button",
+      "source": null,
+      "required": false,
+      "safety_category": "destructive action",
+      "redact": false,
+      "_note": "Must stay manual — permanently removes data"
+    },
+    "modal_confirm_button": {
+      "selector": "[data-testid='modal-confirm-button']",
+      "type": "button",
+      "source": null,
+      "required": false,
+      "safety_category": "destructive action",
+      "redact": false,
+      "_note": "Must stay manual — modal confirmation of destructive action"
     }
   }
 }

@@ -6,16 +6,13 @@
 
 ## 2. Goal
 
-Download partner pipeline reports from salesforce
+submit
 
 ## 3. Target websites / pages
 
 | Purpose | URL | Requires login? | Notes |
 | --- | --- | --- | --- |
-| Start page | https://d2l.okta.com/app/UserHome | yes | |
-| Salesforce dashboard | https://d2l.lightning.force.com/lightning/r/Dashboard/01ZMm000002BjOrMAK/view | no | |
-| Channel Pipereport | https://d2l.lightning.force.com/lightning/r/Report/00OMm0000082spKMAQ/view | no | |
-| Email | https://outlook.cloud.microsoft/mail/inbox/id/AAQkADg2MDE3MzY3LWUyOTctNDJlZC05ODE2LTkxNGM0YmU5ZWZmZAAQAJ8jGDXZfWBGsM1FalijLuk%3D | no | |
+| Start page |  | yes | |
 
 ## 4. Existing APIs or local systems
 
@@ -43,7 +40,7 @@ Download partner pipeline reports from salesforce
 
 | Field / action | Source in input | Website field/page | Rule / why |
 | --- | --- | --- | --- |
-| (Run discovery to identify fields) | | | |
+| id | `id` | unknown until discovery | Unique item identifier |
 
 ## 8. Actions that must stay manual
 
@@ -66,9 +63,6 @@ Download partner pipeline reports from salesforce
 ## 11. Discovery needs
 
 - https://d2l.okta.com/app/UserHome
-- https://d2l.lightning.force.com/lightning/r/Dashboard/01ZMm000002BjOrMAK/view
-- https://d2l.lightning.force.com/lightning/r/Report/00OMm0000082spKMAQ/view
-- https://outlook.cloud.microsoft/mail/inbox/id/AAQkADg2MDE3MzY3LWUyOTctNDJlZC05ODE2LTkxNGM0YmU5ZWZmZAAQAJ8jGDXZfWBGsM1FalijLuk%3D
 
 The generated harness should produce:
 
@@ -117,7 +111,6 @@ Every run should save:
 - screenshot-final-review.png if reached
 - page-text-snapshot.txt
 - html-snapshot.html
-**Completion action:** Send email via outlook
 
 ## 14. Test commands expected
 

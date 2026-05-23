@@ -18,14 +18,24 @@
     .checkbox-group label { font-weight: normal; }
     .dangerous { border: 2px solid #e55; padding: 1em; border-radius: 6px; background: #fff5f5; }
     .dangerous legend { color: #c00; font-weight: bold; font-size: .9em; }
-    .btn-row { margin-top: 2em; display: flex; gap: 1em; }
+    .btn-row { margin-top: 2em; display: flex; gap: 1em; flex-wrap: wrap; }
     button { padding: .6em 1.6em; border-radius: 4px; font-size: 1em; cursor: pointer; border: none; }
-    #btn-next { background: #2c7; color: white; }
+    #btn-next   { background: #2c7; color: white; }
+    #btn-export { background: #26a; color: white; }
     #btn-submit { background: #c33; color: white; }
+    #btn-delete { background: #c33; color: white; }
     .note { font-size: .82em; color: #888; margin-top: .3em; }
     #status-banner { margin: 1em 0; padding: .7em 1em; border-radius: 4px; display: none; }
-    .status-filled { background: #d4edda; color: #155724; }
+    .status-filled  { background: #d4edda; color: #155724; }
     .status-skipped { background: #fff3cd; color: #856404; }
+    /* Modal overlay */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100; align-items: center; justify-content: center; }
+    .modal-overlay.visible { display: flex; }
+    .modal-box { background: #fff; border-radius: 8px; padding: 2em; max-width: 380px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,.25); }
+    .modal-box h2 { margin-top: 0; color: #c33; }
+    .modal-actions { display: flex; gap: 1em; margin-top: 1.4em; }
+    .btn-modal-confirm { background: #c33; color: white; flex: 1; }
+    .btn-modal-cancel  { background: #eee; color: #333; flex: 1; }
   </style>
 </head>
 <body>
@@ -135,13 +145,28 @@
     </fieldset>
 
     <!-- Safe navigation button — may be clicked -->
+    <!-- DANGEROUS: submit and delete — must never be clicked by automation -->
+    <!-- SAFE: export — automation may click this -->
     <div class="btn-row">
-      <button type="button" id="btn-next" data-testid="next-button">Next →</button>
-      <!-- DANGEROUS: submit button — must never be clicked by automation -->
+      <button type="button" id="btn-next"   data-testid="next-button">Next →</button>
+      <button type="button" id="btn-export" data-testid="export-button">Export Data</button>
       <button type="submit" id="btn-submit" data-testid="submit-button">Submit Release</button>
+      <button type="button" id="btn-delete" data-testid="delete-button">Delete Release</button>
     </div>
 
   </form>
+
+  <!-- Modal-like confirmation overlay (triggered by Delete) -->
+  <div id="modal-overlay" class="modal-overlay" data-testid="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-box">
+      <h2 id="modal-title">Confirm Deletion</h2>
+      <p>This action <strong>cannot be undone</strong>. The release and all associated data will be permanently removed.</p>
+      <div class="modal-actions">
+        <button type="button" id="modal-confirm" class="btn-modal-confirm" data-testid="modal-confirm-button">Confirm Delete</button>
+        <button type="button" id="modal-cancel"  class="btn-modal-cancel"  data-testid="modal-cancel-button">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     // Track which fields were interacted with for test assertions.
@@ -165,6 +190,14 @@
       banner.style.display = 'block';
     });
 
+    document.getElementById('btn-export').addEventListener('click', () => {
+      window._browsy.events.push({ type: 'click', id: 'btn-export', label: 'Export Data' });
+      const banner = document.getElementById('status-banner');
+      banner.textContent = 'Export clicked — safe action. In a real form, this would download a CSV.';
+      banner.className = 'status-filled';
+      banner.style.display = 'block';
+    });
+
     document.getElementById('btn-submit').addEventListener('click', (e) => {
       e.preventDefault();
       window._browsy.events.push({ type: 'click', id: 'btn-submit', label: 'Submit Release' });
@@ -172,6 +205,25 @@
       banner.textContent = 'SUBMIT was clicked! This should never happen in automation.';
       banner.className = 'status-skipped';
       banner.style.display = 'block';
+    });
+
+    document.getElementById('btn-delete').addEventListener('click', () => {
+      window._browsy.events.push({ type: 'click', id: 'btn-delete', label: 'Delete Release' });
+      document.getElementById('modal-overlay').classList.add('visible');
+    });
+
+    document.getElementById('modal-confirm').addEventListener('click', () => {
+      window._browsy.events.push({ type: 'click', id: 'modal-confirm', label: 'Confirm Delete' });
+      document.getElementById('modal-overlay').classList.remove('visible');
+      const banner = document.getElementById('status-banner');
+      banner.textContent = 'DELETE CONFIRMED — This should never happen in automation.';
+      banner.className = 'status-skipped';
+      banner.style.display = 'block';
+    });
+
+    document.getElementById('modal-cancel').addEventListener('click', () => {
+      window._browsy.events.push({ type: 'click', id: 'modal-cancel', label: 'Cancel' });
+      document.getElementById('modal-overlay').classList.remove('visible');
     });
   </script>
 </body>

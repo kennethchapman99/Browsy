@@ -1,0 +1,36 @@
+{
+  "id": "test-form",
+  "description": "Discover fields and dry-run on httpbin echo form without submitting.",
+  "auth": {
+    "mode": "none",
+    "storage_state": ".auth/test-form.json"
+  },
+  "runtime": {
+    "dry_run_default": true,
+    "headed_default": true,
+    "pause_at_end_default": false
+  },
+  "targets": {
+    "start_url": "https://httpbin.org/forms/post",
+    "urls": [
+      {
+        "purpose": "form under test",
+        "url": "https://httpbin.org/forms/post"
+      }
+    ]
+  },
+  "discovery_urls": [
+    "https://httpbin.org/forms/post"
+  ],
+  "local_fallback_url": "file://fixtures/local-form/index.html",
+  "execution_strategy": "playwright",
+  "artifacts": {
+    "screenshots": true,
+    "html_snapshot": true,
+    "page_text_snapshot": true,
+    "discovered_fields": true
+  },
+  "promoted": true,
+  "promoted_at": "2026-05-23T00:26:02.078Z",
+  "last_good_run": "unknown"
+}

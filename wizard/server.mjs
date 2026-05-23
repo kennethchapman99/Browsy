@@ -4,12 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { validateExecArgs } from './arg-validator.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
 const PORT = 3333;
 
-// Whitelisted commands — only these can be executed via /api/exec.
+// Whitelisted commands — arg-level validation is enforced by validateExecArgs().
 const ALLOWED_COMMANDS = new Set([
   'validate-request',
   'plan',
@@ -44,9 +45,25 @@ function getWorkflowState(workflowId) {
   const has = f => fs.existsSync(f);
 
   const scaffolded = has(path.join(wfDir, 'workflow.json'));
-  const authed = has(authFile);
-  const discovered = has(path.join(wfDir, 'field-map.local.json'));
+  // validate: plan command writes output/plans/<id>/build-plan.md; fall back to scaffold
+  const validated = has(path.join(REPO_ROOT, 'output', 'plans', workflowId, 'build-plan.md'));
 
+  // request: check AUTOMATION_REQUEST.md contains this workflow's ID, not just any request.
+  const reqFile = path.join(REPO_ROOT, 'AUTOMATION_REQUEST.md');
+  let requestDone = false;
+  if (has(reqFile)) {
+    try {
+      const reqText = fs.readFileSync(reqFile, 'utf8');
+      requestDone = reqText.includes(`\`${workflowId}\``) || reqText.includes(`"${workflowId}"`);
+    } catch { requestDone = false; }
+  }
+  // If the workflow is scaffolded, its request was already processed.
+  if (scaffolded) requestDone = true;
+  const authed = has(authFile);
+
+  // discover: check for discovered-fields.json in any run (written by `discover`)
+  // NOT field-map.local.json, which is created manually after discovery.
+  let hasDiscovery = false;
   let latestRun = null;
   let hasReview = false;
   let hasErrors = false;
@@ -66,6 +83,8 @@ function getWorkflowState(workflowId) {
         } catch { hasErrors = false; }
       }
     }
+    // Any run that contains discovered-fields.json counts as a completed discovery.
+    hasDiscovery = runs.some(r => has(path.join(runsDir, r, 'discovered-fields.json')));
   }
 
   const feedbackDir = path.join(wfDir, 'feedback');
@@ -75,11 +94,11 @@ function getWorkflowState(workflowId) {
   return {
     workflowId,
     stages: {
-      request: { done: has(path.join(REPO_ROOT, 'AUTOMATION_REQUEST.md')) },
-      validate: { done: scaffolded },
+      request: { done: requestDone },
+      validate: { done: validated || scaffolded },
       scaffold: { done: scaffolded },
       auth: { done: authed },
-      discover: { done: discovered },
+      discover: { done: hasDiscovery },
       'dry-run': { done: latestRun !== null, error: hasErrors, runId: latestRun },
       review: { done: hasReview, runId: latestRun },
       feedback: { done: hasFeedback },
@@ -234,10 +253,19 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // Validate args — only strings, no shell injection
+    // Validate args: must be an array of strings before deeper validation.
     if (!Array.isArray(args) || args.some(a => typeof a !== 'string')) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'args must be array of strings' }));
+      res.end(JSON.stringify({ error: 'args must be an array of strings' }));
+      return;
+    }
+
+    // Per-command allowlist + value sanitization (blocks path traversal, unknown flags,
+    // bad workflow IDs, file:// URLs, allow-final-action, etc.)
+    const argCheck = validateExecArgs(command, args);
+    if (!argCheck.ok) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: `invalid args: ${argCheck.reason}` }));
       return;
     }
 
@@ -280,7 +308,83 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // GET /api/artifact-list?workflow=<id> — enumerate artifacts for a workflow
+  if (req.method === 'GET' && url.pathname === '/api/artifact-list') {
+    const workflowId = url.searchParams.get('workflow');
+    if (!workflowId || !/^[a-z0-9][a-z0-9\-_]{0,63}$/.test(workflowId)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'valid workflow id required' }));
+      return;
+    }
+
+    const wfDir   = path.join(REPO_ROOT, 'workflows', workflowId);
+    const runsDir = path.join(REPO_ROOT, 'output', 'runs', workflowId);
+    const has = f => fs.existsSync(f);
+
+    // Workflow-level files
+    const wfFiles = ['workflow.json','field-map.local.json','safety-policy.json','walkthrough.md','README.md','PROMOTED'];
+    const wfArtifacts = wfFiles.map(f => ({
+      file: f, scope: 'workflow',
+      path: `workflows/${workflowId}/${f}`,
+      exists: has(path.join(wfDir, f)),
+    }));
+
+    // Feedback files
+    const feedbackDir = path.join(wfDir, 'feedback');
+    const feedbackFiles = has(feedbackDir)
+      ? fs.readdirSync(feedbackDir).map(f => ({
+          file: f, scope: 'feedback',
+          path: `workflows/${workflowId}/feedback/${f}`,
+          exists: true,
+        }))
+      : [];
+
+    // Latest run files
+    let latestRun = null;
+    let runArtifacts = [];
+    if (has(runsDir)) {
+      const runs = fs.readdirSync(runsDir)
+        .filter(d => fs.statSync(path.join(runsDir, d)).isDirectory())
+        .sort().reverse();
+      if (runs.length) {
+        latestRun = runs[0];
+        const runDir = path.join(runsDir, latestRun);
+        const runFiles = [
+          'run-review.md','run-log.json','filled-fields.json','skipped-fields.json',
+          'errors.json','discovered-fields.json','discovered-fields.md',
+          'field-map.candidates.md','page-text-snapshot.txt','html-snapshot.html',
+          'screenshot-start.png','screenshot-after-fill.png','screenshot-discovery.png',
+        ];
+        runArtifacts = runFiles.map(f => ({
+          file: f, scope: 'run', runId: latestRun,
+          path: `output/runs/${workflowId}/${latestRun}/${f}`,
+          exists: has(path.join(runDir, f)),
+        }));
+      }
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      workflowId, latestRun,
+      artifacts: [...wfArtifacts, ...feedbackFiles, ...runArtifacts],
+    }));
+    return;
+  }
+
   res.writeHead(404); res.end('Not found');
+});
+
+server.on('error', err => {
+  if (err.code === 'EADDRINUSE') {
+    console.log('');
+    console.log(`  Port ${PORT} is already in use.`);
+    console.log(`  The wizard may already be running — open: http://localhost:${PORT}`);
+    console.log('  If it is not, kill the process using that port and retry.');
+    console.log('');
+    process.exit(0);
+  }
+  console.error('  Server error:', err.message);
+  process.exit(1);
 });
 
 server.listen(PORT, '127.0.0.1', () => {

@@ -1,0 +1,7 @@
+{
+  "custname": "Browsy Test User",
+  "custtel": "555-0100",
+  "custemail": "test@browsy-fixture.local",
+  "instructions": "This is a dry-run test. No real order will be placed.",
+  "_notes": "Test manifest for test-form workflow. All values are safe fixture data."
+}

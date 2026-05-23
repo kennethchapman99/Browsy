@@ -1,0 +1,24 @@
+# test-form — PROMOTED
+
+Promoted: 2026-05-23T00:26:02.077Z
+Last successful dry-run: unknown
+
+## Auth mode
+
+none
+
+## Manual checkpoints
+
+- (see safety-policy.json)
+
+## Expected inputs
+
+See: workflows/test-form/manifest.schema.json
+
+## Output artifacts
+
+See: output/runs/test-form/<timestamp>/
+
+## Safety policy
+
+See: workflows/test-form/safety-policy.json

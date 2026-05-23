@@ -686,6 +686,83 @@ body {
   .nav-bar { left: 0; padding: 12px 20px 18px; }
   .step-title { font-size: 1.8rem; }
 }
+
+/* ── Lifecycle: extra badge states ── */
+.lifecycle-stage.lc-ready   { border-color: color-mix(in srgb, var(--accent) 38%, transparent); }
+.lifecycle-stage.lc-promoted{ border-color: var(--green); }
+.stage-badge.b-ready    { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.stage-badge.b-promoted { background: color-mix(in srgb, var(--green) 16%, transparent); color: #1a9e55; font-weight: 900; }
+.stage-badge.b-artifacts{ background: color-mix(in srgb, var(--orange) 14%, transparent); color: var(--orange); }
+
+/* ── Run Review card ── */
+.run-review-wrap { margin-top: 14px; }
+.run-review-card { background: var(--card); border: 2px solid var(--green); border-radius: 16px; padding: 20px 22px; }
+.run-review-card.rr-fail    { border-color: var(--coral); }
+.run-review-card.rr-partial { border-color: var(--orange); }
+.rr-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.rr-status-badge { padding: 4px 12px; border-radius: 100px; font-size: .72rem; font-weight: 900; text-transform: uppercase; letter-spacing: .07em; background: color-mix(in srgb, var(--green) 14%, transparent); color: #1a9e55; }
+.rr-status-badge.fail    { background: color-mix(in srgb, var(--coral) 14%, transparent); color: var(--coral); }
+.rr-status-badge.partial { background: color-mix(in srgb, var(--orange) 14%, transparent); color: var(--orange); }
+.rr-run-id { font-family: 'SF Mono','Fira Code',monospace; font-size: .72rem; color: var(--muted); }
+.rr-sections { display: flex; flex-direction: column; gap: 12px; }
+.rr-section-label { font-size: .7rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 4px; }
+.rr-items { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; }
+.rr-items li { font-size: .83rem; line-height: 1.55; padding: 3px 0; border-bottom: 1px solid var(--border); color: var(--dark); }
+.rr-items li:last-child { border-bottom: none; }
+.rr-items li code { background: var(--bg); padding: 1px 4px; border-radius: 4px; font-size: .82em; font-family: 'SF Mono','Fira Code',monospace; }
+.rr-empty { font-size: .83rem; color: var(--muted); font-style: italic; }
+.rr-path-line { font-family: 'SF Mono','Fira Code',monospace; font-size: .72rem; color: var(--muted); margin-top: 12px; padding: 7px 10px; background: var(--bg); border-radius: 8px; word-break: break-all; }
+.rr-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.btn-rr { display: inline-flex; align-items: center; gap: 5px; padding: 8px 16px; border-radius: 10px; border: none; font-size: .82rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+.btn-rr.primary { background: var(--accent); color: white; }
+.btn-rr.secondary { background: var(--bg); color: var(--dark); border: 1.5px solid var(--border); }
+.btn-rr:hover { opacity: .85; }
+
+/* ── Artifact panel ── */
+.artifact-panel { margin-top: 18px; background: var(--card); border: 2px solid var(--border); border-radius: 16px; overflow: hidden; }
+.artifact-panel-head { display: flex; align-items: center; gap: 10px; padding: 13px 18px; cursor: pointer; user-select: none; }
+.artifact-panel-head:hover .artifact-panel-title { color: var(--accent); }
+.artifact-panel-title { flex: 1; font-size: .78rem; font-weight: 900; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 0; }
+.artifact-panel-count { font-size: .75rem; color: var(--muted); }
+.artifact-panel-chevron { color: var(--muted); font-size: .75rem; transition: transform .18s; }
+.artifact-panel-chevron.open { transform: rotate(90deg); }
+.artifact-panel-body { padding: 4px 18px 16px; display: none; }
+.artifact-panel-body.open { display: block; }
+.artifact-group { margin-bottom: 12px; }
+.artifact-group-label { font-size: .68rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 10px 0 6px; }
+.artifact-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.artifact-chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 8px; background: var(--bg); border: 1.5px solid var(--border); cursor: pointer; font-size: .78rem; font-weight: 600; color: var(--dark); transition: border-color .12s; }
+.artifact-chip:hover { border-color: var(--accent); color: var(--accent); }
+.artifact-chip.missing { opacity: .3; cursor: default; pointer-events: none; text-decoration: line-through; }
+
+/* ── Artifact modal ── */
+.artmodal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 300; align-items: flex-start; justify-content: center; padding: 24px 16px; overflow-y: auto; }
+.artmodal.open { display: flex; }
+.artmodal-box { background: var(--card); border-radius: 18px; width: 100%; max-width: 800px; margin: 0 auto; overflow: hidden; box-shadow: 0 16px 64px rgba(0,0,0,.3); }
+.artmodal-head { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1.5px solid var(--border); background: var(--bg); }
+.artmodal-head h2 { flex: 1; font-size: .9rem; font-weight: 800; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.artmodal-subpath { font-family: 'SF Mono','Fira Code',monospace; font-size: .7rem; color: var(--muted); padding: 5px 20px 8px; border-bottom: 1.5px solid var(--border); background: var(--bg); word-break: break-all; }
+.artmodal-body { padding: 20px; max-height: 72vh; overflow-y: auto; }
+.artmodal-body pre { font-family: 'SF Mono','Fira Code',monospace; font-size: .78rem; line-height: 1.65; white-space: pre-wrap; word-break: break-word; margin: 0; color: var(--dark); }
+.artmodal-body img { max-width: 100%; border-radius: 8px; }
+.artmodal-body .md-render { font-size: .88rem; line-height: 1.6; }
+.artmodal-body .md-render h1 { font-size: 1.1rem; margin: 0 0 10px; }
+.artmodal-body .md-render h2 { font-size: .95rem; margin: 16px 0 6px; border-bottom: 1.5px solid var(--border); padding-bottom: 4px; }
+.artmodal-body .md-render h3 { font-size: .85rem; margin: 12px 0 4px; color: var(--muted); }
+.artmodal-body .md-render p  { margin: 5px 0; }
+.artmodal-body .md-render li { margin: 2px 0; }
+.artmodal-body .md-render code { background: var(--bg); padding: 1px 4px; border-radius: 3px; font-family: 'SF Mono','Fira Code',monospace; font-size: .82em; }
+.artmodal-body .md-render strong { color: var(--dark); }
+.artmodal-body .md-render hr { border: none; border-top: 1.5px solid var(--border); margin: 12px 0; }
+.btn-artclose { background: none; border: none; font-size: 1.25rem; cursor: pointer; color: var(--muted); padding: 5px 9px; border-radius: 8px; line-height: 1; }
+.btn-artclose:hover { color: var(--dark); background: var(--border); }
+
+/* ── Feedback input in stage ── */
+.stage-fb-area { margin-top: 10px; }
+.stage-fb-area textarea { width: 100%; min-height: 88px; padding: 10px 12px; border: 2px solid var(--border); border-radius: 10px; font-family: inherit; font-size: .87rem; resize: vertical; background: var(--bg); color: var(--dark); transition: border-color .2s; }
+.stage-fb-area textarea:focus { outline: none; border-color: var(--accent); }
+.stage-fb-hint { font-size: .76rem; color: var(--muted); margin-bottom: 6px; line-height: 1.5; }
+.stage-fb-result { font-size: .8rem; font-weight: 700; color: var(--green); padding: 5px 0; display: none; }
 </style>
 </head>
 <body>
@@ -845,6 +922,31 @@ body {
         Stages run in order; each one writes real files you can inspect.
       </div>
       <div class="lifecycle-panel" id="lifecycle-panel"></div>
+
+      <!-- Run review — auto-shown after dry-run / review stage -->
+      <div id="run-review-wrap" class="run-review-wrap" style="display:none"></div>
+
+      <!-- Artifact panel — collapsible, loaded after any stage completes -->
+      <div id="artifact-panel" class="artifact-panel" style="display:none">
+        <div class="artifact-panel-head" onclick="toggleArtifactPanel()">
+          <h3 class="artifact-panel-title">📁 Artifacts</h3>
+          <span class="artifact-panel-count" id="artifact-count"></span>
+          <span class="artifact-panel-chevron" id="artifact-chevron">▶</span>
+        </div>
+        <div class="artifact-panel-body" id="artifact-panel-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Artifact preview modal (outside lifecycle-wrap so it overlays everything) -->
+  <div class="artmodal" id="artmodal" onclick="closeArtmodal(event)">
+    <div class="artmodal-box" onclick="event.stopPropagation()">
+      <div class="artmodal-head">
+        <h2 id="artmodal-title">—</h2>
+        <button class="btn-artclose" onclick="closeArtmodal()">✕</button>
+      </div>
+      <div class="artmodal-subpath" id="artmodal-subpath"></div>
+      <div class="artmodal-body" id="artmodal-body"></div>
     </div>
   </div>
 
@@ -1102,6 +1204,7 @@ const LIFECYCLE_STAGES = [
     label: 'Validate request',
     command: 'validate-request',
     buildArgs: () => [],
+    readyWhen: (st) => st.request?.done,
     note: 'Checks AUTOMATION_REQUEST.md for required sections and field values.',
     artifacts: [],
   },
@@ -1109,8 +1212,9 @@ const LIFECYCLE_STAGES = [
     key: 'scaffold',
     label: 'Scaffold workflow',
     command: 'init',
-    buildArgs: (id) => ['--from-request'],
-    note: 'Creates workflows/<id>/ with workflow.json, field-map, safety policy, run.mjs.',
+    buildArgs: () => ['--from-request'],
+    readyWhen: (st) => st.request?.done,
+    note: 'Creates workflows/&lt;id&gt;/ with workflow.json, field-map, safety policy, run.mjs.',
     artifacts: (id) => [`workflows/${id}/workflow.json`, `workflows/${id}/run.mjs`],
   },
   {
@@ -1118,6 +1222,7 @@ const LIFECYCLE_STAGES = [
     label: 'Save auth (if needed)',
     command: 'auth',
     buildArgs: (id, url) => ['save', '--workflow', id, '--url', url],
+    readyWhen: (st) => st.scaffold?.done,
     note: 'Opens browser for manual login; saves Playwright storage state.',
     artifacts: (id) => [`.auth/${id}.json`],
     optional: true,
@@ -1127,26 +1232,30 @@ const LIFECYCLE_STAGES = [
     label: 'Discover fields',
     command: 'discover',
     buildArgs: (id, url) => ['--workflow', id, '--url', url, '--candidates'],
-    note: 'Navigates to the target page and captures field candidates ranked by selector stability.',
+    readyWhen: (st) => st.scaffold?.done,
+    note: 'Navigates to the target page and captures all visible fields and buttons.',
     artifacts: (id) => [
-      `workflows/${id}/field-map.candidates.md`,
-      `workflows/${id}/discovered-fields.json`,
+      `output/runs/${id}/&lt;timestamp&gt;/discovered-fields.json`,
+      `output/runs/${id}/&lt;timestamp&gt;/discovered-fields.md`,
+      `output/runs/${id}/&lt;timestamp&gt;/field-map.candidates.md`,
     ],
   },
   {
     key: 'dry-run',
     label: 'Dry-run',
     command: 'run',
-    buildArgs: (id) => ['--workflow', id, '--dry-run'],
+    buildArgs: (id) => ['--workflow', id, '--dry-run', '--no-pause'],
+    readyWhen: (st) => st.discover?.done || st.scaffold?.done,
     note: 'Fills safe fields only. Never clicks Submit, Pay, or Confirm. Writes full artifacts.',
-    artifacts: (id) => [`output/runs/${id}/<timestamp>/run-review.md`],
+    artifacts: (id) => [`output/runs/${id}/&lt;timestamp&gt;/run-review.md`],
   },
   {
     key: 'review',
     label: 'Review run',
     command: 'review',
     buildArgs: (id) => ['--workflow', id],
-    note: 'Prints the latest run-review.md — filled fields, skipped, errors, and recommended fix.',
+    readyWhen: (st) => st['dry-run']?.done,
+    note: 'Generates run-review.md — filled fields, skipped safety actions, errors, recommended fix.',
     artifacts: [],
   },
   {
@@ -1154,16 +1263,19 @@ const LIFECYCLE_STAGES = [
     label: 'Submit feedback',
     command: 'feedback',
     buildArgs: (id) => ['--workflow', id],
-    note: 'Saves your notes on what to improve. Provide --notes <file> for a markdown feedback file.',
+    readyWhen: (st) => st['dry-run']?.done,
+    note: 'Type plain-English notes. Saved as feedback files for the next iteration.',
     artifacts: (id) => [`workflows/${id}/feedback/`],
     optional: true,
+    feedbackInput: true,
   },
   {
     key: 'promote',
     label: 'Promote workflow',
     command: 'promote',
     buildArgs: (id) => ['--workflow', id],
-    note: 'Marks the workflow stable. Creates PROMOTED file and updates workflow.json.',
+    readyWhen: (st) => st['dry-run']?.done,
+    note: 'Marks the workflow stable and reusable. Creates PROMOTED file and updates workflow.json.',
     artifacts: (id) => [`workflows/${id}/PROMOTED`],
   },
 ];
@@ -1171,6 +1283,7 @@ const LIFECYCLE_STAGES = [
 let lcState = {};
 let lcOpenStage = null;
 let lcRunning = false;
+let artifactPanelOpen = false;
 
 function showCommands() {
   document.getElementById('lifecycle-wrap').style.display = '';
@@ -1184,41 +1297,74 @@ async function loadLifecycle() {
     if (res.ok) lcState = await res.json();
   } catch (_) { lcState = {}; }
   renderLifecycle();
+  // Auto-load run review if a run exists
+  if (lcState.latestRun) {
+    loadRunReview();
+    loadArtifactPanel();
+  }
+}
+
+// Derive display status for a single stage.
+function stageStatus(stage) {
+  const s = lcState.stages?.[stage.key] || {};
+  if (s.done && stage.key === 'promote') return 'promoted';
+  if (s.done) return 'done';
+  // A completed run with errors counts as "failed-with-artifacts"
+  if (!s.done && s.error) return 'error';
+  if (stage.readyWhen?.(lcState.stages || {})) return 'ready';
+  return 'pending';
+}
+
+function stageBadge(status, stage) {
+  const labels = {
+    promoted: ['b-promoted', '★ Promoted'],
+    done:     ['b-done',     'Done'],
+    error:    ['b-error',    'Error'],
+    ready:    ['b-ready',    'Ready'],
+    pending:  ['b-pending',  stage.optional ? 'Optional' : 'Pending'],
+  };
+  return labels[status] || labels.pending;
 }
 
 function renderLifecycle() {
-  const id = S.workflowName || 'my-workflow';
+  const id  = S.workflowName || 'my-workflow';
   const url = S.startUrl || S.pages[0]?.url || '';
   const panel = document.getElementById('lifecycle-panel');
 
   panel.innerHTML = LIFECYCLE_STAGES.map((stage, idx) => {
-    const stageState = lcState.stages?.[stage.key] || {};
-    const isDone = stageState.done;
-    const isErr  = stageState.error;
-    const badgeCls = isErr ? 'b-error' : isDone ? 'b-done' : 'b-pending';
-    const badgeLabel = isErr ? 'Error' : isDone ? 'Done' : (stage.optional ? 'Optional' : 'Pending');
-    const lcCls = isErr ? 'lc-error' : isDone ? 'lc-done' : '';
-    const isOpen = lcOpenStage === stage.key;
-    const chevCls = isOpen ? 'open' : '';
+    const status    = stageStatus(stage);
+    const isOpen    = lcOpenStage === stage.key;
+    const [bCls, bLabel] = stageBadge(status, stage);
+    const lcCls = status === 'promoted' ? 'lc-promoted'
+                : status === 'done'     ? 'lc-done'
+                : status === 'error'    ? 'lc-error'
+                : status === 'ready'    ? 'lc-ready' : '';
 
-    const args = stage.buildArgs(id, url);
-    const cliCmd = `npm run ${stage.command === 'validate-request' ? 'validate:request'
-      : stage.command === 'init' ? 'init:workflow'
-      : stage.command === 'auth' ? 'auth:save'
-      : stage.command === 'discover' ? 'discover'
-      : stage.command === 'dry-run' ? 'run'
-      : stage.command} -- ${args.join(' ')}`.trim().replace(/-- $/, '');
+    const args   = stage.buildArgs(id, url);
+    const npmCmd = stage.command === 'validate-request' ? 'validate:request'
+                 : stage.command === 'init'   ? 'init:workflow'
+                 : stage.command === 'auth'   ? 'auth:save'
+                 : stage.command;
+    const cliCmd = `npm run ${npmCmd} -- ${args.join(' ')}`.trim().replace(/-- $/, '');
 
-    const artifactList = typeof stage.artifacts === 'function'
-      ? stage.artifacts(id) : stage.artifacts;
+    const artifactList = (typeof stage.artifacts === 'function' ? stage.artifacts(id) : stage.artifacts) || [];
 
-    return `<div class="lifecycle-stage ${lcCls}" id="lc-stage-${stage.key}">
-  <div class="stage-header" onclick="toggleStage('${stage.key}')">
-    <span class="stage-badge ${badgeCls}">${badgeLabel}</span>
-    <span class="stage-name">${idx + 1}. ${stage.label}</span>
-    <span class="stage-chevron ${chevCls}">▶</span>
-  </div>
-  <div class="stage-body ${isOpen ? 'open' : ''}" id="lc-body-${stage.key}">
+    // Feedback stage gets a textarea instead of just a Run button
+    const stageBody = stage.feedbackInput ? `
+    <div class="stage-cmd">${esc(cliCmd)} --message "…"</div>
+    <p style="font-size:.82rem;color:var(--muted);margin:4px 0 8px">${stage.note}</p>
+    <div class="stage-fb-area">
+      <p class="stage-fb-hint">Describe what to change in plain English — selector issues, wrong fields, timing problems, safety policy questions.</p>
+      <textarea id="fb-text-${stage.key}" placeholder="e.g. Click Export first, then Details Only. Submit and Delete should stay blocked. Wait longer after page load."></textarea>
+      <div class="stage-actions" style="margin-top:6px">
+        <button class="btn-run-stage" onclick="runStageFeedback()" ${lcRunning ? 'disabled' : ''}>💬 Save Feedback</button>
+        ${status === 'done' ? `<button class="btn-run-stage" style="background:var(--bg);color:var(--dark);border:1.5px solid var(--border)" onclick="runStage('dry-run')">↺ Dry-run Again</button>` : ''}
+        <span class="stage-note" id="fb-result-${stage.key}"></span>
+      </div>
+    </div>
+    <div class="stage-output" id="lc-out-${stage.key}"></div>
+    ${artifactList.length ? `<div class="stage-artifacts">${artifactList.map(f => `<span style="font-size:.8rem;color:var(--muted)">📄 ${f}</span>`).join('')}</div>` : ''}
+` : `
     <div class="stage-cmd">${esc(cliCmd)}</div>
     <div class="stage-actions">
       <button class="btn-run-stage" onclick="runStage('${stage.key}')" ${lcRunning ? 'disabled' : ''}>▶ Run</button>
@@ -1226,9 +1372,16 @@ function renderLifecycle() {
     </div>
     <p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">${stage.note}</p>
     <div class="stage-output" id="lc-out-${stage.key}"></div>
-    ${artifactList.length ? `<div class="stage-artifacts">${artifactList.map(f =>
-      `<span style="font-size:.8rem;color:var(--muted)">📄 ${esc(f)}</span>`
-    ).join('')}</div>` : ''}
+    ${artifactList.length ? `<div class="stage-artifacts">${artifactList.map(f => `<span style="font-size:.8rem;color:var(--muted)">📄 ${f}</span>`).join('')}</div>` : ''}
+`;
+
+    return `<div class="lifecycle-stage ${lcCls}" id="lc-stage-${stage.key}">
+  <div class="stage-header" onclick="toggleStage('${stage.key}')">
+    <span class="stage-badge ${bCls}">${bLabel}</span>
+    <span class="stage-name">${idx + 1}. ${stage.label}</span>
+    <span class="stage-chevron ${isOpen ? 'open' : ''}">▶</span>
+  </div>
+  <div class="stage-body ${isOpen ? 'open' : ''}" id="lc-body-${stage.key}">${stageBody}
   </div>
 </div>`;
   }).join('');
@@ -1241,7 +1394,7 @@ function toggleStage(key) {
 
 async function runStage(key) {
   if (lcRunning) return;
-  const id = S.workflowName || 'my-workflow';
+  const id  = S.workflowName || 'my-workflow';
   const url = S.startUrl || S.pages[0]?.url || '';
   const stage = LIFECYCLE_STAGES.find(s => s.key === key);
   if (!stage) return;
@@ -1252,11 +1405,11 @@ async function runStage(key) {
 
   const outEl = document.getElementById(`lc-out-${key}`);
   const badge = document.querySelector(`#lc-stage-${key} .stage-badge`);
-  outEl.className = 'stage-output visible';
-  outEl.textContent = '';
+  if (outEl) { outEl.className = 'stage-output visible'; outEl.textContent = ''; }
   if (badge) { badge.className = 'stage-badge b-running'; badge.textContent = 'Running…'; }
 
   const args = stage.buildArgs(id, url);
+  let exitCode = null;
 
   try {
     const res = await fetch('/api/exec', {
@@ -1267,13 +1420,13 @@ async function runStage(key) {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));
-      outEl.textContent = 'Error: ' + (err.error || res.statusText);
+      if (outEl) outEl.textContent = 'Error: ' + (err.error || res.statusText);
       lcRunning = false;
       await loadLifecycle();
       return;
     }
 
-    const reader = res.body.getReader();
+    const reader  = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = '';
 
@@ -1284,28 +1437,273 @@ async function runStage(key) {
       const parts = buf.split('\n\n');
       buf = parts.pop();
       for (const part of parts) {
-        const eventLine = part.match(/^event: (.+)/m);
-        const dataLine  = part.match(/^data: (.+)/m);
+        const evLine   = part.match(/^event: (.+)/m);
+        const dataLine = part.match(/^data: (.+)/m);
         if (!dataLine) continue;
         let payload;
         try { payload = JSON.parse(dataLine[1]); } catch { continue; }
-        const ev = eventLine?.[1] || 'stdout';
-        if (ev === 'stdout') {
-          outEl.textContent += payload.line + '\n';
-        } else if (ev === 'stderr') {
-          outEl.textContent += payload.line + '\n';
-        } else if (ev === 'done') {
-          outEl.textContent += `\n[exit ${payload.code}]`;
+        const ev = evLine?.[1] || 'stdout';
+        if (outEl) {
+          if (ev === 'stdout' || ev === 'stderr') {
+            const span = document.createElement('span');
+            span.className = ev === 'stderr' ? 'out-err' : '';
+            span.textContent = payload.line + '\n';
+            outEl.appendChild(span);
+          } else if (ev === 'done') {
+            exitCode = payload.code;
+            const span = document.createElement('span');
+            span.style.opacity = '.5';
+            span.textContent = `\n[exit ${payload.code}]`;
+            outEl.appendChild(span);
+          }
+          outEl.scrollTop = outEl.scrollHeight;
         }
-        outEl.scrollTop = outEl.scrollHeight;
       }
     }
   } catch (e) {
-    outEl.textContent = 'Network error: ' + e.message;
+    if (outEl) outEl.textContent = 'Network error: ' + e.message;
   }
 
   lcRunning = false;
   await loadLifecycle();
+
+  // Post-run: show run review and refresh artifacts for relevant stages
+  if (key === 'dry-run' || key === 'review') {
+    await loadRunReview();
+    lcOpenStage = key; // keep stage open to see output
+    renderLifecycle();
+  }
+  if (exitCode === 0 || lcState.latestRun) {
+    loadArtifactPanel();
+  }
+}
+
+async function runStageFeedback() {
+  const key  = 'feedback';
+  const id   = S.workflowName || 'my-workflow';
+  const ta   = document.getElementById(`fb-text-${key}`);
+  const result = document.getElementById(`fb-result-${key}`);
+  const msg  = ta?.value?.trim() || '';
+  if (!msg) {
+    if (result) { result.style.color = 'var(--coral)'; result.style.display = ''; result.textContent = '⚠ Enter feedback text first.'; }
+    return;
+  }
+  const stage = LIFECYCLE_STAGES.find(s => s.key === key);
+  const baseArgs = stage.buildArgs(id, '');
+  await runStageWithArgs(key, stage.command, [...baseArgs, '--message', msg]);
+  if (result) { result.style.color = 'var(--green)'; result.style.display = ''; result.textContent = '✓ Feedback saved.'; }
+  if (ta) ta.value = '';
+}
+
+async function runStageWithArgs(key, command, args) {
+  if (lcRunning) return;
+  lcRunning = true;
+  lcOpenStage = key;
+  renderLifecycle();
+  const outEl = document.getElementById(`lc-out-${key}`);
+  if (outEl) { outEl.className = 'stage-output visible'; outEl.textContent = ''; }
+  try {
+    const res = await fetch('/api/exec', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command, args }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      if (outEl) outEl.textContent = 'Error: ' + (err.error || res.statusText);
+      lcRunning = false; await loadLifecycle(); return;
+    }
+    const reader = res.body.getReader(); const decoder = new TextDecoder(); let buf = '';
+    while (true) {
+      const { done, value } = await reader.read(); if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split('\n\n'); buf = parts.pop();
+      for (const part of parts) {
+        const dataLine = part.match(/^data: (.+)/m); if (!dataLine) continue;
+        let payload; try { payload = JSON.parse(dataLine[1]); } catch { continue; }
+        const ev = (part.match(/^event: (.+)/m) || [])[1] || 'stdout';
+        if (outEl && (ev === 'stdout' || ev === 'stderr')) { outEl.textContent += payload.line + '\n'; outEl.scrollTop = outEl.scrollHeight; }
+      }
+    }
+  } catch(e) { if (outEl) outEl.textContent = 'Network error: ' + e.message; }
+  lcRunning = false;
+  await loadLifecycle();
+  loadArtifactPanel();
+}
+
+// ── Run Review inline card ──────────────────────────────────────────────────
+
+async function loadRunReview() {
+  const id   = S.workflowName || 'my-workflow';
+  const wrap = document.getElementById('run-review-wrap');
+  if (!wrap) return;
+  try {
+    const res = await fetch(`/api/artifact?workflow=${encodeURIComponent(id)}&file=run-review.md`);
+    if (!res.ok) { wrap.style.display = 'none'; return; }
+    const text = await res.text();
+    wrap.style.display = '';
+    wrap.innerHTML = buildRunReviewCard(text, lcState.latestRun);
+  } catch { wrap.style.display = 'none'; }
+}
+
+function buildRunReviewCard(text, runId) {
+  const statusLine  = (text.match(/\*\*Status:\*\*\s*(.+)/) || [])[1]?.trim() || '';
+  const isDryRun    = /yes/.test((text.match(/\*\*Dry-run:\*\*\s*(.+)/) || [])[1] || '');
+  const isFail      = /FAILED/.test(statusLine);
+  const isPartial   = /PARTIAL/.test(statusLine);
+  const cardCls     = isFail ? 'rr-fail' : isPartial ? 'rr-partial' : '';
+  const badgeCls    = isFail ? 'fail' : isPartial ? 'partial' : '';
+
+  function extractSection(h2) {
+    const re = new RegExp(`## ${h2}\\s*([\\s\\S]*?)(?=\\n## |$)`);
+    return (text.match(re) || [])[1]?.trim() || '';
+  }
+
+  function listItems(raw) {
+    if (!raw || raw === '_None_') return `<span class="rr-empty">None</span>`;
+    const lines = raw.split('\n').filter(l => l.trim().startsWith('-'));
+    if (!lines.length) return `<span class="rr-empty">None</span>`;
+    return `<ul class="rr-items">${lines.map(l => `<li>${esc(l.replace(/^-\s*/,''))}</li>`).join('')}</ul>`;
+  }
+
+  const worked   = extractSection('What worked');
+  const skipped  = extractSection('What was skipped for safety');
+  const errors   = extractSection('Errors');
+  const recs     = extractSection('Recommended next fix');
+  const artMatch = text.match(/Artifacts saved to: `([^`]+)`/);
+  const artPath  = artMatch ? artMatch[1] : '';
+
+  return `<div class="run-review-card ${cardCls}">
+  <div class="rr-header">
+    <span class="rr-status-badge ${badgeCls}">${esc(statusLine || 'Run complete')}</span>
+    ${isDryRun ? '<span style="font-size:.72rem;color:var(--muted);font-weight:700">DRY-RUN</span>' : ''}
+    ${runId ? `<span class="rr-run-id">${esc(runId)}</span>` : ''}
+  </div>
+  <div class="rr-sections">
+    <div><div class="rr-section-label">✓ What worked</div>${listItems(worked)}</div>
+    <div><div class="rr-section-label">⚡ Skipped for safety</div>${listItems(skipped)}</div>
+    ${errors && errors !== '_None_' ? `<div><div class="rr-section-label" style="color:var(--coral)">✗ Errors</div>${listItems(errors)}</div>` : ''}
+    ${recs ? `<div><div class="rr-section-label">→ Recommended next fix</div><div style="font-size:.83rem;line-height:1.55">${esc(recs).replace(/\n/g,'<br>')}</div></div>` : ''}
+  </div>
+  ${artPath ? `<div class="rr-path-line">📁 ${esc(artPath)}</div>` : ''}
+  <div class="rr-actions">
+    <button class="btn-rr primary" onclick="openArtmodal('run-review.md','run-review.md')">📄 Full review</button>
+    <button class="btn-rr secondary" onclick="runStage('feedback');toggleStage('feedback')">💬 Add feedback</button>
+    <button class="btn-rr secondary" onclick="runStage('dry-run')">↺ Dry-run again</button>
+  </div>
+</div>`;
+}
+
+// ── Artifact panel ──────────────────────────────────────────────────────────
+
+function toggleArtifactPanel() {
+  artifactPanelOpen = !artifactPanelOpen;
+  const body    = document.getElementById('artifact-panel-body');
+  const chevron = document.getElementById('artifact-chevron');
+  if (body)    body.className    = 'artifact-panel-body' + (artifactPanelOpen ? ' open' : '');
+  if (chevron) chevron.className = 'artifact-panel-chevron' + (artifactPanelOpen ? ' open' : '');
+}
+
+async function loadArtifactPanel() {
+  const id    = S.workflowName || 'my-workflow';
+  const panel = document.getElementById('artifact-panel');
+  const body  = document.getElementById('artifact-panel-body');
+  const count = document.getElementById('artifact-count');
+  if (!panel || !body) return;
+  try {
+    const res = await fetch(`/api/artifact-list?workflow=${encodeURIComponent(id)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const existing = data.artifacts.filter(a => a.exists);
+    if (count) count.textContent = `${existing.length} file${existing.length !== 1 ? 's' : ''}`;
+    panel.style.display = '';
+
+    const byScope = {};
+    for (const a of data.artifacts) {
+      (byScope[a.scope] = byScope[a.scope] || []).push(a);
+    }
+
+    const scopeLabels = { workflow: 'Workflow files', run: `Latest run · ${data.latestRun || '—'}`, feedback: 'Feedback' };
+    const iconFor = (f) => f.endsWith('.md') ? '📄' : f.endsWith('.json') ? '{}' : f.endsWith('.png') ? '🖼' : f.endsWith('.html') ? '🌐' : f.endsWith('.txt') ? '📝' : '📁';
+
+    body.innerHTML = Object.entries(byScope).map(([scope, items]) => {
+      if (!items.some(i => i.exists)) return '';
+      const chips = items.map(a => {
+        const icon = iconFor(a.file);
+        const clickable = ['.md','.json','.txt','.html','.png'].some(e => a.file.endsWith(e));
+        const onclick = clickable && a.exists ? `onclick="openArtmodal('${esc(a.file)}','${esc(a.path)}',${a.runId ? `'${esc(a.runId)}'` : 'undefined'})"` : '';
+        return `<span class="artifact-chip ${a.exists ? '' : 'missing'}" ${onclick} title="${esc(a.path)}">${icon} ${esc(a.file)}</span>`;
+      }).join('');
+      return `<div class="artifact-group"><div class="artifact-group-label">${esc(scopeLabels[scope] || scope)}</div><div class="artifact-chips">${chips}</div></div>`;
+    }).join('');
+
+    if (artifactPanelOpen) {
+      const b = document.getElementById('artifact-panel-body');
+      const c = document.getElementById('artifact-chevron');
+      if (b) b.className = 'artifact-panel-body open';
+      if (c) c.className = 'artifact-panel-chevron open';
+    }
+  } catch { /* non-fatal */ }
+}
+
+// ── Artifact modal ──────────────────────────────────────────────────────────
+
+async function openArtmodal(file, pathLabel, runId) {
+  const id      = S.workflowName || 'my-workflow';
+  const modal   = document.getElementById('artmodal');
+  const title   = document.getElementById('artmodal-title');
+  const subpath = document.getElementById('artmodal-subpath');
+  const body    = document.getElementById('artmodal-body');
+  if (!modal) return;
+  title.textContent   = file;
+  subpath.textContent = pathLabel || file;
+  body.innerHTML      = '<p style="color:var(--muted);font-size:.85rem">Loading…</p>';
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  try {
+    const params = new URLSearchParams({ workflow: id, file });
+    if (runId) params.set('run', runId);
+    const res = await fetch('/api/artifact?' + params);
+    if (!res.ok) { body.innerHTML = `<p style="color:var(--coral)">Not found: ${esc(file)}</p>`; return; }
+
+    if (file.endsWith('.png')) {
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      body.innerHTML = `<img src="${url}" alt="${esc(file)}">`;
+    } else {
+      const text = await res.text();
+      if (file.endsWith('.md')) {
+        body.innerHTML = `<div class="md-render">${simpleMd(text)}</div>`;
+      } else {
+        body.innerHTML = `<pre>${esc(text.slice(0, 40000))}</pre>`;
+      }
+    }
+  } catch(e) {
+    body.innerHTML = `<p style="color:var(--coral)">Error: ${esc(e.message)}</p>`;
+  }
+}
+
+function closeArtmodal(e) {
+  if (e && e.target !== document.getElementById('artmodal')) return;
+  document.getElementById('artmodal')?.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// Very small Markdown → HTML renderer (covers what run-review.md uses).
+function simpleMd(text) {
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^---+$/gm, '<hr>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm,  '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm,   '<h1>$1</h1>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>')
+    .replace(/\n{2,}/g, '</p><p>')
+    .replace(/^(.+)$/gm, (m) => /^<[hul]/.test(m) ? m : m)
+    .replace(/\n/g, '<br>');
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
