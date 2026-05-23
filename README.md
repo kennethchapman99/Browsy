@@ -1,36 +1,60 @@
 # Browsy
 
-Browser automation harness factory.
+**Browser automation harness factory.** v0.2
 
-Browsy is designed so a coding agent can read **one filled-in request file** and produce a completed, safe, inspectable automation harness using the best available mix of:
+> Read AGENTS.md first. Then read AUTOMATION_REQUEST.md. Build the completed automation harness described there under `workflows/<workflow-id>/`. Use APIs where available, Playwright where deterministic, and adapter-based browser control only where needed. Preserve safety gates. Run `npm run smoke` before final response.
 
-- APIs
-- Playwright
-- OpenClaw-style browser control
-- saved browser sessions
-- human checkpoints
+---
 
-The goal is not to create a magical autonomous browser agent. The goal is to generate boring, reviewable automation that can be tested, logged, and stopped before risky actions.
+## What Browsy is
 
-## Core workflow
+Browsy lets you fill in one request file, then a coding agent (or you) can generate a safe, inspectable automation harness for a repeatable web workflow.
 
-1. Fill in `automation.request.md`.
-2. Point a coding agent at this repo.
-3. Tell it: `Read AGENTS.md and build the automation described in automation.request.md.`
-4. The coding agent should output a completed workflow under `workflows/<workflow-id>/`.
-5. You test using dry-run commands before allowing any real-world action.
+The harness uses:
+- **APIs** where a stable interface exists
+- **Playwright** for deterministic browser actions (fill, select, upload, safe navigation)
+- **Adapter placeholders** for AI browser control when Playwright selectors are insufficient
+- **Human checkpoints** for final submit, payment, legal attestation, and destructive actions
 
-## Key files
+Every run produces logs, screenshots, filled/skipped/error artifacts, and pauses before anything dangerous.
 
-| File | Purpose |
-|---|---|
-| `automation.request.md` | The single file you fill in for a new workflow. |
-| `AGENTS.md` | The coding-agent instruction contract. |
-| `docs/agent-build-runbook.md` | Step-by-step agent build process. |
-| `docs/architecture.md` | System design and safety philosophy. |
-| `templates/workflow/` | Reference structure agents should copy from. |
-| `src/core/` | Reusable auth, discovery, runtime, and safety primitives. |
-| `examples/distrokid-upload/` | Reference example based on the Pancake Robot DistroKid case. |
+## What Browsy is NOT
+
+- Not a general-purpose browser agent
+- Not a no-code tool (code is written and reviewed)
+- Not autonomous — dangerous actions always require a human
+- Not a scraper
+- Not a replacement for Playwright codegen (Browsy adds business logic on top)
+
+See [docs/product-positioning.md](docs/product-positioning.md) for a full comparison.
+
+---
+
+## Workflow lifecycle
+
+```
+1. Fill AUTOMATION_REQUEST.md
+        ↓
+2. npm run validate:request       ← check request is complete
+        ↓
+3. npm run plan                   ← generate build-plan.md
+        ↓
+4. npm run init:workflow --from-request   ← scaffold workflow files
+        ↓
+5. npm run auth:save (if login needed)
+        ↓
+6. npm run discover --candidates  ← discover DOM + selector candidates
+        ↓
+7. Create field-map.local.json   ← pick verified selectors
+        ↓
+8. npm run run --dry-run          ← test without real actions
+        ↓
+9. npm run smoke                  ← verify all checks pass
+        ↓
+10. Human reviews + approves final action
+```
+
+---
 
 ## Install
 
@@ -39,52 +63,163 @@ npm install
 npx playwright install chromium
 ```
 
-## Validate the request file
+## Commands
+
+### Validate the request file
 
 ```bash
 npm run validate:request
 ```
 
-## Create a new workflow skeleton
+Checks sections, extracts data, validates safety policy JSON, reports errors with fix hints.
+
+### Generate a build plan
 
 ```bash
+npm run plan
+# or
+npm run plan -- --request AUTOMATION_REQUEST.md
+```
+
+Saves `output/plans/<workflow-id>/build-plan.md` and `build-plan.json`.
+
+### Create a workflow scaffold
+
+```bash
+# Basic scaffold
 npm run init:workflow -- --id my-workflow
+
+# Populated from request file
+npm run init:workflow -- --from-request
 ```
 
-## Discover a page DOM
+`--from-request` reads `AUTOMATION_REQUEST.md` and creates all workflow files populated with real data (goal, URLs, safety policy, auth mode, README, run.mjs).
 
-```bash
-npm run discover -- --workflow my-workflow --url https://example.com/form
-```
-
-## Save auth for a workflow
+### Save / check auth
 
 ```bash
 npm run auth:save -- --workflow my-workflow --url https://example.com/login
-npm run auth:check -- --workflow my-workflow --url https://example.com/form
+npm run auth:check -- --workflow my-workflow --url https://example.com/dashboard
 ```
 
-## Smoke test
+### Discover a page DOM
 
+```bash
+# Basic discovery
+npm run discover -- --workflow my-workflow --url https://example.com/form
+
+# Discovery + field-map candidates
+npm run discover -- --workflow my-workflow --url https://example.com/form --candidates
+```
+
+`--candidates` writes `field-map.candidates.json` and `field-map.candidates.md` with ranked selector suggestions and semantic labels.
+
+### Run a workflow
+
+```bash
+# Dry-run (default, recommended first)
+npm run run -- --workflow my-workflow --manifest workflows/my-workflow/manifest.example.json --dry-run
+
+# Live run (still blocked at final action unless --allow-final-action is passed AND safety policy permits)
+npm run run -- --workflow my-workflow --manifest workflows/my-workflow/manifest.local.json
+```
+
+### Smoke test
+
+```bash
+npm run smoke              # fast, no browser (file checks + logic tests)
+npm run smoke:browser      # includes fixture-based Playwright tests
+```
+
+---
+
+## Safety model
+
+Every generated harness:
+
+- Defaults `dry_run: true`
+- Defaults `headed: true` (browser is visible)
+- Defaults `pause_at_end: true` (waits before closing)
+- Blocks clicks on text matching: Submit, Pay, Purchase, Release, Delete, Finalize, Checkout, Send, and more
+- Blocks `legal certification`, `payment`, `paid extras`, `final submission`, `destructive action` field categories
+- Requires `--allow-final-action` flag AND explicit safety policy approval to proceed past checkpoint
+
+These defaults are enforced in `src/core/safety.mjs` and are testable.
+
+---
+
+## How to create a new automation
+
+1. Copy or edit `AUTOMATION_REQUEST.md` — fill in all sections.
+2. Run `npm run validate:request` — fix any errors.
+3. Run `npm run plan` — read the build plan.
+4. Run `npm run init:workflow -- --from-request` — creates `workflows/<id>/`.
+5. Save auth if needed: `npm run auth:save -- --workflow <id> --url <login-url>`.
+6. Discover the live page: `npm run discover -- --workflow <id> --url <form-url> --candidates`.
+7. Review `output/runs/<id>/.../field-map.candidates.md`.
+8. Create `workflows/<id>/field-map.local.json` from verified selectors.
+9. Run `npm run run -- --workflow <id> --dry-run`.
+10. Review artifacts in `output/runs/<id>/<timestamp>/`.
+
+---
+
+## How to use a coding agent with Browsy
+
+Point Claude Code, Codex, or similar at this repo and give the agent this prompt:
+
+```text
+Read AGENTS.md first. Then read AUTOMATION_REQUEST.md. Build the completed automation harness described there under workflows/<workflow-id>/. Use APIs where available, Playwright where deterministic, and adapter-based browser control only where needed. Preserve all safety gates. Run npm run smoke before final response.
+```
+
+The agent should:
+- Parse `AUTOMATION_REQUEST.md`
+- Create or update `workflows/<workflow-id>/`
+- Populate `field-map.example.json` from discovery
+- Write a real `run.mjs` using `src/core/workflow-runtime.mjs`
+- Run `npm run smoke` and report the result
+
+See [AGENTS.md](AGENTS.md) for the full agent contract.
+
+---
+
+## How to test locally
+
+Run non-browser smoke tests:
 ```bash
 npm run smoke
 ```
 
-## Safety defaults
-
-Browsy-generated automations should default to:
-
-- dry-run mode
-- visible browser mode
-- screenshots and logs
-- explicit safety policies
-- no final submit/payment/purchase actions
-- no paid extras or legal checkboxes unless manually approved
-
-## Coding-agent handoff
-
-Use this prompt with Claude Code, Codex, or similar:
-
-```text
-You are working in the Browsy repo. Read AGENTS.md first. Then read automation.request.md. Build the completed automation harness described there under workflows/<workflow-id>/. Use APIs where available, Playwright where deterministic, and OpenClaw-style browser control only where needed. Preserve all safety gates. Run npm run smoke before final response.
+Run with browser fixture (requires Playwright):
+```bash
+npm run smoke:browser
 ```
+
+The fixture at `fixtures/local-form/index.html` includes safe fields, a paid add-on checkbox, a legal certification checkbox, and a Submit button. The browser smoke test verifies:
+- Discovery finds all fields
+- Dry-run fills safe fields (title, artist, description, category)
+- Dry-run skips legal checkbox and paid add-on
+- Submit is never clicked
+- All artifacts are written
+
+---
+
+## Key files
+
+| File | Purpose |
+|---|---|
+| `AUTOMATION_REQUEST.md` | Fill this in for a new workflow |
+| `AGENTS.md` | Coding-agent contract |
+| `docs/product-positioning.md` | What Browsy is and isn't |
+| `docs/architecture.md` | System design |
+| `docs/agent-build-runbook.md` | Step-by-step agent process |
+| `src/core/request-parser.mjs` | Parse + validate request file |
+| `src/core/workflow-runtime.mjs` | Shared run primitives |
+| `src/core/field-map-candidates.mjs` | Selector candidate generator |
+| `src/core/safety.mjs` | Dangerous action detection |
+| `src/core/discovery.mjs` | Playwright DOM inventory |
+| `src/adapters/playwright-adapter.mjs` | Playwright execution adapter |
+| `src/adapters/api-adapter.mjs` | API adapter (placeholder) |
+| `src/adapters/browser-agent-adapter.mjs` | AI browser agent adapter (placeholder) |
+| `templates/workflow/` | Reference structure |
+| `fixtures/local-form/` | Local test fixture page |
+| `examples/distrokid-upload/` | Reference DistroKid example |

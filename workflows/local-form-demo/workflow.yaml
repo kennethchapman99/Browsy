@@ -1,0 +1,19 @@
+id: local-form-demo
+description: Generated Browsy workflow.
+auth:
+  mode: manual-save-state
+  storage_state: .auth/local-form-demo.json
+runtime:
+  dry_run_default: true
+  headed_default: true
+  pause_at_end_default: true
+targets:
+  start_url: 
+  urls:
+    []
+execution_strategy: playwright
+artifacts:
+  screenshots: true
+  html_snapshot: true
+  page_text_snapshot: true
+  discovered_fields: true

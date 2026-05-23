@@ -1,0 +1,2 @@
+This is a dummy upload file used by Browsy fixture tests.
+It simulates an audio file upload without requiring a real media file.

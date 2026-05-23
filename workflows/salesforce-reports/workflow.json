@@ -1,0 +1,47 @@
+{
+  "id": "salesforce-reports",
+  "description": "Download partner pipeline reports from salesforce",
+  "auth": {
+    "mode": "manual-save-state",
+    "storage_state": ".auth/salesforce-reports.json"
+  },
+  "runtime": {
+    "dry_run_default": true,
+    "headed_default": true,
+    "pause_at_end_default": true
+  },
+  "targets": {
+    "start_url": "https://d2l.okta.com/app/UserHome",
+    "urls": [
+      {
+        "purpose": "Start page",
+        "url": "https://d2l.okta.com/app/UserHome"
+      },
+      {
+        "purpose": "Salesforce dashboard",
+        "url": "https://d2l.lightning.force.com/lightning/r/Dashboard/01ZMm000002BjOrMAK/view"
+      },
+      {
+        "purpose": "Channel Pipereport",
+        "url": "https://d2l.lightning.force.com/lightning/r/Report/00OMm0000082spKMAQ/view"
+      },
+      {
+        "purpose": "Email",
+        "url": "https://outlook.cloud.microsoft/mail/inbox/id/AAQkADg2MDE3MzY3LWUyOTctNDJlZC05ODE2LTkxNGM0YmU5ZWZmZAAQAJ8jGDXZfWBGsM1FalijLuk%3D"
+      }
+    ]
+  },
+  "discovery_urls": [
+    "https://d2l.okta.com/app/UserHome",
+    "https://d2l.lightning.force.com/lightning/r/Dashboard/01ZMm000002BjOrMAK/view",
+    "https://d2l.lightning.force.com/lightning/r/Report/00OMm0000082spKMAQ/view",
+    "https://outlook.cloud.microsoft/mail/inbox/id/AAQkADg2MDE3MzY3LWUyOTctNDJlZC05ODE2LTkxNGM0YmU5ZWZmZAAQAJ8jGDXZfWBGsM1FalijLuk%3D"
+  ],
+  "execution_strategy": "playwright",
+  "artifacts": {
+    "screenshots": true,
+    "html_snapshot": true,
+    "page_text_snapshot": true,
+    "discovered_fields": true
+  }
+}

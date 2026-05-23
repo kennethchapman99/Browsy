@@ -1,0 +1,4 @@
+{
+  "_notes": "Copy this file to field-map.local.json and replace selectors with verified values from discovery.",
+  "fields": {}
+}

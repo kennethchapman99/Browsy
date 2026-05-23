@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browsy Wizard</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --bg: #f7f6f2;
+  --card: #fff;
+  --dark: #1c1936;
+  --muted: #7572a0;
+  --border: #e2dfd6;
+  --teal:   #2ec4b4;
+  --orange: #f47c30;
+  --purple: #7048c8;
+  --green:  #28c87a;
+  --yellow: #f5c030;
+  --coral:  #f03c52;
+  --navy:   #1c1936;
+  --accent: var(--teal);
+  --sidebar-w: 280px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--dark);
+  min-height: 100vh;
+  display: flex;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-height: 100vh;
+  background: var(--accent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 36px 24px 32px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+  transition: background .4s ease;
+  flex-shrink: 0;
+}
+
+.sidebar-logo {
+  width: 160px;
+  height: 160px;
+  margin-bottom: 36px;
+  border-radius: 24px;
+  overflow: hidden;
+  background: rgba(255,255,255,.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.15);
+}
+
+.sidebar-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.sidebar-steps {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.sidebar-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: default;
+  transition: all .2s;
+  opacity: .5;
+}
+
+.sidebar-step.done {
+  opacity: .7;
+}
+
+.sidebar-step.active {
+  background: rgba(255,255,255,.22);
+  opacity: 1;
+}
+
+.sidebar-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.25);
+  color: white;
+  font-size: .75rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all .2s;
+}
+
+.sidebar-step.active .sidebar-num {
+  background: white;
+  color: var(--accent);
+}
+
+.sidebar-step.done .sidebar-num {
+  background: rgba(255,255,255,.4);
+}
+
+.sidebar-step-name {
+  font-size: .87rem;
+  font-weight: 700;
+  color: white;
+  letter-spacing: .01em;
+}
+
+.sidebar-brand {
+  font-size: .78rem;
+  font-weight: 800;
+  color: rgba(255,255,255,.6);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-top: 20px;
+}
+
+/* ── Main ── */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-y: auto;
+}
+
+.steps-wrap {
+  flex: 1;
+}
+
+.step {
+  display: none;
+  flex-direction: column;
+  padding: 52px 48px 130px;
+  max-width: 680px;
+  animation: fadeIn .22s ease;
+}
+.step.active { display: flex; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Step header ── */
+.step-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 100px;
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  margin-bottom: 18px;
+  width: fit-content;
+}
+
+.step-title {
+  font-size: 2.4rem;
+  font-weight: 900;
+  line-height: 1.15;
+  margin-bottom: 10px;
+  color: var(--dark);
+}
+
+.step-hint {
+  font-size: 1rem;
+  color: var(--muted);
+  margin-bottom: 36px;
+  line-height: 1.55;
+  max-width: 520px;
+}
+
+/* ── Form ── */
+.field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 22px; }
+
+.field label {
+  font-size: .8rem;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field label span {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: .82rem;
+}
+
+.field input,
+.field textarea,
+.field select {
+  padding: 15px 18px;
+  font-size: 1.05rem;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--dark);
+  transition: border-color .2s, box-shadow .2s;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.field textarea { min-height: 110px; }
+
+.field-row { display: grid; gap: 14px; }
+.field-row.cols-2 { grid-template-columns: 1fr 1fr; }
+.field-row.cols-3 { grid-template-columns: 2fr 1fr 1fr; }
+
+/* ── Voice button on fields ── */
+.voice-field { position: relative; }
+.voice-field textarea,
+.voice-field input { padding-right: 56px; }
+
+.btn-voice {
+  position: absolute;
+  right: 10px; top: 10px;
+  width: 38px; height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s;
+}
+.btn-voice:hover { background: color-mix(in srgb, var(--accent) 24%, transparent); }
+.btn-voice.recording { background: var(--coral); color: white; animation: pulse 1.4s infinite; }
+
+@keyframes pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(240,60,82,.4); }
+  50%      { box-shadow: 0 0 0 10px rgba(240,60,82,0); }
+}
+
+/* ── Table builder ── */
+.table-builder { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+
+.table-row {
+  display: grid;
+  gap: 10px;
+  align-items: center;
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  transition: border-color .2s;
+}
+.table-row:focus-within { border-color: var(--accent); }
+
+.table-row input,
+.table-row select {
+  padding: 8px 12px;
+  font-size: .95rem;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--dark);
+  font-family: inherit;
+  transition: border-color .15s;
+}
+.table-row input:focus,
+.table-row select:focus { outline: none; border-color: var(--accent); }
+
+.btn-remove {
+  background: none; border: none;
+  color: var(--muted); cursor: pointer;
+  font-size: 1.3rem; line-height: 1;
+  padding: 4px; border-radius: 6px;
+  transition: color .15s;
+}
+.btn-remove:hover { color: var(--coral); }
+
+.btn-add {
+  display: flex; align-items: center; gap: 8px;
+  padding: 13px 20px;
+  border: 2.5px dashed var(--border);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .95rem; font-weight: 700;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: inherit;
+  width: 100%;
+}
+.btn-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+/* ── Walkthrough / recorder ── */
+.recorder-card {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 20px;
+  padding: 28px;
+  margin-bottom: 20px;
+  transition: border-color .2s;
+}
+.recorder-card:focus-within { border-color: var(--accent); }
+
+.recorder-top {
+  display: flex; align-items: center; gap: 18px;
+  margin-bottom: 16px;
+}
+
+.btn-mic {
+  width: 72px; height: 72px;
+  border-radius: 50%; border: none;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-size: 2rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s;
+  flex-shrink: 0;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.btn-mic:hover { transform: scale(1.06); box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 34%, transparent); }
+.btn-mic.recording { background: var(--coral); color: white; animation: pulse 1.4s infinite; }
+
+.recorder-status strong { display: block; font-size: 1rem; margin-bottom: 3px; }
+.recorder-status span   { font-size: .87rem; color: var(--muted); }
+
+.transcript-box {
+  min-height: 90px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  font-size: .95rem;
+  line-height: 1.65;
+  color: var(--dark);
+  background: var(--bg);
+  margin-bottom: 14px;
+  white-space: pre-wrap;
+}
+.transcript-box.live { border-color: var(--coral); background: #fff8f8; }
+.transcript-box em  { color: var(--muted); }
+
+.recorder-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.step-title-input {
+  flex: 1; min-width: 160px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 11px;
+  font-size: .95rem;
+  background: var(--bg);
+  color: var(--dark);
+  font-family: inherit;
+}
+.step-title-input:focus { outline: none; border-color: var(--accent); }
+
+.btn-save-step {
+  padding: 10px 20px;
+  border-radius: 11px;
+  border: 2px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: .9rem; font-weight: 800;
+  cursor: pointer; transition: all .2s;
+  font-family: inherit;
+}
+.btn-save-step:hover { background: var(--accent); color: white; }
+.btn-save-step:disabled { opacity: .35; cursor: default; }
+
+.steps-list { display: flex; flex-direction: column; gap: 10px; }
+
+.step-card {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex; gap: 12px; align-items: flex-start;
+}
+.step-num {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: .8rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 2px;
+}
+.step-card-body { flex: 1; }
+.step-card-title { font-weight: 800; font-size: .95rem; margin-bottom: 3px; }
+.step-card-text  { font-size: .87rem; color: var(--muted); line-height: 1.5; }
+
+/* ── Chip list ── */
+.chip-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+
+.chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  border-radius: 100px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--dark);
+  font-size: .87rem; font-weight: 600;
+}
+.chip button { background: none; border: none; cursor: pointer; color: var(--muted); font-size: .95rem; padding: 0; }
+.chip button:hover { color: var(--coral); }
+
+.chip.danger { background: color-mix(in srgb, var(--coral) 12%, transparent); }
+
+/* ── Auth pills ── */
+.auth-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.auth-pill {
+  padding: 10px 18px;
+  border: 2.5px solid var(--border);
+  border-radius: 100px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .87rem; font-weight: 700;
+  cursor: pointer; transition: all .2s;
+  font-family: inherit;
+}
+.auth-pill:hover { border-color: var(--accent); color: var(--dark); }
+.auth-pill.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--dark);
+}
+
+/* ── Generate / preview ── */
+.preview-box {
+  background: var(--dark);
+  color: #a8f0e8;
+  padding: 22px;
+  border-radius: 18px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: .77rem;
+  line-height: 1.65;
+  max-height: 300px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  margin-bottom: 20px;
+  word-break: break-word;
+}
+
+.btn-write {
+  display: block; width: 100%;
+  padding: 18px;
+  border-radius: 16px; border: none;
+  background: var(--accent);
+  color: white;
+  font-size: 1.1rem; font-weight: 900;
+  cursor: pointer; transition: all .22s;
+  font-family: inherit;
+  margin-bottom: 12px;
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--accent) 38%, transparent);
+}
+.btn-write:hover { transform: translateY(-2px); box-shadow: 0 10px 32px color-mix(in srgb, var(--accent) 48%, transparent); }
+.btn-write:disabled { opacity: .5; cursor: default; transform: none; }
+
+.write-status { text-align: center; font-size: .9rem; color: var(--muted); min-height: 24px; }
+.write-status.success { color: var(--green); font-weight: 800; }
+.write-status.error   { color: var(--coral); font-weight: 800; }
+
+.commands-box {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 18px;
+  padding: 22px 26px; margin-top: 18px;
+}
+.commands-box h3 {
+  font-size: .8rem; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--muted); margin-bottom: 14px;
+}
+.commands-box pre {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: .85rem; line-height: 1.85; color: var(--dark);
+  white-space: pre-wrap;
+}
+
+/* ── Lifecycle panel ── */
+.lifecycle-intro {
+  font-size: .9rem; color: var(--muted);
+  background: color-mix(in srgb,var(--accent) 8%,transparent);
+  border: 1.5px solid color-mix(in srgb,var(--accent) 22%,transparent);
+  border-radius: 12px; padding: 12px 16px;
+  margin: 18px 0 14px; line-height: 1.55;
+}
+.lifecycle-intro strong { color: var(--dark); }
+
+.lifecycle-panel { display: flex; flex-direction: column; gap: 8px; }
+
+.lifecycle-stage {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.lifecycle-stage.lc-done  { border-color: var(--green); }
+.lifecycle-stage.lc-error { border-color: var(--coral); }
+.lifecycle-stage.lc-open  { border-color: var(--accent); }
+
+.stage-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; cursor: pointer;
+  user-select: none;
+}
+.stage-header:hover .stage-name { color: var(--accent); }
+
+.stage-badge {
+  font-size: .68rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .06em; padding: 3px 9px;
+  border-radius: 100px; flex-shrink: 0;
+}
+.stage-badge.b-pending { background: color-mix(in srgb,var(--muted) 12%,transparent); color: var(--muted); }
+.stage-badge.b-done    { background: color-mix(in srgb,var(--green) 14%,transparent); color: #1a9e55; }
+.stage-badge.b-error   { background: color-mix(in srgb,var(--coral) 14%,transparent); color: var(--coral); }
+.stage-badge.b-running { background: color-mix(in srgb,var(--accent) 14%,transparent); color: var(--accent); animation: lc-blink .9s infinite; }
+
+@keyframes lc-blink { 0%,100%{opacity:1} 50%{opacity:.45} }
+
+.stage-name { font-weight: 800; font-size: .9rem; flex: 1; }
+.stage-chevron { color: var(--muted); font-size: .8rem; transition: transform .2s; }
+.stage-chevron.open { transform: rotate(90deg); }
+
+.stage-body {
+  display: none; padding: 0 16px 14px;
+  border-top: 1.5px solid var(--border);
+}
+.stage-body.open { display: block; }
+
+.stage-cmd {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: .78rem; color: var(--muted);
+  background: var(--bg); border-radius: 8px;
+  padding: 7px 11px; margin: 10px 0 8px;
+  white-space: pre-wrap; word-break: break-all;
+}
+
+.stage-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+
+.btn-run-stage {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 8px 16px;
+  border-radius: 10px; border: none;
+  background: var(--accent); color: white;
+  font-size: .82rem; font-weight: 800;
+  cursor: pointer; transition: opacity .18s;
+  font-family: inherit;
+}
+.btn-run-stage:hover { opacity: .85; }
+.btn-run-stage:disabled { opacity: .38; cursor: default; }
+
+.stage-note { font-size: .8rem; color: var(--muted); font-style: italic; }
+
+.stage-output {
+  display: none;
+  background: var(--dark); color: #b2f5ec;
+  border-radius: 10px; padding: 10px 13px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: .76rem; line-height: 1.7;
+  max-height: 200px; overflow-y: auto;
+  white-space: pre-wrap; margin-top: 8px;
+}
+.stage-output.visible { display: block; }
+.stage-output .out-err { color: #fca5a5; }
+
+.stage-artifacts { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+.stage-artifact-link {
+  font-size: .8rem; color: var(--accent);
+  text-decoration: none; font-weight: 700;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.stage-artifact-link:hover { text-decoration: underline; }
+
+/* ── Nav bar ── */
+.nav-bar {
+  position: fixed; bottom: 0; left: var(--sidebar-w); right: 0;
+  padding: 14px 48px 22px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; z-index: 10;
+}
+
+.btn-back {
+  padding: 13px 28px;
+  border-radius: 14px;
+  border: 2px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: .97rem; font-weight: 700;
+  cursor: pointer; transition: all .2s; font-family: inherit;
+}
+.btn-back:hover { border-color: var(--dark); color: var(--dark); }
+.btn-back:disabled { opacity: .3; cursor: default; }
+
+.btn-next {
+  padding: 13px 38px;
+  border-radius: 14px; border: none;
+  background: var(--accent); color: white;
+  font-size: .97rem; font-weight: 900;
+  cursor: pointer; transition: all .22s; font-family: inherit;
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.btn-next:hover { transform: translateY(-1px); box-shadow: 0 8px 26px color-mix(in srgb, var(--accent) 50%, transparent); }
+.btn-next:disabled { opacity: .4; cursor: default; transform: none; }
+
+.step-counter { font-size: .85rem; color: var(--muted); font-weight: 700; }
+
+.section-label {
+  font-size: .8rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--muted); margin-bottom: 12px;
+}
+
+.no-speech-note {
+  font-size: .82rem; color: var(--muted);
+  padding: 8px 14px;
+  background: #fffbee;
+  border-radius: 10px;
+  border: 1px solid #f5c03044;
+  margin-bottom: 16px;
+}
+
+/* ── Toggle ── */
+.toggle {
+  width: 44px; height: 24px;
+  background: var(--border); border-radius: 100px;
+  position: relative; cursor: pointer;
+  transition: background .2s; border: none;
+  appearance: none; -webkit-appearance: none; flex-shrink: 0;
+}
+.toggle::after {
+  content: ''; position: absolute;
+  top: 2px; left: 2px;
+  width: 20px; height: 20px;
+  background: white; border-radius: 50%;
+  transition: transform .2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,.18);
+}
+.toggle:checked { background: var(--accent); }
+.toggle:checked::after { transform: translateX(20px); }
+.toggle-row { display: flex; align-items: center; gap: 10px; }
+
+@media (max-width: 700px) {
+  :root { --sidebar-w: 0px; }
+  .sidebar { display: none; }
+  .step { padding: 28px 20px 110px; }
+  .nav-bar { left: 0; padding: 12px 20px 18px; }
+  .step-title { font-size: 1.8rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <img src="data:image/png;base64,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" alt="Browsy">
+  </div>
+  <div class="sidebar-steps" id="sidebar-steps"></div>
+  <div class="sidebar-brand">Browsy</div>
+</aside>
+
+<!-- ── Main content ── -->
+<div class="main">
+<div class="steps-wrap">
+
+  <!-- Step 1: Mission -->
+  <div class="step active" data-step="1">
+    <div class="step-badge">Step 1 of 7 · Mission</div>
+    <h1 class="step-title">What are you automating?</h1>
+    <p class="step-hint">Give this workflow a short name and describe what it should accomplish in plain English.</p>
+
+    <div class="field">
+      <label>Workflow name <span>(becomes the folder id)</span></label>
+      <input type="text" id="workflowName" placeholder="e.g. distrokid-upload, sheet-row-sync" oninput="slugify(this)">
+    </div>
+
+    <div class="field voice-field">
+      <label>Goal</label>
+      <textarea id="goal" rows="4" placeholder="e.g. Upload one music release to DistroKid up to final review, using metadata and files from a local manifest. Do not click final submit."></textarea>
+      <button class="btn-voice" title="Dictate goal" onclick="toggleVoice('goal',this)">🎤</button>
+    </div>
+
+    <div class="field">
+      <label>Start URL</label>
+      <input type="url" id="startUrl" placeholder="https://example.com/start-page">
+    </div>
+  </div>
+
+  <!-- Step 2: Pages & Auth -->
+  <div class="step" data-step="2">
+    <div class="step-badge">Step 2 of 7 · Target Pages</div>
+    <h1 class="step-title">Where does it happen?</h1>
+    <p class="step-hint">List every page the automation will touch. The agent needs to run discovery on all of them.</p>
+
+    <div class="table-builder" id="pages-list"></div>
+    <button class="btn-add" onclick="addPage()">+ Add page</button>
+
+    <div style="margin-top:32px">
+      <div class="section-label">Authentication mode</div>
+      <div class="auth-pills" id="auth-pills">
+        <button class="auth-pill active" onclick="setAuth(this,'manual-save-state')">Manual login → save state</button>
+        <button class="auth-pill" onclick="setAuth(this,'api-key')">API key / token</button>
+        <button class="auth-pill" onclick="setAuth(this,'oauth')">OAuth</button>
+        <button class="auth-pill" onclick="setAuth(this,'chrome-profile')">Chrome real profile</button>
+        <button class="auth-pill" onclick="setAuth(this,'none')">No auth needed</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Walkthrough -->
+  <div class="step" data-step="3">
+    <div class="step-badge">Step 3 of 7 · Walkthrough</div>
+    <h1 class="step-title">Walk me through it</h1>
+    <p class="step-hint">Hit record, switch to the site, and narrate as you go. Explain <em>why</em> you make each choice — not just what you click. Save each page as a step.</p>
+
+    <div id="no-speech-note" class="no-speech-note" style="display:none">⚠️ Voice not available here. Use Chrome for dictation, or type directly.</div>
+
+    <div class="recorder-card">
+      <div class="recorder-top">
+        <button class="btn-mic" id="btn-mic" onclick="toggleMic()">🎤</button>
+        <div class="recorder-status">
+          <strong id="mic-status">Ready to record</strong>
+          <span id="mic-hint">Click the mic and start talking</span>
+        </div>
+      </div>
+      <div class="transcript-box" id="live-transcript"><em>Your speech will appear here…</em></div>
+      <div class="recorder-actions">
+        <input type="text" class="step-title-input" id="step-title-input" placeholder="Step name (e.g. 'Fill upload form')">
+        <button class="btn-save-step" id="btn-save-step" onclick="saveStep()" disabled>Save step ↓</button>
+      </div>
+    </div>
+
+    <div class="steps-list" id="steps-list"></div>
+  </div>
+
+  <!-- Step 4: Parameters -->
+  <div class="step" data-step="4">
+    <div class="step-badge">Step 4 of 7 · Parameters</div>
+    <h1 class="step-title">What changes each run?</h1>
+    <p class="step-hint">List the variables the automation needs at runtime — IDs, titles, file paths, toggles. These become the input manifest.</p>
+
+    <div class="table-builder" id="params-list"></div>
+    <button class="btn-add" onclick="addParam()">+ Add parameter</button>
+  </div>
+
+  <!-- Step 5: Data wiring -->
+  <div class="step" data-step="5">
+    <div class="step-badge">Step 5 of 7 · Data Wiring</div>
+    <h1 class="step-title">Where does data come from — and go?</h1>
+    <p class="step-hint">Describe what system feeds data in, and what should happen when a run finishes.</p>
+
+    <div class="field voice-field">
+      <label>Data source</label>
+      <textarea id="dataSource" rows="3" placeholder="e.g. Local manifest JSON built by Pancake Robot. Lives at output/releases/<id>/manifest.json"></textarea>
+      <button class="btn-voice" title="Dictate" onclick="toggleVoice('dataSource',this)">🎤</button>
+    </div>
+
+    <div class="field voice-field">
+      <label>What happens when it finishes?</label>
+      <textarea id="completionAction" rows="3" placeholder="e.g. POST to http://localhost:3000/api/complete with run status. Or: update column D in Google Sheet row matching songId."></textarea>
+      <button class="btn-voice" title="Dictate" onclick="toggleVoice('completionAction',this)">🎤</button>
+    </div>
+
+    <div class="field">
+      <label>Callback URL <span>(optional)</span></label>
+      <input type="url" id="callbackUrl" placeholder="http://localhost:3000/api/complete">
+    </div>
+  </div>
+
+  <!-- Step 6: Safety -->
+  <div class="step" data-step="6">
+    <div class="step-badge">Step 6 of 7 · Safety</div>
+    <h1 class="step-title">What stays manual?</h1>
+    <p class="step-hint">The automation will block these and pause for a human. Add or remove anything that fits your workflow.</p>
+
+    <div class="section-label">Manual-only action categories</div>
+    <div class="chip-list" id="manual-chips"></div>
+    <div class="field-row cols-2" style="margin-bottom:28px">
+      <input type="text" id="new-manual-action" placeholder="Add manual action…" style="padding:10px 14px;border:2px solid var(--border);border-radius:12px;font-size:.95rem;font-family:inherit;" onkeydown="if(event.key==='Enter')addChip('manual')">
+      <button class="btn-add" style="border-radius:12px;padding:10px 16px" onclick="addChip('manual')">+ Add</button>
+    </div>
+
+    <div class="section-label">Danger words (block buttons / text matching these)</div>
+    <div class="chip-list" id="danger-chips"></div>
+    <div class="field-row cols-2">
+      <input type="text" id="new-danger-word" placeholder="Add danger word…" style="padding:10px 14px;border:2px solid var(--border);border-radius:12px;font-size:.95rem;font-family:inherit;" onkeydown="if(event.key==='Enter')addChip('danger')">
+      <button class="btn-add" style="border-radius:12px;padding:10px 16px" onclick="addChip('danger')">+ Add</button>
+    </div>
+  </div>
+
+  <!-- Step 7: Generate -->
+  <div class="step" data-step="7">
+    <div class="step-badge">Step 7 of 7 · Generate</div>
+    <h1 class="step-title">Ready to build</h1>
+    <p class="step-hint">This is your <code style="background:var(--bg);padding:2px 6px;border-radius:6px;font-size:.92em">AUTOMATION_REQUEST.md</code>. Review it, then write it — your coding agent reads this file and builds the full harness.</p>
+
+    <div class="preview-box" id="preview-box">Generating preview…</div>
+    <button class="btn-write" id="btn-write" onclick="writeRequest()">✦ Write AUTOMATION_REQUEST.md</button>
+    <div class="write-status" id="write-status"></div>
+
+    <div id="lifecycle-wrap" style="display:none">
+      <div class="lifecycle-intro">
+        <strong>Request generated only — no workflow files created yet.</strong><br>
+        Run each stage below to build and verify your automation harness.
+        Stages run in order; each one writes real files you can inspect.
+      </div>
+      <div class="lifecycle-panel" id="lifecycle-panel"></div>
+    </div>
+  </div>
+
+</div><!-- /steps-wrap -->
+
+<!-- ── Nav bar ── -->
+<div class="nav-bar">
+  <button class="btn-back" id="btn-back" onclick="prevStep()" disabled>← Back</button>
+  <span class="step-counter" id="step-counter">Step 1 of 7</span>
+  <button class="btn-next" id="btn-next" onclick="nextStep()">Next →</button>
+</div>
+
+</div><!-- /main -->
+
+<script>
+// ── State ───────────────────────────────────────────────────────────────────
+const S = {
+  step: 1, totalSteps: 7,
+  workflowName: '', goal: '', startUrl: '',
+  pages: [], authMode: 'manual-save-state',
+  walkthroughSteps: [], parameters: [],
+  dataSource: '', completionAction: '', callbackUrl: '',
+  manualActions: [
+    'Final submit','Payment or purchase',
+    'Legal certification checkboxes','Paid extras or add-ons',
+    'Deletion or destructive changes'
+  ],
+  dangerText: ['Submit','Finalize','Pay','Purchase','Release','Send','Delete','Checkout','Continue & submit'],
+};
+
+const STEP_NAMES  = ['','Mission','Target Pages','Walkthrough','Parameters','Data Wiring','Safety','Generate'];
+const STEP_COLORS = ['','var(--teal)','var(--orange)','var(--purple)','var(--green)','var(--yellow)','var(--coral)','var(--navy)'];
+
+// ── Voice (field dictation) ─────────────────────────────────────────────────
+let activeVoiceBtn = null;
+let recognition = null;
+
+function toggleVoice(fieldId, btn) {
+  if (!window.SpeechRecognition && !window.webkitSpeechRecognition) { alert('Use Chrome for voice.'); return; }
+  if (activeVoiceBtn && activeVoiceBtn !== btn) stopVoice();
+  if (activeVoiceBtn === btn) { stopVoice(); return; }
+  activeVoiceBtn = btn;
+  btn.classList.add('recording');
+  const field = document.getElementById(fieldId);
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.continuous = true; recognition.interimResults = true; recognition.lang = 'en-US';
+  recognition.onresult = e => {
+    let fin = '', interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) fin += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    if (fin) field.value += fin;
+    field.placeholder = interim || '';
+  };
+  recognition.onerror = recognition.onend = () => { if (activeVoiceBtn === btn) stopVoice(); };
+  recognition.start();
+}
+
+function stopVoice() {
+  if (recognition) { try { recognition.stop(); } catch {} recognition = null; }
+  if (activeVoiceBtn) { activeVoiceBtn.classList.remove('recording'); activeVoiceBtn.title = 'Dictate'; }
+  activeVoiceBtn = null;
+}
+
+// ── Mic (walkthrough) ───────────────────────────────────────────────────────
+let micRec = null, micActive = false, liveText = '', finalText = '';
+
+function toggleMic() { micActive ? stopMic() : startMic(); }
+
+function startMic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { document.getElementById('no-speech-note').style.display = ''; return; }
+  micActive = true;
+  liveText = finalText;
+  const btn = document.getElementById('btn-mic');
+  btn.classList.add('recording'); btn.textContent = '⏹';
+  document.getElementById('mic-status').textContent = 'Recording…';
+  document.getElementById('mic-hint').textContent = 'Narrate while you use the site — click ⏹ to stop';
+  const box = document.getElementById('live-transcript');
+  box.classList.add('live');
+  micRec = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+  micRec.continuous = true; micRec.interimResults = true; micRec.lang = 'en-US';
+  micRec.onresult = e => {
+    let fin = liveText, interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) fin += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    liveText = fin;
+    box.textContent = fin + (interim ? ' ' + interim : '') || '';
+    document.getElementById('btn-save-step').disabled = !(fin + interim).trim();
+  };
+  micRec.onerror = () => stopMic();
+  micRec.onend = () => { if (micActive) { try { micRec.start(); } catch {} } };
+  micRec.start();
+}
+
+function stopMic() {
+  micActive = false;
+  if (micRec) { try { micRec.stop(); } catch {} micRec = null; }
+  const btn = document.getElementById('btn-mic');
+  btn.classList.remove('recording'); btn.textContent = '🎤';
+  document.getElementById('mic-status').textContent = 'Recording stopped';
+  document.getElementById('mic-hint').textContent = 'Save the step or keep recording';
+  document.getElementById('live-transcript').classList.remove('live');
+  finalText = liveText;
+  document.getElementById('btn-save-step').disabled = !liveText.trim();
+}
+
+function saveStep() {
+  const text = liveText.trim() || document.getElementById('live-transcript').textContent.trim();
+  if (!text || text.includes('Your speech will appear')) return;
+  const title = document.getElementById('step-title-input').value.trim() || `Step ${S.walkthroughSteps.length + 1}`;
+  S.walkthroughSteps.push({ title, transcript: text });
+  renderStepsList();
+  liveText = ''; finalText = '';
+  document.getElementById('live-transcript').innerHTML = '<em>Your speech will appear here…</em>';
+  document.getElementById('step-title-input').value = '';
+  document.getElementById('btn-save-step').disabled = true;
+  document.getElementById('mic-status').textContent = 'Ready to record';
+  document.getElementById('mic-hint').textContent = 'Click the mic and start talking';
+}
+
+function renderStepsList() {
+  document.getElementById('steps-list').innerHTML = S.walkthroughSteps.map((s,i) => `
+    <div class="step-card">
+      <div class="step-num">${i+1}</div>
+      <div class="step-card-body">
+        <div class="step-card-title">${esc(s.title)}</div>
+        <div class="step-card-text">${esc(s.transcript)}</div>
+      </div>
+      <button class="btn-remove" onclick="S.walkthroughSteps.splice(${i},1);renderStepsList()">×</button>
+    </div>`).join('');
+}
+
+// ── Pages ───────────────────────────────────────────────────────────────────
+function addPage(d={}) {
+  S.pages.push({ purpose: d.purpose||'', url: d.url||'', requiresLogin: d.requiresLogin||false });
+  renderPages();
+}
+function renderPages() {
+  document.getElementById('pages-list').innerHTML = S.pages.map((p,i) => `
+    <div class="table-row" style="grid-template-columns:1.6fr 2.2fr auto auto">
+      <input type="text" placeholder="Purpose (e.g. Login page)" value="${esc(p.purpose)}" oninput="S.pages[${i}].purpose=this.value">
+      <input type="url"  placeholder="https://…" value="${esc(p.url)}" oninput="S.pages[${i}].url=this.value">
+      <label class="toggle-row" style="justify-content:center;gap:5px">
+        <input type="checkbox" class="toggle" ${p.requiresLogin?'checked':''} onchange="S.pages[${i}].requiresLogin=this.checked">
+        <span style="font-size:.78rem;color:var(--muted)">Login</span>
+      </label>
+      <button class="btn-remove" onclick="S.pages.splice(${i},1);renderPages()">×</button>
+    </div>`).join('');
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+function setAuth(btn, mode) {
+  S.authMode = mode;
+  document.querySelectorAll('.auth-pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ── Params ───────────────────────────────────────────────────────────────────
+function addParam(d={}) {
+  S.parameters.push({ key: d.key||'', type: d.type||'string', example: d.example||'', description: d.description||'' });
+  renderParams();
+}
+function renderParams() {
+  document.getElementById('params-list').innerHTML = S.parameters.map((p,i) => `
+    <div class="table-row" style="grid-template-columns:1fr 90px 1fr 1.4fr auto">
+      <input type="text" placeholder="key (e.g. songId)" value="${esc(p.key)}" oninput="S.parameters[${i}].key=this.value">
+      <select onchange="S.parameters[${i}].type=this.value">
+        ${['string','number','boolean','enum'].map(t=>`<option value="${t}"${p.type===t?' selected':''}>${t}</option>`).join('')}
+      </select>
+      <input type="text" placeholder="Example value" value="${esc(p.example)}" oninput="S.parameters[${i}].example=this.value">
+      <input type="text" placeholder="Description" value="${esc(p.description)}" oninput="S.parameters[${i}].description=this.value">
+      <button class="btn-remove" onclick="S.parameters.splice(${i},1);renderParams()">×</button>
+    </div>`).join('');
+}
+
+// ── Safety chips ─────────────────────────────────────────────────────────────
+function renderChips() {
+  document.getElementById('manual-chips').innerHTML = S.manualActions.map((a,i) => `
+    <div class="chip"><span>${esc(a)}</span><button onclick="S.manualActions.splice(${i},1);renderChips()">×</button></div>`).join('');
+  document.getElementById('danger-chips').innerHTML = S.dangerText.map((w,i) => `
+    <div class="chip danger"><span>${esc(w)}</span><button onclick="S.dangerText.splice(${i},1);renderChips()">×</button></div>`).join('');
+}
+function addChip(type) {
+  const id = type==='manual' ? 'new-manual-action' : 'new-danger-word';
+  const val = document.getElementById(id).value.trim();
+  if (!val) return;
+  if (type==='manual') S.manualActions.push(val); else S.dangerText.push(val);
+  document.getElementById(id).value = '';
+  renderChips();
+}
+
+// ── Markdown generator ────────────────────────────────────────────────────────
+function generateMarkdown() {
+  const id = S.workflowName || 'my-workflow';
+  const startUrl = S.startUrl || S.pages[0]?.url || 'https://example.com';
+  const pagesRows = S.pages.length
+    ? S.pages.map(p=>`| ${p.purpose||'Page'} | ${p.url} | ${p.requiresLogin?'yes':'no'} | |`).join('\n')
+    : `| Start page | ${startUrl} | yes | |`;
+  const contract = { id: 'ITEM_123' };
+  S.parameters.forEach(p => { if (p.key) contract[p.key] = p.example || (p.type==='boolean'?false:p.type==='number'?0:'value'); });
+  if (S.callbackUrl) contract.callback_url = S.callbackUrl;
+  const steps = S.walkthroughSteps.length
+    ? S.walkthroughSteps.map((s,i)=>`${i+1}. **${s.title}**: ${s.transcript}`).join('\n')
+    : '1. Open the start page.\n2. Authenticate if needed.\n3. Fill, upload, or select fields.\n4. Stop before final action.\n5. Save artifacts and logs.';
+  const fieldsRows = S.parameters.filter(p=>p.key).length
+    ? S.parameters.filter(p=>p.key).map(p=>`| ${p.key} | \`${p.key}\` | unknown until discovery | ${p.description||'See walkthrough'} |`).join('\n')
+    : '| (Run discovery to identify fields) | | | |';
+  const discoveryUrls = S.pages.filter(p=>p.url).length
+    ? S.pages.filter(p=>p.url).map(p=>`- ${p.url}`).join('\n')
+    : `- ${startUrl}`;
+  const safetyJson = JSON.stringify({ never_click_text: S.dangerText, never_click_selectors: [], manual_only_categories: S.manualActions }, null, 2);
+  const narration = S.walkthroughSteps.length
+    ? S.walkthroughSteps.map((s,i)=>`**Step ${i+1}: ${s.title}**\n\n> ${s.transcript}`).join('\n\n')
+    : '(No walkthrough recorded yet — run the wizard to add narration.)';
+  const dataSourceRow = S.dataSource
+    ? `| Local system | files/API | ${S.dataSource.slice(0,80)} | See walkthrough |`
+    : '| Local files | files | Source of truth | |';
+  const completionNote = S.completionAction ? `\n**Completion action:** ${S.completionAction}` : '';
+
+  return `# Browsy Automation Request\n\n## 1. Workflow name\n\n\`${id}\`\n\n## 2. Goal\n\n${S.goal||'Describe the goal here.'}\n\n## 3. Target websites / pages\n\n| Purpose | URL | Requires login? | Notes |\n| --- | --- | --- | --- |\n${pagesRows}\n\n## 4. Existing APIs or local systems\n\n| System | Type | Purpose | Auth/notes |\n| --- | --- | --- | --- |\n${dataSourceRow}\n\n## 5. Input data contract\n\n\`\`\`json\n${JSON.stringify(contract, null, 2)}\n\`\`\`\n\n## 6. Desired workflow steps\n\n${steps}\n\n## 7. Fields to fill or upload\n\n| Field / action | Source in input | Website field/page | Rule / why |\n| --- | --- | --- | --- |\n${fieldsRows}\n\n## 8. Actions that must stay manual\n\n${S.manualActions.map(a=>`- ${a}`).join('\n')}\n\n## 9. Human checkpoints\n\n- Stop before final submit.\n- Leave browser open by default.\n- Provide \`--no-pause\` only for non-destructive dry-runs.\n\n## 10. Authentication plan\n\n- ${S.authMode}\n\n## 11. Discovery needs\n\n${discoveryUrls}\n\nThe generated harness should produce:\n\n- discovered-fields.json\n- discovered-fields.md\n- screenshots\n- HTML snapshot\n- page text snapshot\n\n## 12. Safety policy\n\n\`\`\`json\n${safetyJson}\n\`\`\`\n\n## 13. Output artifacts expected\n\nEvery run should save:\n\n- run-log.json\n- filled-fields.json\n- skipped-fields.json\n- errors.json\n- screenshot-start.png\n- screenshot-after-fill.png\n- screenshot-final-review.png if reached\n- page-text-snapshot.txt\n- html-snapshot.html${completionNote}\n\n## 14. Test commands expected\n\n\`\`\`bash\nnpm install\nnpm run smoke\nnpm run auth:save -- --workflow ${id}\nnpm run auth:check -- --workflow ${id} --url ${startUrl}\nnpm run discover -- --workflow ${id} --url ${startUrl}\nnpm run run -- --workflow ${id} --manifest workflows/${id}/manifest.example.json --dry-run\n\`\`\`\n\n## 15. Acceptance criteria\n\n- Auth works or failure path is clearly documented.\n- DOM discovery works.\n- Dry-run fills/uploads safe fields.\n- Dangerous actions are blocked.\n- Browser pauses before manual checkpoint.\n- Logs/screenshots are saved.\n- A coding agent can rerun tests and understand failures.\n\n## 16. Narrated walkthrough\n\n${narration}\n`;
+}
+
+// ── Write ─────────────────────────────────────────────────────────────────────
+async function writeRequest() {
+  const markdown = generateMarkdown();
+  const btn = document.getElementById('btn-write');
+  const status = document.getElementById('write-status');
+  btn.disabled = true; btn.textContent = 'Writing…';
+  status.className = 'write-status'; status.textContent = '';
+  try {
+    const res = await fetch('/write-request', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ markdown }) });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Unknown error');
+    status.className = 'write-status success';
+    status.textContent = '✓ AUTOMATION_REQUEST.md written successfully';
+    btn.textContent = '✓ Written';
+    showCommands();
+  } catch(e) {
+    status.className = 'write-status error';
+    status.textContent = '✗ ' + e.message + (e.message.includes('fetch') ? ' — is the wizard server running?' : '');
+    btn.disabled = false; btn.textContent = '✦ Write AUTOMATION_REQUEST.md';
+  }
+}
+
+// ── Lifecycle panel ────────────────────────────────────────────────────────
+
+const LIFECYCLE_STAGES = [
+  {
+    key: 'validate',
+    label: 'Validate request',
+    command: 'validate-request',
+    buildArgs: () => [],
+    note: 'Checks AUTOMATION_REQUEST.md for required sections and field values.',
+    artifacts: [],
+  },
+  {
+    key: 'scaffold',
+    label: 'Scaffold workflow',
+    command: 'init',
+    buildArgs: (id) => ['--from-request'],
+    note: 'Creates workflows/<id>/ with workflow.json, field-map, safety policy, run.mjs.',
+    artifacts: (id) => [`workflows/${id}/workflow.json`, `workflows/${id}/run.mjs`],
+  },
+  {
+    key: 'auth',
+    label: 'Save auth (if needed)',
+    command: 'auth',
+    buildArgs: (id, url) => ['save', '--workflow', id, '--url', url],
+    note: 'Opens browser for manual login; saves Playwright storage state.',
+    artifacts: (id) => [`.auth/${id}.json`],
+    optional: true,
+  },
+  {
+    key: 'discover',
+    label: 'Discover fields',
+    command: 'discover',
+    buildArgs: (id, url) => ['--workflow', id, '--url', url, '--candidates'],
+    note: 'Navigates to the target page and captures field candidates ranked by selector stability.',
+    artifacts: (id) => [
+      `workflows/${id}/field-map.candidates.md`,
+      `workflows/${id}/discovered-fields.json`,
+    ],
+  },
+  {
+    key: 'dry-run',
+    label: 'Dry-run',
+    command: 'run',
+    buildArgs: (id) => ['--workflow', id, '--dry-run'],
+    note: 'Fills safe fields only. Never clicks Submit, Pay, or Confirm. Writes full artifacts.',
+    artifacts: (id) => [`output/runs/${id}/<timestamp>/run-review.md`],
+  },
+  {
+    key: 'review',
+    label: 'Review run',
+    command: 'review',
+    buildArgs: (id) => ['--workflow', id],
+    note: 'Prints the latest run-review.md — filled fields, skipped, errors, and recommended fix.',
+    artifacts: [],
+  },
+  {
+    key: 'feedback',
+    label: 'Submit feedback',
+    command: 'feedback',
+    buildArgs: (id) => ['--workflow', id],
+    note: 'Saves your notes on what to improve. Provide --notes <file> for a markdown feedback file.',
+    artifacts: (id) => [`workflows/${id}/feedback/`],
+    optional: true,
+  },
+  {
+    key: 'promote',
+    label: 'Promote workflow',
+    command: 'promote',
+    buildArgs: (id) => ['--workflow', id],
+    note: 'Marks the workflow stable. Creates PROMOTED file and updates workflow.json.',
+    artifacts: (id) => [`workflows/${id}/PROMOTED`],
+  },
+];
+
+let lcState = {};
+let lcOpenStage = null;
+let lcRunning = false;
+
+function showCommands() {
+  document.getElementById('lifecycle-wrap').style.display = '';
+  loadLifecycle();
+}
+
+async function loadLifecycle() {
+  const id = S.workflowName || 'my-workflow';
+  try {
+    const res = await fetch(`/api/state?workflow=${encodeURIComponent(id)}`);
+    if (res.ok) lcState = await res.json();
+  } catch (_) { lcState = {}; }
+  renderLifecycle();
+}
+
+function renderLifecycle() {
+  const id = S.workflowName || 'my-workflow';
+  const url = S.startUrl || S.pages[0]?.url || '';
+  const panel = document.getElementById('lifecycle-panel');
+
+  panel.innerHTML = LIFECYCLE_STAGES.map((stage, idx) => {
+    const stageState = lcState.stages?.[stage.key] || {};
+    const isDone = stageState.done;
+    const isErr  = stageState.error;
+    const badgeCls = isErr ? 'b-error' : isDone ? 'b-done' : 'b-pending';
+    const badgeLabel = isErr ? 'Error' : isDone ? 'Done' : (stage.optional ? 'Optional' : 'Pending');
+    const lcCls = isErr ? 'lc-error' : isDone ? 'lc-done' : '';
+    const isOpen = lcOpenStage === stage.key;
+    const chevCls = isOpen ? 'open' : '';
+
+    const args = stage.buildArgs(id, url);
+    const cliCmd = `npm run ${stage.command === 'validate-request' ? 'validate:request'
+      : stage.command === 'init' ? 'init:workflow'
+      : stage.command === 'auth' ? 'auth:save'
+      : stage.command === 'discover' ? 'discover'
+      : stage.command === 'dry-run' ? 'run'
+      : stage.command} -- ${args.join(' ')}`.trim().replace(/-- $/, '');
+
+    const artifactList = typeof stage.artifacts === 'function'
+      ? stage.artifacts(id) : stage.artifacts;
+
+    return `<div class="lifecycle-stage ${lcCls}" id="lc-stage-${stage.key}">
+  <div class="stage-header" onclick="toggleStage('${stage.key}')">
+    <span class="stage-badge ${badgeCls}">${badgeLabel}</span>
+    <span class="stage-name">${idx + 1}. ${stage.label}</span>
+    <span class="stage-chevron ${chevCls}">▶</span>
+  </div>
+  <div class="stage-body ${isOpen ? 'open' : ''}" id="lc-body-${stage.key}">
+    <div class="stage-cmd">${esc(cliCmd)}</div>
+    <div class="stage-actions">
+      <button class="btn-run-stage" onclick="runStage('${stage.key}')" ${lcRunning ? 'disabled' : ''}>▶ Run</button>
+      ${stage.optional ? '<span class="stage-note">Optional — skip if not needed</span>' : ''}
+    </div>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:6px">${stage.note}</p>
+    <div class="stage-output" id="lc-out-${stage.key}"></div>
+    ${artifactList.length ? `<div class="stage-artifacts">${artifactList.map(f =>
+      `<span style="font-size:.8rem;color:var(--muted)">📄 ${esc(f)}</span>`
+    ).join('')}</div>` : ''}
+  </div>
+</div>`;
+  }).join('');
+}
+
+function toggleStage(key) {
+  lcOpenStage = lcOpenStage === key ? null : key;
+  renderLifecycle();
+}
+
+async function runStage(key) {
+  if (lcRunning) return;
+  const id = S.workflowName || 'my-workflow';
+  const url = S.startUrl || S.pages[0]?.url || '';
+  const stage = LIFECYCLE_STAGES.find(s => s.key === key);
+  if (!stage) return;
+
+  lcRunning = true;
+  lcOpenStage = key;
+  renderLifecycle();
+
+  const outEl = document.getElementById(`lc-out-${key}`);
+  const badge = document.querySelector(`#lc-stage-${key} .stage-badge`);
+  outEl.className = 'stage-output visible';
+  outEl.textContent = '';
+  if (badge) { badge.className = 'stage-badge b-running'; badge.textContent = 'Running…'; }
+
+  const args = stage.buildArgs(id, url);
+
+  try {
+    const res = await fetch('/api/exec', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command: stage.command, args }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      outEl.textContent = 'Error: ' + (err.error || res.statusText);
+      lcRunning = false;
+      await loadLifecycle();
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+      for (const part of parts) {
+        const eventLine = part.match(/^event: (.+)/m);
+        const dataLine  = part.match(/^data: (.+)/m);
+        if (!dataLine) continue;
+        let payload;
+        try { payload = JSON.parse(dataLine[1]); } catch { continue; }
+        const ev = eventLine?.[1] || 'stdout';
+        if (ev === 'stdout') {
+          outEl.textContent += payload.line + '\n';
+        } else if (ev === 'stderr') {
+          outEl.textContent += payload.line + '\n';
+        } else if (ev === 'done') {
+          outEl.textContent += `\n[exit ${payload.code}]`;
+        }
+        outEl.scrollTop = outEl.scrollHeight;
+      }
+    }
+  } catch (e) {
+    outEl.textContent = 'Network error: ' + e.message;
+  }
+
+  lcRunning = false;
+  await loadLifecycle();
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function syncFromDOM() {
+  S.workflowName    = document.getElementById('workflowName').value.trim();
+  S.goal            = document.getElementById('goal').value.trim();
+  S.startUrl        = document.getElementById('startUrl').value.trim();
+  S.dataSource      = document.getElementById('dataSource').value.trim();
+  S.completionAction= document.getElementById('completionAction').value.trim();
+  S.callbackUrl     = document.getElementById('callbackUrl').value.trim();
+}
+
+function showStep(n) {
+  syncFromDOM();
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.querySelector(`.step[data-step="${n}"]`).classList.add('active');
+  S.step = n;
+  updateNav();
+  if (n === 7) document.getElementById('preview-box').textContent = generateMarkdown();
+  window.scrollTo(0,0);
+}
+
+function updateNav() {
+  const color = STEP_COLORS[S.step];
+  document.documentElement.style.setProperty('--accent', color);
+  document.getElementById('sidebar').style.background = color;
+  document.getElementById('btn-back').disabled = S.step === 1;
+  const isLast = S.step === S.totalSteps;
+  document.getElementById('btn-next').style.display = isLast ? 'none' : '';
+  document.getElementById('step-counter').textContent = `Step ${S.step} of ${S.totalSteps}`;
+  renderSidebarSteps();
+}
+
+function renderSidebarSteps() {
+  document.getElementById('sidebar-steps').innerHTML = STEP_NAMES.slice(1).map((name,i) => {
+    const n = i+1;
+    const cls = n === S.step ? 'active' : n < S.step ? 'done' : '';
+    const icon = n < S.step ? '✓' : n;
+    return `<div class="sidebar-step ${cls}"><div class="sidebar-num">${icon}</div><div class="sidebar-step-name">${name}</div></div>`;
+  }).join('');
+}
+
+function nextStep() { if (S.step < S.totalSteps) showStep(S.step + 1); }
+function prevStep() { if (S.step > 1) showStep(S.step - 1); }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function slugify(el) {
+  el.value = el.value.toLowerCase().replace(/[^a-z0-9-]/g,'-').replace(/^-+/,'');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+function init() {
+  updateNav();
+  addPage({ purpose: 'Start page', url: '', requiresLogin: true });
+  addParam({ key: 'id', type: 'string', example: 'ITEM_123', description: 'Unique item identifier' });
+  renderChips();
+  if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+    document.getElementById('no-speech-note').style.display = '';
+  }
+}
+
+init();
+</script>
+</body>
+</html>

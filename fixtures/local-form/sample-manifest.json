@@ -1,0 +1,10 @@
+{
+  "id": "LOCAL-DEMO-001",
+  "title": "Test Release Title",
+  "artist": "Demo Artist",
+  "description": "A short description of this test release used for Browsy fixture testing.",
+  "category": "music",
+  "audio_file": "fixtures/local-form/upload-target/sample.txt",
+  "notify_email": true,
+  "_notes": "This is a test manifest for the local-form-demo fixture workflow. audio_file points to a dummy file."
+}

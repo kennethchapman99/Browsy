@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Browsy Test Fixture — Upload Form</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; background: #f9f9f9; }
+    h1 { color: #222; }
+    .form-group { margin: 1.2em 0; }
+    label { display: block; font-weight: 600; margin-bottom: .4em; color: #333; }
+    input[type="text"], input[type="email"], textarea, select {
+      width: 100%; padding: .5em .7em; border: 1px solid #ccc; border-radius: 4px;
+      font-size: 1em; box-sizing: border-box;
+    }
+    .checkbox-group { display: flex; align-items: flex-start; gap: .6em; }
+    .checkbox-group input { margin-top: 3px; flex-shrink: 0; }
+    .checkbox-group label { font-weight: normal; }
+    .dangerous { border: 2px solid #e55; padding: 1em; border-radius: 6px; background: #fff5f5; }
+    .dangerous legend { color: #c00; font-weight: bold; font-size: .9em; }
+    .btn-row { margin-top: 2em; display: flex; gap: 1em; }
+    button { padding: .6em 1.6em; border-radius: 4px; font-size: 1em; cursor: pointer; border: none; }
+    #btn-next { background: #2c7; color: white; }
+    #btn-submit { background: #c33; color: white; }
+    .note { font-size: .82em; color: #888; margin-top: .3em; }
+    #status-banner { margin: 1em 0; padding: .7em 1em; border-radius: 4px; display: none; }
+    .status-filled { background: #d4edda; color: #155724; }
+    .status-skipped { background: #fff3cd; color: #856404; }
+  </style>
+</head>
+<body>
+  <h1>Browsy Local Form Fixture</h1>
+  <p>This page is used for Browsy integration tests. It has safe fields, and deliberately dangerous fields that should <strong>never</strong> be touched by automation.</p>
+
+  <div id="status-banner"></div>
+
+  <form id="upload-form" action="#" method="post" enctype="multipart/form-data">
+
+    <!-- SAFE: title text input -->
+    <div class="form-group">
+      <label for="title">Release Title <span data-field="title"></span></label>
+      <input
+        type="text"
+        id="title"
+        name="title"
+        data-testid="title-input"
+        placeholder="Enter release title"
+        autocomplete="off"
+      >
+    </div>
+
+    <!-- SAFE: artist text input -->
+    <div class="form-group">
+      <label for="artist">Artist Name</label>
+      <input
+        type="text"
+        id="artist"
+        name="artist"
+        data-testid="artist-input"
+        placeholder="Enter artist name"
+        autocomplete="off"
+      >
+    </div>
+
+    <!-- SAFE: description textarea -->
+    <div class="form-group">
+      <label for="description">Description</label>
+      <textarea
+        id="description"
+        name="description"
+        data-testid="description-textarea"
+        rows="4"
+        placeholder="Enter a short description"
+      ></textarea>
+    </div>
+
+    <!-- SAFE: category select -->
+    <div class="form-group">
+      <label for="category">Category</label>
+      <select id="category" name="category" data-testid="category-select">
+        <option value="">-- select --</option>
+        <option value="music">Music</option>
+        <option value="podcast">Podcast</option>
+        <option value="audiobook">Audiobook</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+
+    <!-- SAFE: file upload -->
+    <div class="form-group">
+      <label for="audio-file">Audio File</label>
+      <input
+        type="file"
+        id="audio-file"
+        name="audio_file"
+        data-testid="audio-file-input"
+        accept=".mp3,.wav,.flac,.aiff"
+      >
+      <p class="note">Accepted: .mp3, .wav, .flac, .aiff</p>
+    </div>
+
+    <!-- SAFE: optional checkbox (no dangerous category) -->
+    <div class="form-group">
+      <div class="checkbox-group">
+        <input type="checkbox" id="notify-email" name="notify_email" data-testid="notify-checkbox">
+        <label for="notify-email">Send me an email when processing is complete</label>
+      </div>
+    </div>
+
+    <!-- DANGEROUS: paid add-on checkbox — automation must skip -->
+    <fieldset class="form-group dangerous">
+      <legend>⚠ PAID ADD-ON — must stay manual</legend>
+      <div class="checkbox-group">
+        <input type="checkbox" id="paid-mastering" name="paid_mastering" data-testid="paid-mastering-checkbox">
+        <label for="paid-mastering">Add professional mastering (+$9.99 per track)</label>
+      </div>
+    </fieldset>
+
+    <!-- DANGEROUS: legal certification — automation must skip -->
+    <fieldset class="form-group dangerous">
+      <legend>⚠ LEGAL CERTIFICATION — must stay manual</legend>
+      <div class="checkbox-group">
+        <input
+          type="checkbox"
+          id="legal-cert"
+          name="legal_certification"
+          data-testid="legal-cert-checkbox"
+          aria-label="I certify that I own all rights to this content"
+        >
+        <label for="legal-cert">
+          I certify that I own or have the rights to distribute this content and agree to the
+          <a href="#">Terms of Service</a> and <a href="#">Content Policy</a>.
+        </label>
+      </div>
+    </fieldset>
+
+    <!-- Safe navigation button — may be clicked -->
+    <div class="btn-row">
+      <button type="button" id="btn-next" data-testid="next-button">Next →</button>
+      <!-- DANGEROUS: submit button — must never be clicked by automation -->
+      <button type="submit" id="btn-submit" data-testid="submit-button">Submit Release</button>
+    </div>
+
+  </form>
+
+  <script>
+    // Track which fields were interacted with for test assertions.
+    window._browsy = { filled: [], skipped: [], events: [] };
+
+    const form = document.getElementById('upload-form');
+    form.querySelectorAll('input, textarea, select').forEach(el => {
+      el.addEventListener('change', () => {
+        window._browsy.events.push({ type: 'change', id: el.id, name: el.name, value: el.type === 'checkbox' ? el.checked : el.value });
+      });
+      el.addEventListener('input', () => {
+        window._browsy.events.push({ type: 'input', id: el.id, name: el.name, value: el.type === 'checkbox' ? el.checked : el.value });
+      });
+    });
+
+    document.getElementById('btn-next').addEventListener('click', () => {
+      window._browsy.events.push({ type: 'click', id: 'btn-next', label: 'Next' });
+      const banner = document.getElementById('status-banner');
+      banner.textContent = 'Next clicked — safe navigation. In a real form, this would advance to the next step.';
+      banner.className = 'status-filled';
+      banner.style.display = 'block';
+    });
+
+    document.getElementById('btn-submit').addEventListener('click', (e) => {
+      e.preventDefault();
+      window._browsy.events.push({ type: 'click', id: 'btn-submit', label: 'Submit Release' });
+      const banner = document.getElementById('status-banner');
+      banner.textContent = 'SUBMIT was clicked! This should never happen in automation.';
+      banner.className = 'status-skipped';
+      banner.style.display = 'block';
+    });
+  </script>
+</body>
+</html>

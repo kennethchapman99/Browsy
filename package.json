@@ -1,20 +1,27 @@
 {
   "name": "browsy",
-  "version": "0.1.0",
-  "description": "Automation harness factory for API, Playwright, and OpenClaw-style browser workflows.",
+  "version": "0.3.0",
+  "description": "Automation harness factory for API, Playwright, and browser agent workflows.",
   "type": "module",
   "bin": {
     "browsy": "src/cli/index.mjs"
   },
   "scripts": {
+    "wizard": "node wizard/server.mjs",
     "smoke": "node scripts/smoke-test.mjs",
+    "smoke:browser": "node scripts/smoke-test.mjs --browser",
     "validate:request": "node src/cli/index.mjs validate-request",
+    "plan": "node src/cli/index.mjs plan",
     "init:workflow": "node src/cli/index.mjs init",
     "auth:save": "node src/cli/index.mjs auth save",
     "auth:check": "node src/cli/index.mjs auth check",
     "discover": "node src/cli/index.mjs discover",
     "generate:prompt": "node src/cli/index.mjs generate-prompt",
-    "run": "node src/cli/index.mjs run"
+    "run": "node src/cli/index.mjs run",
+    "discover:all": "node src/cli/index.mjs discover:all",
+    "review": "node src/cli/index.mjs review",
+    "feedback": "node src/cli/index.mjs feedback",
+    "promote": "node src/cli/index.mjs promote"
   },
   "engines": {
     "node": ">=22"

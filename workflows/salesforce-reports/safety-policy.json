@@ -1,0 +1,21 @@
+{
+  "never_click_text": [
+    "Submit",
+    "Finalize",
+    "Pay",
+    "Purchase",
+    "Release",
+    "Send",
+    "Delete",
+    "Checkout",
+    "Continue & submit"
+  ],
+  "never_click_selectors": [],
+  "manual_only_categories": [
+    "Final submit",
+    "Payment or purchase",
+    "Legal certification checkboxes",
+    "Paid extras or add-ons",
+    "Deletion or destructive changes"
+  ]
+}

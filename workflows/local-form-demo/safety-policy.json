@@ -1,0 +1,31 @@
+{
+  "dry_run_default": true,
+  "pause_at_end_default": true,
+  "never_click_text": [
+    "Submit",
+    "Finalize",
+    "Release",
+    "Pay",
+    "Purchase",
+    "Checkout",
+    "Confirm order",
+    "Upload to stores",
+    "Continue & submit",
+    "Continue and submit",
+    "Save and submit",
+    "Send to stores",
+    "Send",
+    "Delete",
+    "Remove",
+    "Publish"
+  ],
+  "never_click_selectors": [],
+  "manual_only_categories": [
+    "legal certification",
+    "payment",
+    "purchase",
+    "paid extras",
+    "final submission",
+    "destructive action"
+  ]
+}

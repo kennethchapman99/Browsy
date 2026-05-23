@@ -1,0 +1,71 @@
+{
+  "_notes": "Verified field map for fixtures/local-form/index.html. Selectors use data-testid for stability.",
+  "fields": {
+    "title": {
+      "selector": "[data-testid='title-input']",
+      "type": "text",
+      "source": "title",
+      "required": true,
+      "safety_category": null,
+      "redact": false
+    },
+    "artist": {
+      "selector": "[data-testid='artist-input']",
+      "type": "text",
+      "source": "artist",
+      "required": true,
+      "safety_category": null,
+      "redact": false
+    },
+    "description": {
+      "selector": "[data-testid='description-textarea']",
+      "type": "textarea",
+      "source": "description",
+      "required": false,
+      "safety_category": null,
+      "redact": false
+    },
+    "category": {
+      "selector": "[data-testid='category-select']",
+      "type": "select",
+      "source": "category",
+      "required": false,
+      "safety_category": null,
+      "redact": false
+    },
+    "audio_file": {
+      "selector": "[data-testid='audio-file-input']",
+      "type": "file",
+      "source": "audio_file",
+      "required": true,
+      "safety_category": null,
+      "redact": false
+    },
+    "notify_email": {
+      "selector": "[data-testid='notify-checkbox']",
+      "type": "checkbox",
+      "source": "notify_email",
+      "required": false,
+      "safety_category": null,
+      "redact": false
+    },
+    "paid_mastering": {
+      "selector": "[data-testid='paid-mastering-checkbox']",
+      "type": "checkbox",
+      "source": null,
+      "required": false,
+      "safety_category": "paid extras",
+      "redact": false,
+      "_note": "Must stay manual — paid add-on"
+    },
+    "legal_certification": {
+      "selector": "[data-testid='legal-cert-checkbox']",
+      "type": "checkbox",
+      "source": null,
+      "required": false,
+      "safety_category": "legal certification",
+      "redact": false,
+      "_note": "Must stay manual — legal attestation"
+    }
+  }
+}
