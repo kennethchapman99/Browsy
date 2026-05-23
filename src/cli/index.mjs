@@ -113,6 +113,7 @@ function generatePlan() {
     field_action_map: req.fieldsActions,
     manual_only: req.manualOnlyActions,
     safety_constraints: req.safetyPolicy,
+    runtime_variables: req.runtimeVariables,
     acceptance_criteria: req.acceptanceCriteria,
     required_workflow_files: [
       `workflows/${req.workflowId}/workflow.yaml`,
@@ -205,6 +206,29 @@ function buildPlanMarkdown(req, plan) {
     lines.push('_None listed. Add URLs to ## 11 in AUTOMATION_REQUEST.md._');
   }
 
+  // Runtime variables section
+  const rv = req.runtimeVariables;
+  if (rv && (rv.input?.length || rv.captured?.length || rv.derived?.length)) {
+    lines.push('', '## Runtime Variables', '');
+    if (rv.input?.length) {
+      lines.push('**Input (provided before run):**');
+      for (const v of rv.input) lines.push(`- \`${v.name}\`${v.description ? ` — ${v.description}` : ''}${v.example ? ` (example: \`${v.example}\`)` : ''}`);
+      lines.push('');
+    }
+    if (rv.captured?.length) {
+      lines.push('**Captured (extracted during run):**');
+      for (const v of rv.captured) {
+        lines.push(`- \`${v.name}\` — source: \`${v.source}\`${v.regex ? `, regex: \`${v.regex}\`` : ''}${v.example ? `, example: \`${v.example}\`` : ''}${v.required === false ? ' _(optional)_' : ''}`);
+      }
+      lines.push('');
+    }
+    if (rv.derived?.length) {
+      lines.push('**Derived (computed from other variables):**');
+      for (const v of rv.derived) lines.push(`- \`${v.name}\` = \`${v.template}\``);
+      lines.push('');
+    }
+  }
+
   lines.push('', '## Safety Constraints', '');
   const policy = req.safetyPolicy || defaultSafetyPolicy();
   lines.push('**Never click text:**');
@@ -270,13 +294,17 @@ function initWorkflowFromRequest(req) {
   const dir = workflowDir(id);
   ensureDir(dir);
 
-  const startUrl = req.targetUrls.find(r => r.url?.startsWith('http'))?.url || '';
+  const startUrlRow = req.targetUrls.find(r => r.url?.startsWith('http'));
+  const startUrl = startUrlRow?.url || '';
+  const startUrlExample = startUrlRow?.url_example || startUrlRow?.example_url || '';
   const config = buildWorkflowConfig(id, {
     description: req.goal,
     startUrl,
+    startUrlExample: startUrlExample || undefined,
     authMode: req.authMode,
     targets: req.targetUrls,
     discoveryUrls: req.discoveryNeeds,
+    variables: req.runtimeVariables,
   });
 
   writeWorkflowFiles(id, dir, config, req);
@@ -295,8 +323,8 @@ function initWorkflowFromRequest(req) {
   }
 }
 
-function buildWorkflowConfig(id, { description, startUrl, authMode, targets = [], discoveryUrls = [] }) {
-  return {
+function buildWorkflowConfig(id, { description, startUrl, startUrlExample, authMode, targets = [], discoveryUrls = [], variables = null }) {
+  const config = {
     id,
     description,
     auth: {
@@ -310,7 +338,11 @@ function buildWorkflowConfig(id, { description, startUrl, authMode, targets = []
     },
     targets: {
       start_url: startUrl,
-      urls: targets.map(r => ({ purpose: r.purpose || '', url: r.url || '' }))
+      urls: targets.map(r => {
+        const entry = { purpose: r.purpose || '', url: r.url || '' };
+        if (r.url_example || r.example_url) entry.url_example = r.url_example || r.example_url;
+        return entry;
+      })
     },
     discovery_urls: discoveryUrls,
     execution_strategy: 'playwright',
@@ -321,6 +353,11 @@ function buildWorkflowConfig(id, { description, startUrl, authMode, targets = []
       discovered_fields: true
     }
   };
+  if (startUrlExample) config.targets.start_url_example = startUrlExample;
+  if (variables && (variables.input?.length || variables.captured?.length || variables.derived?.length)) {
+    config.variables = variables;
+  }
+  return config;
 }
 
 function writeWorkflowFiles(id, dir, config, req) {
@@ -328,7 +365,12 @@ function writeWorkflowFiles(id, dir, config, req) {
     ? req.safetyPolicy
     : defaultSafetyPolicy();
 
-  const inputContract = req.inputDataContract || { id: 'ITEM_123' };
+  // Input contract excludes captured variable names — they are runtime-only
+  const capturedNames = new Set((req.runtimeVariables?.captured || []).map(v => v.name));
+  const rawContract = req.inputDataContract || { id: 'ITEM_123' };
+  const inputContract = Object.fromEntries(
+    Object.entries(rawContract).filter(([k]) => !capturedNames.has(k))
+  );
 
   const fieldMapExample = buildFieldMapExample(req.fieldsActions || []);
 
@@ -357,7 +399,36 @@ function writeWorkflowFiles(id, dir, config, req) {
 }
 
 function buildWorkflowYaml(config) {
-  const urls = config.targets.urls.map(u => `    - url: ${u.url}\n      purpose: ${u.purpose}`).join('\n') || '    []';
+  const urls = config.targets.urls.map(u => {
+    let s = `    - url: ${u.url}\n      purpose: ${u.purpose}`;
+    if (u.url_example) s += `\n      url_example: ${u.url_example}`;
+    return s;
+  }).join('\n') || '    []';
+
+  const rv = config.variables;
+  let varsYaml = '';
+  if (rv && (rv.input?.length || rv.captured?.length || rv.derived?.length)) {
+    varsYaml = '\nvariables:';
+    if (rv.input?.length) {
+      varsYaml += '\n  input:';
+      for (const v of rv.input) varsYaml += `\n    - name: ${v.name}${v.example ? `\n      example: ${v.example}` : ''}`;
+    }
+    if (rv.captured?.length) {
+      varsYaml += '\n  captured:';
+      for (const v of rv.captured) {
+        varsYaml += `\n    - name: ${v.name}\n      source: ${v.source}`;
+        if (v.regex) varsYaml += `\n      regex: "${v.regex}"`;
+        if (v.selector) varsYaml += `\n      selector: "${v.selector}"`;
+        if (v.example) varsYaml += `\n      example: ${v.example}`;
+        if (v.required === false) varsYaml += `\n      required: false`;
+      }
+    }
+    if (rv.derived?.length) {
+      varsYaml += '\n  derived:';
+      for (const v of rv.derived) varsYaml += `\n    - name: ${v.name}\n      template: "${v.template}"`;
+    }
+  }
+
   return `id: ${config.id}
 description: ${config.description}
 auth:
@@ -368,7 +439,7 @@ runtime:
   headed_default: ${config.runtime.headed_default}
   pause_at_end_default: ${config.runtime.pause_at_end_default}
 targets:
-  start_url: ${config.targets.start_url || ''}
+  start_url: ${config.targets.start_url || ''}${config.targets.start_url_example ? '\n  start_url_example: ' + config.targets.start_url_example : ''}
   urls:
 ${urls}
 execution_strategy: ${config.execution_strategy}
@@ -376,7 +447,7 @@ artifacts:
   screenshots: ${config.artifacts.screenshots}
   html_snapshot: ${config.artifacts.html_snapshot}
   page_text_snapshot: ${config.artifacts.page_text_snapshot}
-  discovered_fields: ${config.artifacts.discovered_fields}
+  discovered_fields: ${config.artifacts.discovered_fields}${varsYaml}
 `;
 }
 
@@ -485,7 +556,32 @@ The browser pauses before any final action. Review the form, then complete manua
 \`\`\`bash
 npm run smoke
 \`\`\`
-`;
+${buildRuntimeVarsReadmeSection(config)}`;
+}
+
+function buildRuntimeVarsReadmeSection(config) {
+  const rv = config.variables;
+  if (!rv || !(rv.input?.length || rv.captured?.length || rv.derived?.length)) return '';
+  const lines = ['\n## Runtime variables\n'];
+  if (rv.input?.length) {
+    lines.push('**Input variables** (provide in the manifest):\n');
+    for (const v of rv.input) lines.push(`- \`${v.name}\`${v.example ? ` — e.g. \`${v.example}\`` : ''}`);
+    lines.push('');
+  }
+  if (rv.captured?.length) {
+    lines.push('**Captured variables** (extracted automatically during the run — not required in the manifest):\n');
+    for (const v of rv.captured) {
+      lines.push(`- \`${v.name}\` — source: \`${v.source}\`${v.regex ? `, regex: \`${v.regex}\`` : ''}${v.example ? ` (example: \`${v.example}\`)` : ''}`);
+    }
+    lines.push('');
+  }
+  if (rv.derived?.length) {
+    lines.push('**Derived variables** (computed from input + captured):\n');
+    for (const v of rv.derived) lines.push(`- \`${v.name}\` = \`${v.template}\``);
+    lines.push('');
+  }
+  lines.push('All captured and derived values are saved to `runtime-vars.json` in the run directory.\n');
+  return lines.join('\n');
 }
 
 function buildRunScript(id, config) {
@@ -495,7 +591,7 @@ function buildRunScript(id, config) {
  * Workflow runner: ${id}
  * Goal: ${config.description}
  *
- * Generated by Browsy v0.2 — review before first use.
+ * Generated by Browsy v0.3 — review before first use.
  * Replace placeholder selectors in field-map.local.json before running against a real site.
  *
  * Usage:
@@ -506,7 +602,8 @@ import {
   loadWorkflowConfig, loadManifest, loadSafetyPolicy, loadFieldMap,
   createRunDir, createRunLogger, writeRunArtifact, saveScreenshot,
   recordFilledField, recordSkippedField, recordError, finalizeRun,
-  getManifestValue
+  getManifestValue,
+  resolveTemplate, hasTemplateVars, captureVariables, computeDerived, saveRuntimeVars
 } from '../../src/core/workflow-runtime.mjs';
 import { isDangerousText, isManualOnly } from '../../src/core/safety.mjs';
 import { PlaywrightAdapter } from '../../src/adapters/playwright-adapter.mjs';
@@ -541,15 +638,61 @@ const skipped = [];
 const errors = [];
 const adapter = new PlaywrightAdapter();
 
+// Runtime variable context — seeded from input variables declared in workflow.json.
+// Input variables are resolved from the manifest; captured/derived are added during the run.
+const varDefs = config.variables || { input: [], captured: [], derived: [] };
+let runtimeVars = {};
+for (const def of (varDefs.input || [])) {
+  const val = manifest[def.name];
+  if (val !== undefined && val !== null) runtimeVars[def.name] = String(val);
+}
+
+// Helper: resolve a URL template if it contains {{...}} tokens, or return it as-is.
+function resolveUrl(urlTemplate) {
+  if (!hasTemplateVars(urlTemplate)) return urlTemplate;
+  try {
+    return resolveTemplate(urlTemplate, runtimeVars);
+  } catch (e) {
+    throw new Error(\`Cannot navigate — \${e.message}. Check that all capture steps ran before this navigation.\`);
+  }
+}
+
+// Helper: run variable capture + derive after a navigation step.
+async function captureAndDerive(label) {
+  if (!(varDefs.captured || []).length) return;
+  const { vars: updated, missing } = await captureVariables(adapter.page, varDefs.captured, runtimeVars);
+  runtimeVars = computeDerived(varDefs.derived || [], updated);
+  saveRuntimeVars(runDir, runtimeVars);
+  if (missing.length) {
+    logger.log('warn', \`[CAPTURE] Missing required variable(s) after \${label}: \${missing.join(', ')}\`);
+    for (const name of missing) {
+      recordSkippedField(skipped, name, \`missing runtime variable: \${name}\`);
+    }
+    return missing;
+  }
+  logger.log('info', \`[CAPTURE] Variables captured after \${label}: \${Object.keys(runtimeVars).join(', ')}\`);
+  return [];
+}
+
 try {
   await adapter.open({ headed, storageState: \`.auth/\${WORKFLOW_ID}.json\`, dryRun });
 
-  const startUrl = config.targets?.start_url || '${startUrl}';
-  if (!startUrl) throw new Error('No start_url in workflow.json. Set targets.start_url.');
+  const startUrlTemplate = config.targets?.start_url || '${startUrl}';
+  if (!startUrlTemplate) throw new Error('No start_url in workflow.json. Set targets.start_url.');
 
+  const startUrl = resolveUrl(startUrlTemplate);
   logger.log('info', 'Navigating to: ' + startUrl);
   await adapter.page.goto(startUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await adapter.snapshot(runDir, 'screenshot-start.png');
+
+  // Capture runtime variables from the start page if any capture specs are declared.
+  const missingAfterStart = await captureAndDerive('start page');
+  if (missingAfterStart?.length) {
+    logger.log('error', 'Stopping: required runtime variable(s) could not be captured from start page.');
+    finalizeRun(runDir, { logger, filled, skipped, errors, workflowId: WORKFLOW_ID, startUrl, dryRun, runtimeVars });
+    await adapter.close().catch(() => {});
+    process.exit(1);
+  }
 
   writeRunArtifact(runDir, 'page-text-snapshot.txt', await adapter.text());
   writeRunArtifact(runDir, 'html-snapshot.html', await adapter.html());
@@ -633,7 +776,7 @@ try {
   recordError(errors, 'workflow', err);
   await adapter.close().catch(() => {});
 } finally {
-  finalizeRun(runDir, { logger, filled, skipped, errors, workflowId: WORKFLOW_ID, startUrl, dryRun });
+  finalizeRun(runDir, { logger, filled, skipped, errors, workflowId: WORKFLOW_ID, startUrl: config.targets?.start_url || '', dryRun, runtimeVars: Object.keys(runtimeVars).length ? runtimeVars : null });
 }
 `;
 }

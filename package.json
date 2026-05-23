@@ -21,7 +21,8 @@
     "discover:all": "node src/cli/index.mjs discover:all",
     "review": "node src/cli/index.mjs review",
     "feedback": "node src/cli/index.mjs feedback",
-    "promote": "node src/cli/index.mjs promote"
+    "promote": "node src/cli/index.mjs promote",
+    "acceptance:song-flow": "node scripts/acceptance-song-flow.mjs"
   },
   "engines": {
     "node": ">=22"

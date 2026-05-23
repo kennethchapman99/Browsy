@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Song Creator</title>
+<style>
+  body { font-family: sans-serif; max-width: 640px; margin: 60px auto; padding: 20px; }
+  h1   { margin-bottom: 6px; }
+  .subtitle { color: #666; margin-bottom: 32px; font-size: .95rem; }
+  .field  { margin-bottom: 16px; }
+  label   { display: block; font-size: .85rem; color: #444; margin-bottom: 4px; }
+  input[type=text] { width: 100%; padding: 10px 12px; border: 1.5px solid #ddd;
+                     border-radius: 8px; font-size: 1rem; font-family: inherit; }
+  button  { padding: 10px 28px; font-size: 1rem; cursor: pointer; border: none;
+            background: #2ec4b4; color: #fff; border-radius: 8px; }
+  button:hover { background: #28a89a; }
+  #detail { display: none; margin-top: 32px; padding: 20px; background: #f0fff8;
+             border: 1.5px solid #a0e8d4; border-radius: 10px; }
+  .song-id { font-family: monospace; font-size: 1.15rem; font-weight: bold;
+              color: #156648; background: #e0fff0; padding: 4px 10px;
+              border-radius: 6px; letter-spacing: .04em; }
+  .song-url-line { margin-top: 10px; font-size: .9rem; color: #555; }
+  code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; font-size: .88rem; }
+  #creator { }
+</style>
+</head>
+<body>
+
+<div id="creator">
+  <h1>Song Creator</h1>
+  <p class="subtitle">Fill in the details and click Create. A unique Song ID will be generated.</p>
+
+  <div class="field">
+    <label for="song-title">Song title</label>
+    <input type="text" id="song-title" placeholder="e.g. Summer Haze" value="">
+  </div>
+  <div class="field">
+    <label for="artist-name">Artist name</label>
+    <input type="text" id="artist-name" placeholder="e.g. The Midnight" value="">
+  </div>
+
+  <button id="btn-create" onclick="createSong()">Create Song</button>
+</div>
+
+<div id="detail">
+  <p><strong>Song created successfully!</strong></p>
+  <p>Song ID: <span class="song-id" id="song-id-display"></span></p>
+  <p class="song-url-line">
+    Detail page URL: <code id="song-url-display"></code>
+  </p>
+  <p class="song-url-line" style="margin-top:8px;color:#888;font-size:.82rem">
+    This page is at <code id="current-hash-display"></code> — Browsy reads this URL to capture <code>songId</code>.
+  </p>
+</div>
+
+<script>
+window._browsy = { events: [] };
+
+function randChars(n, pool) {
+  pool = pool || 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  return Array.from({ length: n }, () => pool[Math.floor(Math.random() * pool.length)]).join('');
+}
+
+function generateSongId() {
+  // Format matches Pancake Robot: SONG_XXXXXXXX_XXXX_T01
+  return 'SONG_' + randChars(8) + '_' + randChars(4) + '_T01';
+}
+
+function createSong() {
+  window._browsy.events.push({ type: 'click', id: 'btn-create' });
+  const id = generateSongId();
+  // Update hash to simulate server-side navigation to the detail page
+  window.location.hash = '/songs/' + id;
+  showDetail(id);
+}
+
+function showDetail(id) {
+  document.getElementById('creator').style.display = 'none';
+  document.getElementById('song-id-display').textContent = id;
+  document.getElementById('song-url-display').textContent = 'http://localhost:3737/songs/' + id;
+  document.getElementById('current-hash-display').textContent = window.location.hash;
+  document.getElementById('detail').style.display = '';
+  document.title = 'Song: ' + id;
+}
+
+// If the hash already encodes a song ID (e.g. direct navigation to example URL),
+// show the detail view immediately — this enables discovery on the example URL.
+(function init() {
+  const m = window.location.hash.match(/^#\/songs\/(SONG_[A-Z0-9_]+)$/);
+  if (m) showDetail(m[1]);
+})();
+</script>
+</body>
+</html>

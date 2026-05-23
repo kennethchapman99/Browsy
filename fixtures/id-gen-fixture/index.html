@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ID Gen Fixture</title>
+<style>
+  body { font-family: sans-serif; max-width: 600px; margin: 60px auto; padding: 20px; }
+  h1   { margin-bottom: 24px; }
+  button { padding: 10px 24px; font-size: 1rem; cursor: pointer; border: none;
+           background: #2ec4b4; color: #fff; border-radius: 8px; }
+  button:hover { background: #28a89a; }
+  #result { margin-top: 32px; padding: 16px; background: #f0f8ff; border-radius: 8px;
+             display: none; border: 1px solid #c0d8ef; }
+  #item-id { font-family: monospace; font-size: 1.2rem; font-weight: bold; color: #1a7a4a; }
+  code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; font-size: .9rem; }
+</style>
+</head>
+<body>
+<h1>Item Creator</h1>
+<p>Click the button to create a new item. A unique ID will be generated and the
+   URL will be updated — Browsy can capture it as a runtime variable.</p>
+<button id="btn-create" onclick="createItem()">Create Item</button>
+
+<div id="result">
+  <p><strong>Item created successfully!</strong></p>
+  <p>Item ID: <span id="item-id"></span></p>
+  <p>You can navigate to: <code id="item-url"></code></p>
+</div>
+
+<script>
+window._browsy = { events: [] };
+
+function randChars(n) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  return Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+function createItem() {
+  const id = 'ITEM_' + randChars(8) + '_' + randChars(4);
+  window._browsy.events.push({ type: 'click', id: 'btn-create' });
+  // Update hash to simulate URL-based navigation (works in file:// context)
+  window.location.hash = '/items/' + id;
+  showResult(id);
+}
+
+function showResult(id) {
+  document.getElementById('item-id').textContent = id;
+  document.getElementById('item-url').textContent = window.location.href;
+  document.getElementById('result').style.display = '';
+  document.title = 'Item: ' + id;
+}
+
+// If the hash already encodes an item (page reload or direct nav), show result.
+(function init() {
+  const m = window.location.hash.match(/^#\/items\/(ITEM_[A-Z0-9_]+)$/);
+  if (m) showResult(m[1]);
+})();
+</script>
+</body>
+</html>

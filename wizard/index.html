@@ -850,14 +850,25 @@ body {
     <div class="steps-list" id="steps-list"></div>
   </div>
 
-  <!-- Step 4: Parameters -->
+  <!-- Step 4: Parameters / Runtime Variables -->
   <div class="step" data-step="4">
-    <div class="step-badge">Step 4 of 7 · Parameters</div>
+    <div class="step-badge">Step 4 of 7 · Variables</div>
     <h1 class="step-title">What changes each run?</h1>
-    <p class="step-hint">List the variables the automation needs at runtime — IDs, titles, file paths, toggles. These become the input manifest.</p>
+    <p class="step-hint">Declare all variables the automation needs. <strong>Input</strong> = provided before the run. <strong>Captured</strong> = extracted from the page during the run (e.g. a generated ID in the URL). <strong>Derived</strong> = computed from input + captured.</p>
 
+    <div class="section-label" style="margin-top:24px">Input variables <span style="font-weight:400;color:var(--muted)">— provided before the run (become the manifest)</span></div>
     <div class="table-builder" id="params-list"></div>
-    <button class="btn-add" onclick="addParam()">+ Add parameter</button>
+    <button class="btn-add" onclick="addParam()">+ Add input variable</button>
+
+    <div class="section-label" style="margin-top:32px">Captured variables <span style="font-weight:400;color:var(--muted)">— extracted from the page during the run (not in manifest)</span></div>
+    <div class="table-builder" id="captured-list"></div>
+    <button class="btn-add" onclick="addCaptured()">+ Add captured variable</button>
+
+    <div class="section-label" style="margin-top:32px">Derived variables <span style="font-weight:400;color:var(--muted)">— built from input + captured using <code style="font-size:.85em">{{varName}}</code> templates</span></div>
+    <div class="table-builder" id="derived-list"></div>
+    <button class="btn-add" onclick="addDerived()">+ Add derived variable</button>
+
+    <div id="var-validation" style="margin-top:20px;font-size:.85rem;color:var(--coral);display:none"></div>
   </div>
 
   <!-- Step 5: Data wiring -->
@@ -968,6 +979,8 @@ const S = {
   workflowName: '', goal: '', startUrl: '',
   pages: [], authMode: 'manual-save-state',
   walkthroughSteps: [], parameters: [],
+  // Runtime variables: input (user-provided), captured (from page), derived (computed)
+  runtimeVars: { input: [], captured: [], derived: [] },
   dataSource: '', completionAction: '', callbackUrl: '',
   manualActions: [
     'Final submit','Payment or purchase',
@@ -1089,16 +1102,25 @@ function addPage(d={}) {
   S.pages.push({ purpose: d.purpose||'', url: d.url||'', requiresLogin: d.requiresLogin||false });
   renderPages();
 }
+function hasTemplateVars(s) { return typeof s === 'string' && /\{\{[^}]+\}\}/.test(s); }
+
 function renderPages() {
   document.getElementById('pages-list').innerHTML = S.pages.map((p,i) => `
-    <div class="table-row" style="grid-template-columns:1.6fr 2.2fr auto auto">
-      <input type="text" placeholder="Purpose (e.g. Login page)" value="${esc(p.purpose)}" oninput="S.pages[${i}].purpose=this.value">
-      <input type="url"  placeholder="https://…" value="${esc(p.url)}" oninput="S.pages[${i}].url=this.value">
+    <div class="table-row" style="grid-template-columns:1.6fr 2.2fr auto auto;row-gap:6px">
+      <input type="text" placeholder="Purpose (e.g. Song detail)" value="${esc(p.purpose)}" oninput="S.pages[${i}].purpose=this.value">
+      <input type="url"  placeholder="https://… or http://…/{{varName}}" value="${esc(p.url)}" oninput="S.pages[${i}].url=this.value;renderPages()">
       <label class="toggle-row" style="justify-content:center;gap:5px">
         <input type="checkbox" class="toggle" ${p.requiresLogin?'checked':''} onchange="S.pages[${i}].requiresLogin=this.checked">
         <span style="font-size:.78rem;color:var(--muted)">Login</span>
       </label>
       <button class="btn-remove" onclick="S.pages.splice(${i},1);renderPages()">×</button>
+      ${hasTemplateVars(p.url) ? `
+      <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px;margin-top:2px">
+        <span style="font-size:.78rem;color:var(--orange);white-space:nowrap">📌 Example URL for discovery:</span>
+        <input type="url" style="flex:1;font-size:.85rem;padding:6px 10px;border:1.5px solid var(--orange);border-radius:8px"
+          placeholder="e.g. http://…/SONG_MPHMZMDK_E9UU_T01 (concrete URL for discovery)"
+          value="${esc(p.urlExample||'')}" oninput="S.pages[${i}].urlExample=this.value">
+      </div>` : ''}
     </div>`).join('');
 }
 
@@ -1109,7 +1131,7 @@ function setAuth(btn, mode) {
   btn.classList.add('active');
 }
 
-// ── Params ───────────────────────────────────────────────────────────────────
+// ── Params (input variables) ──────────────────────────────────────────────────
 function addParam(d={}) {
   S.parameters.push({ key: d.key||'', type: d.type||'string', example: d.example||'', description: d.description||'' });
   renderParams();
@@ -1117,7 +1139,7 @@ function addParam(d={}) {
 function renderParams() {
   document.getElementById('params-list').innerHTML = S.parameters.map((p,i) => `
     <div class="table-row" style="grid-template-columns:1fr 90px 1fr 1.4fr auto">
-      <input type="text" placeholder="key (e.g. songId)" value="${esc(p.key)}" oninput="S.parameters[${i}].key=this.value">
+      <input type="text" placeholder="key (e.g. albumTheme)" value="${esc(p.key)}" oninput="S.parameters[${i}].key=this.value;validateVarRefs()">
       <select onchange="S.parameters[${i}].type=this.value">
         ${['string','number','boolean','enum'].map(t=>`<option value="${t}"${p.type===t?' selected':''}>${t}</option>`).join('')}
       </select>
@@ -1125,6 +1147,68 @@ function renderParams() {
       <input type="text" placeholder="Description" value="${esc(p.description)}" oninput="S.parameters[${i}].description=this.value">
       <button class="btn-remove" onclick="S.parameters.splice(${i},1);renderParams()">×</button>
     </div>`).join('');
+}
+
+// ── Captured variables ────────────────────────────────────────────────────────
+function addCaptured(d={}) {
+  S.runtimeVars.captured.push({ name: d.name||'', source: d.source||'current_url', regex: d.regex||'', selector: d.selector||'', example: d.example||'', required: d.required!==false });
+  renderCaptured();
+}
+function renderCaptured() {
+  const el = document.getElementById('captured-list');
+  if (!el) return;
+  el.innerHTML = S.runtimeVars.captured.map((c,i) => `
+    <div class="table-row" style="grid-template-columns:1fr 1fr 1.5fr 1fr auto;row-gap:4px">
+      <input type="text" placeholder="name (e.g. songId)" value="${esc(c.name)}" oninput="S.runtimeVars.captured[${i}].name=this.value;validateVarRefs()">
+      <select onchange="S.runtimeVars.captured[${i}].source=this.value;renderCaptured()">
+        ${['current_url','page_text','selector_text','selector_attribute'].map(s=>`<option value="${s}"${c.source===s?' selected':''}>${s}</option>`).join('')}
+      </select>
+      <input type="text" placeholder="${c.source==='current_url'||c.source==='page_text' ? 'regex (e.g. /songs/(SONG_[A-Z0-9_]+))' : 'CSS selector'}"
+        value="${esc(c.source==='selector_text'||c.source==='selector_attribute' ? c.selector : c.regex)}"
+        oninput="S.runtimeVars.captured[${i}][${JSON.stringify(c.source==='selector_text'||c.source==='selector_attribute'?'selector':'regex')}]=this.value">
+      <input type="text" placeholder="Example value" value="${esc(c.example)}" oninput="S.runtimeVars.captured[${i}].example=this.value">
+      <button class="btn-remove" onclick="S.runtimeVars.captured.splice(${i},1);renderCaptured()">×</button>
+    </div>`).join('') || '<p style="color:var(--muted);font-size:.85rem;margin:4px 0">No captured variables yet.</p>';
+}
+
+// ── Derived variables ─────────────────────────────────────────────────────────
+function addDerived(d={}) {
+  S.runtimeVars.derived.push({ name: d.name||'', template: d.template||'' });
+  renderDerived();
+}
+function renderDerived() {
+  const el = document.getElementById('derived-list');
+  if (!el) return;
+  el.innerHTML = S.runtimeVars.derived.map((d,i) => `
+    <div class="table-row" style="grid-template-columns:1fr 2fr auto">
+      <input type="text" placeholder="name (e.g. songUrl)" value="${esc(d.name)}" oninput="S.runtimeVars.derived[${i}].name=this.value">
+      <input type="text" placeholder="template (e.g. http://localhost:3737/songs/{{songId}})"
+        value="${esc(d.template)}" oninput="S.runtimeVars.derived[${i}].template=this.value;validateVarRefs()">
+      <button class="btn-remove" onclick="S.runtimeVars.derived.splice(${i},1);renderDerived()">×</button>
+    </div>`).join('') || '<p style="color:var(--muted);font-size:.85rem;margin:4px 0">No derived variables yet.</p>';
+}
+
+// ── Validate {{varName}} references across pages and derived templates ─────────
+function validateVarRefs() {
+  const declared = new Set([
+    ...S.parameters.filter(p=>p.key).map(p=>p.key),
+    ...S.runtimeVars.captured.filter(c=>c.name).map(c=>c.name),
+    ...S.runtimeVars.derived.filter(d=>d.name).map(d=>d.name),
+  ]);
+  const re = /\{\{([^}]+)\}\}/g;
+  const undeclared = new Set();
+  const checkStr = s => { let m; re.lastIndex=0; while((m=re.exec(s))!==null) if(!declared.has(m[1].trim())) undeclared.add(m[1].trim()); };
+  S.pages.forEach(p => checkStr(p.url||''));
+  S.runtimeVars.derived.forEach(d => checkStr(d.template||''));
+  const el = document.getElementById('var-validation');
+  if (!el) return;
+  if (undeclared.size) {
+    el.style.display='';
+    el.textContent = '⚠ Undeclared variable(s): ' + [...undeclared].map(v=>`{{${v}}}`).join(', ') + ' — add them as input, captured, or derived above.';
+  } else {
+    el.style.display='none';
+    el.textContent='';
+  }
 }
 
 // ── Safety chips ─────────────────────────────────────────────────────────────
@@ -1147,21 +1231,66 @@ function addChip(type) {
 function generateMarkdown() {
   const id = S.workflowName || 'my-workflow';
   const startUrl = S.startUrl || S.pages[0]?.url || 'https://example.com';
+
+  // Pages table — add Example URL column when any URL has template vars
+  const anyTemplated = S.pages.some(p => hasTemplateVars(p.url||''));
   const pagesRows = S.pages.length
-    ? S.pages.map(p=>`| ${p.purpose||'Page'} | ${p.url} | ${p.requiresLogin?'yes':'no'} | |`).join('\n')
-    : `| Start page | ${startUrl} | yes | |`;
+    ? S.pages.map(p => {
+        const exCol = anyTemplated ? ` | ${p.urlExample||''}` : '';
+        return `| ${p.purpose||'Page'} | ${p.url||''} | ${p.requiresLogin?'yes':'no'}${exCol} | |`;
+      }).join('\n')
+    : `| Start page | ${startUrl} | yes${anyTemplated?' | ':''} | |`;
+  const pagesHeader = anyTemplated
+    ? `| Purpose | URL | Requires login? | Example URL | Notes |\n| --- | --- | --- | --- | --- |`
+    : `| Purpose | URL | Requires login? | Notes |\n| --- | --- | --- | --- |`;
+
+  // Input contract — only input parameters (not captured vars)
+  const capturedNames = new Set(S.runtimeVars.captured.filter(c=>c.name).map(c=>c.name));
   const contract = { id: 'ITEM_123' };
-  S.parameters.forEach(p => { if (p.key) contract[p.key] = p.example || (p.type==='boolean'?false:p.type==='number'?0:'value'); });
+  S.parameters.forEach(p => {
+    if (p.key && !capturedNames.has(p.key))
+      contract[p.key] = p.example || (p.type==='boolean'?false:p.type==='number'?0:'value');
+  });
   if (S.callbackUrl) contract.callback_url = S.callbackUrl;
+
+  // Runtime variables section (5a) — only emit if any are declared
+  const rv = S.runtimeVars;
+  const hasRv = rv.input?.length || rv.captured?.length || rv.derived?.length || S.parameters.filter(p=>p.key).length;
+  let runtimeVarsSection = '';
+  if (hasRv) {
+    const rvObj = {
+      input: S.parameters.filter(p=>p.key).map(p=>({ name:p.key, description:p.description||undefined, example:p.example||undefined })),
+      captured: rv.captured.filter(c=>c.name).map(c=>{
+        const v = { name:c.name, source:c.source };
+        if (c.source==='selector_text'||c.source==='selector_attribute') { if(c.selector) v.selector=c.selector; }
+        else { if(c.regex) v.regex=c.regex; }
+        if(c.example) v.example=c.example;
+        if(c.required===false) v.required=false;
+        return v;
+      }),
+      derived: rv.derived.filter(d=>d.name&&d.template).map(d=>({ name:d.name, template:d.template })),
+    };
+    // Remove empty arrays
+    if (!rvObj.input.length) delete rvObj.input;
+    if (!rvObj.captured.length) delete rvObj.captured;
+    if (!rvObj.derived.length) delete rvObj.derived;
+    if (Object.keys(rvObj).length) {
+      runtimeVarsSection = `\n## 5a. Runtime variables\n\n\`\`\`json\n${JSON.stringify(rvObj, null, 2)}\n\`\`\`\n`;
+    }
+  }
+
   const steps = S.walkthroughSteps.length
     ? S.walkthroughSteps.map((s,i)=>`${i+1}. **${s.title}**: ${s.transcript}`).join('\n')
     : '1. Open the start page.\n2. Authenticate if needed.\n3. Fill, upload, or select fields.\n4. Stop before final action.\n5. Save artifacts and logs.';
   const fieldsRows = S.parameters.filter(p=>p.key).length
     ? S.parameters.filter(p=>p.key).map(p=>`| ${p.key} | \`${p.key}\` | unknown until discovery | ${p.description||'See walkthrough'} |`).join('\n')
     : '| (Run discovery to identify fields) | | | |';
+
+  // Discovery URLs — use example URLs for templated pages
   const discoveryUrls = S.pages.filter(p=>p.url).length
-    ? S.pages.filter(p=>p.url).map(p=>`- ${p.url}`).join('\n')
+    ? S.pages.filter(p=>p.url).map(p => hasTemplateVars(p.url) && p.urlExample ? `- ${p.urlExample} _(example for: ${p.url})_` : `- ${p.url}`).join('\n')
     : `- ${startUrl}`;
+
   const safetyJson = JSON.stringify({ never_click_text: S.dangerText, never_click_selectors: [], manual_only_categories: S.manualActions }, null, 2);
   const narration = S.walkthroughSteps.length
     ? S.walkthroughSteps.map((s,i)=>`**Step ${i+1}: ${s.title}**\n\n> ${s.transcript}`).join('\n\n')
@@ -1171,7 +1300,12 @@ function generateMarkdown() {
     : '| Local files | files | Source of truth | |';
   const completionNote = S.completionAction ? `\n**Completion action:** ${S.completionAction}` : '';
 
-  return `# Browsy Automation Request\n\n## 1. Workflow name\n\n\`${id}\`\n\n## 2. Goal\n\n${S.goal||'Describe the goal here.'}\n\n## 3. Target websites / pages\n\n| Purpose | URL | Requires login? | Notes |\n| --- | --- | --- | --- |\n${pagesRows}\n\n## 4. Existing APIs or local systems\n\n| System | Type | Purpose | Auth/notes |\n| --- | --- | --- | --- |\n${dataSourceRow}\n\n## 5. Input data contract\n\n\`\`\`json\n${JSON.stringify(contract, null, 2)}\n\`\`\`\n\n## 6. Desired workflow steps\n\n${steps}\n\n## 7. Fields to fill or upload\n\n| Field / action | Source in input | Website field/page | Rule / why |\n| --- | --- | --- | --- |\n${fieldsRows}\n\n## 8. Actions that must stay manual\n\n${S.manualActions.map(a=>`- ${a}`).join('\n')}\n\n## 9. Human checkpoints\n\n- Stop before final submit.\n- Leave browser open by default.\n- Provide \`--no-pause\` only for non-destructive dry-runs.\n\n## 10. Authentication plan\n\n- ${S.authMode}\n\n## 11. Discovery needs\n\n${discoveryUrls}\n\nThe generated harness should produce:\n\n- discovered-fields.json\n- discovered-fields.md\n- screenshots\n- HTML snapshot\n- page text snapshot\n\n## 12. Safety policy\n\n\`\`\`json\n${safetyJson}\n\`\`\`\n\n## 13. Output artifacts expected\n\nEvery run should save:\n\n- run-log.json\n- filled-fields.json\n- skipped-fields.json\n- errors.json\n- screenshot-start.png\n- screenshot-after-fill.png\n- screenshot-final-review.png if reached\n- page-text-snapshot.txt\n- html-snapshot.html${completionNote}\n\n## 14. Test commands expected\n\n\`\`\`bash\nnpm install\nnpm run smoke\nnpm run auth:save -- --workflow ${id}\nnpm run auth:check -- --workflow ${id} --url ${startUrl}\nnpm run discover -- --workflow ${id} --url ${startUrl}\nnpm run run -- --workflow ${id} --manifest workflows/${id}/manifest.example.json --dry-run\n\`\`\`\n\n## 15. Acceptance criteria\n\n- Auth works or failure path is clearly documented.\n- DOM discovery works.\n- Dry-run fills/uploads safe fields.\n- Dangerous actions are blocked.\n- Browser pauses before manual checkpoint.\n- Logs/screenshots are saved.\n- A coding agent can rerun tests and understand failures.\n\n## 16. Narrated walkthrough\n\n${narration}\n`;
+  // Acceptance criteria — mention runtime vars if captured vars are declared
+  const capturedAC = rv.captured.filter(c=>c.name).length
+    ? `\n- Captured variables are not required in the input manifest.\n- Missing captured variables produce useful run-review.md feedback.\n- runtime-vars.json is saved to the run directory after each capture step.`
+    : '';
+
+  return `# Browsy Automation Request\n\n## 1. Workflow name\n\n\`${id}\`\n\n## 2. Goal\n\n${S.goal||'Describe the goal here.'}\n\n## 3. Target websites / pages\n\n${pagesHeader}\n${pagesRows}\n\n## 4. Existing APIs or local systems\n\n| System | Type | Purpose | Auth/notes |\n| --- | --- | --- | --- |\n${dataSourceRow}\n\n## 5. Input data contract\n\n\`\`\`json\n${JSON.stringify(contract, null, 2)}\n\`\`\`\n${runtimeVarsSection}\n## 6. Desired workflow steps\n\n${steps}\n\n## 7. Fields to fill or upload\n\n| Field / action | Source in input | Website field/page | Rule / why |\n| --- | --- | --- | --- |\n${fieldsRows}\n\n## 8. Actions that must stay manual\n\n${S.manualActions.map(a=>`- ${a}`).join('\n')}\n\n## 9. Human checkpoints\n\n- Stop before final submit.\n- Leave browser open by default.\n- Provide \`--no-pause\` only for non-destructive dry-runs.\n\n## 10. Authentication plan\n\n- ${S.authMode}\n\n## 11. Discovery needs\n\n${discoveryUrls}\n\nThe generated harness should produce:\n\n- discovered-fields.json\n- discovered-fields.md\n- screenshots\n- HTML snapshot\n- page text snapshot\n\n## 12. Safety policy\n\n\`\`\`json\n${safetyJson}\n\`\`\`\n\n## 13. Output artifacts expected\n\nEvery run should save:\n\n- run-log.json\n- filled-fields.json\n- skipped-fields.json\n- errors.json\n- runtime-vars.json (when runtime variables are captured)\n- screenshot-start.png\n- screenshot-after-fill.png\n- screenshot-final-review.png if reached\n- page-text-snapshot.txt\n- html-snapshot.html${completionNote}\n\n## 14. Test commands expected\n\n\`\`\`bash\nnpm install\nnpm run smoke\nnpm run auth:save -- --workflow ${id}\nnpm run auth:check -- --workflow ${id} --url ${startUrl}\nnpm run discover -- --workflow ${id} --url ${startUrl}\nnpm run run -- --workflow ${id} --manifest workflows/${id}/manifest.example.json --dry-run\n\`\`\`\n\n## 15. Acceptance criteria\n\n- Auth works or failure path is clearly documented.\n- DOM discovery works.\n- Dry-run fills/uploads safe fields.\n- Dangerous actions are blocked.\n- Browser pauses before manual checkpoint.\n- Logs/screenshots are saved.\n- A coding agent can rerun tests and understand failures.${capturedAC}\n\n## 16. Narrated walkthrough\n\n${narration}\n`;
 }
 
 // ── Write ─────────────────────────────────────────────────────────────────────
@@ -1763,6 +1897,8 @@ function init() {
   addPage({ purpose: 'Start page', url: '', requiresLogin: true });
   addParam({ key: 'id', type: 'string', example: 'ITEM_123', description: 'Unique item identifier' });
   renderChips();
+  renderCaptured();
+  renderDerived();
   if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
     document.getElementById('no-speech-note').style.display = '';
   }

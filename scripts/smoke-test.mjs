@@ -58,6 +58,7 @@ const requiredFiles = [
   'fixtures/local-form/index.html',
   'fixtures/local-form/sample-manifest.json',
   'fixtures/local-form/field-map.json',
+  'fixtures/song-creator/index.html',
   'wizard/server.mjs',
   'wizard/index.html'
 ];
@@ -558,7 +559,118 @@ try {
 }
 
 // ---------------------------------------------------------------------------
-// 12. Browser tests (opt-in)
+// 12. Runtime variable engine (no browser)
+// ---------------------------------------------------------------------------
+section('Runtime variable engine (no browser)');
+
+try {
+  const {
+    resolveTemplate, tryResolveTemplate, extractTemplateVars, hasTemplateVars,
+    validateTemplateVars, computeDerived, saveRuntimeVars, loadRuntimeVars
+  } = await import('../src/core/runtime-vars.mjs');
+  const { join: pjoin } = await import('path');
+  const { ensureDir, writeJson } = await import('../src/core/paths.mjs');
+  const os = await import('os');
+
+  // resolveTemplate
+  const vars = { songId: 'SONG_ABC123', host: 'localhost:3737' };
+  const resolved = resolveTemplate('http://{{host}}/songs/{{songId}}', vars);
+  if (resolved !== 'http://localhost:3737/songs/SONG_ABC123')
+    fail('resolveTemplate: expected correct substitution, got ' + resolved);
+  else pass('resolveTemplate: substitutes correctly');
+
+  // resolveTemplate throws on missing variable
+  try {
+    resolveTemplate('http://example.com/{{missing}}', {});
+    fail('resolveTemplate: should throw on missing variable');
+  } catch (e) {
+    if (e.message.includes('missing')) pass('resolveTemplate: throws on unresolved variable');
+    else fail('resolveTemplate: wrong error message — ' + e.message);
+  }
+
+  // tryResolveTemplate returns null instead of throwing
+  const nullResult = tryResolveTemplate('http://example.com/{{noSuchVar}}', {});
+  if (nullResult !== null) fail('tryResolveTemplate: should return null for missing var, got ' + nullResult);
+  else pass('tryResolveTemplate: returns null for missing variable');
+
+  // extractTemplateVars
+  const extracted = extractTemplateVars('http://{{host}}/songs/{{songId}}/details');
+  if (extracted.length !== 2 || !extracted.includes('host') || !extracted.includes('songId'))
+    fail('extractTemplateVars: expected [host, songId], got ' + JSON.stringify(extracted));
+  else pass('extractTemplateVars: extracts two variables');
+
+  // extractTemplateVars with no vars
+  const noVars = extractTemplateVars('https://example.com/static');
+  if (noVars.length !== 0) fail('extractTemplateVars: should return [] for plain URL');
+  else pass('extractTemplateVars: returns [] for URL with no templates');
+
+  // hasTemplateVars
+  if (!hasTemplateVars('http://example.com/{{id}}')) fail('hasTemplateVars: should return true');
+  else pass('hasTemplateVars: returns true for templated string');
+  if (hasTemplateVars('https://example.com/plain')) fail('hasTemplateVars: should return false for plain URL');
+  else pass('hasTemplateVars: returns false for plain URL');
+
+  // validateTemplateVars — all declared
+  const defs = { input: [{ name: 'albumId' }], captured: [{ name: 'songId' }], derived: [{ name: 'songUrl' }] };
+  const noIssues = validateTemplateVars(['http://x.com/{{albumId}}/songs/{{songId}}', '{{songUrl}}'], defs);
+  if (noIssues.length !== 0) fail('validateTemplateVars: should find no issues when all vars declared');
+  else pass('validateTemplateVars: no issues when all vars declared');
+
+  // validateTemplateVars — undeclared variable
+  const issues = validateTemplateVars(['http://x.com/{{undeclared}}'], defs);
+  if (!issues.length || issues[0].variable !== 'undeclared')
+    fail('validateTemplateVars: should flag undeclared variable');
+  else pass('validateTemplateVars: flags undeclared {{undeclared}}');
+
+  // computeDerived
+  const baseVars = { songId: 'SONG_XYZ' };
+  const derived = [{ name: 'songUrl', template: 'http://localhost:3737/songs/{{songId}}' }];
+  const withDerived = computeDerived(derived, baseVars);
+  if (withDerived.songUrl !== 'http://localhost:3737/songs/SONG_XYZ')
+    fail('computeDerived: expected correct URL, got ' + withDerived.songUrl);
+  else pass('computeDerived: builds derived URL correctly');
+
+  // computeDerived skips when dependency missing (no throw)
+  const partialDerived = computeDerived([{ name: 'url', template: '{{missingVar}}/path' }], {});
+  if ('url' in partialDerived) fail('computeDerived: should skip if dependency is missing');
+  else pass('computeDerived: skips derived var when dependency not yet captured');
+
+  // saveRuntimeVars / loadRuntimeVars round-trip
+  const tmpDir = pjoin(os.default.tmpdir(), 'browsy-smoke-' + Date.now());
+  ensureDir(tmpDir);
+  const testVars = { songId: 'SONG_TEST', songUrl: 'http://localhost:3737/songs/SONG_TEST' };
+  saveRuntimeVars(tmpDir, testVars);
+  const loaded = loadRuntimeVars(tmpDir);
+  if (loaded.songId !== 'SONG_TEST' || loaded.songUrl !== 'http://localhost:3737/songs/SONG_TEST')
+    fail('saveRuntimeVars/loadRuntimeVars: round-trip failed — ' + JSON.stringify(loaded));
+  else pass('saveRuntimeVars/loadRuntimeVars: round-trip works');
+
+  // loadRuntimeVars returns {} when file missing
+  const emptyDir = pjoin(os.default.tmpdir(), 'browsy-smoke-empty-' + Date.now());
+  ensureDir(emptyDir);
+  const empty = loadRuntimeVars(emptyDir);
+  if (typeof empty !== 'object' || Object.keys(empty).length !== 0)
+    fail('loadRuntimeVars: should return {} when file missing');
+  else pass('loadRuntimeVars: returns {} when runtime-vars.json absent');
+
+  // id-gen-fixture file exists
+  const fixturePath = join(REPO_ROOT, 'fixtures/id-gen-fixture/index.html');
+  if (!fs.existsSync(fixturePath)) fail('id-gen-fixture: index.html missing');
+  else {
+    const html = fs.readFileSync(fixturePath, 'utf8');
+    if (!html.includes('createItem')) fail('id-gen-fixture: missing createItem function');
+    else pass('id-gen-fixture: index.html exists and contains createItem()');
+    if (!html.includes('ITEM_')) fail('id-gen-fixture: missing ITEM_ prefix in ID generation');
+    else pass('id-gen-fixture: generates ITEM_-prefixed IDs');
+  }
+
+} catch (err) {
+  fail('Runtime variable engine threw: ' + err.message);
+  if (process.env.BROWSY_DEBUG) console.error(err.stack);
+}
+
+// ---------------------------------------------------------------------------
+// 13. Browser tests (opt-in)
 // ---------------------------------------------------------------------------
 
 if (withBrowser) {
@@ -765,6 +877,57 @@ async function runBrowserTests() {
     const errorsJson = JSON.parse(fs.readFileSync(join(runDir, 'errors.json'), 'utf8'));
     if (errorsJson.length) warn('Browser: ' + errorsJson.length + ' error(s) in run: ' + errorsJson.map(e => e.field).join(', '));
     else pass('Browser: no errors in dry-run');
+
+    // ── id-gen fixture: variable capture from current URL ──
+    const { captureFromPage, captureVariables, computeDerived, saveRuntimeVars, loadRuntimeVars, resolveTemplate } = await import('../src/core/runtime-vars.mjs');
+
+    const idFixturePath = join(REPO_ROOT, 'fixtures/id-gen-fixture/index.html');
+    const idFixtureUrl = 'file://' + idFixturePath;
+
+    const idPage = await context.newPage();
+    await idPage.goto(idFixtureUrl, { waitUntil: 'domcontentloaded' });
+    pass('Browser id-gen: navigated to fixture');
+
+    // Click "Create Item" to generate an ID and update the hash
+    await idPage.click('#btn-create');
+    await idPage.waitForFunction(() => window.location.hash.startsWith('#/items/'));
+    pass('Browser id-gen: Create Item clicked, hash updated');
+
+    // Capture itemId from current URL hash
+    const capturedUrl = idPage.url();
+    const captureSpec = { source: 'current_url', regex: '#/items/(ITEM_[A-Z0-9_]+)' };
+    const capturedId = await captureFromPage(idPage, captureSpec);
+    if (!capturedId || !capturedId.startsWith('ITEM_'))
+      fail('Browser id-gen: captureFromPage failed to extract ITEM_ ID from URL — got: ' + capturedId);
+    else pass('Browser id-gen: captureFromPage extracted itemId: ' + capturedId);
+
+    // captureVariables using a capture spec array
+    const captureSpecArray = [{ name: 'itemId', source: 'current_url', regex: '#/items/(ITEM_[A-Z0-9_]+)', required: true }];
+    const { vars: captured, missing } = await captureVariables(idPage, captureSpecArray, {});
+    if (missing.length) fail('Browser id-gen: captureVariables reported missing vars: ' + missing.join(', '));
+    else pass('Browser id-gen: captureVariables captured itemId: ' + captured.itemId);
+
+    // computeDerived builds URL from captured var
+    const derivedDefs = [{ name: 'itemUrl', template: 'http://localhost:3737/items/{{itemId}}' }];
+    const withDerived = computeDerived(derivedDefs, captured);
+    const expectedUrl = 'http://localhost:3737/items/' + captured.itemId;
+    if (withDerived.itemUrl !== expectedUrl)
+      fail('Browser id-gen: computeDerived got ' + withDerived.itemUrl + ', expected ' + expectedUrl);
+    else pass('Browser id-gen: computeDerived built correct itemUrl');
+
+    // save and reload runtime-vars.json
+    const idRunDir = createRunDir('id-gen-fixture-smoke');
+    saveRuntimeVars(idRunDir, withDerived);
+    const reloaded = loadRuntimeVars(idRunDir);
+    if (reloaded.itemId !== captured.itemId)
+      fail('Browser id-gen: runtime-vars.json round-trip failed');
+    else pass('Browser id-gen: runtime-vars.json saved and reloaded correctly');
+
+    if (!fs.existsSync(join(idRunDir, 'runtime-vars.json')))
+      fail('Browser id-gen: runtime-vars.json file not written to run dir');
+    else pass('Browser id-gen: runtime-vars.json exists in run dir');
+
+    await idPage.close();
 
   } catch (err) {
     fail('Browser test suite threw: ' + err.message);

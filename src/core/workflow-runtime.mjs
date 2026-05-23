@@ -2,6 +2,9 @@ import { join } from 'path';
 import { workflowDir, workflowRunDir, ensureDir, exists, readJson, writeJson, writeText } from './paths.mjs';
 import { defaultSafetyPolicy } from './safety.mjs';
 import { generateRunReview } from './run-review.mjs';
+export { saveRuntimeVars, loadRuntimeVars, resolveTemplate, tryResolveTemplate,
+         extractTemplateVars, hasTemplateVars, validateTemplateVars,
+         captureVariables, computeDerived } from './runtime-vars.mjs';
 
 // Load the machine-readable workflow config (workflow.json, created by init:workflow).
 // Falls back to safe defaults if file is missing.
@@ -110,15 +113,19 @@ export function recordError(errors, fieldName, errorOrMessage, selector = '') {
 
 // Write all run artifacts and print a summary to stdout.
 // Pass workflowId and startUrl to enable run-review.md generation.
-export function finalizeRun(runDir, { logger, filled = [], skipped = [], errors = [], workflowId = '', startUrl = '', dryRun = true } = {}) {
+// runtimeVars is an optional object of captured/derived variables from this run.
+export function finalizeRun(runDir, { logger, filled = [], skipped = [], errors = [], workflowId = '', startUrl = '', dryRun = true, runtimeVars = null } = {}) {
   writeRunArtifact(runDir, 'filled-fields.json', filled);
   writeRunArtifact(runDir, 'skipped-fields.json', skipped);
   writeRunArtifact(runDir, 'errors.json', errors);
+  if (runtimeVars && Object.keys(runtimeVars).length) {
+    writeRunArtifact(runDir, 'runtime-vars.json', runtimeVars);
+  }
   logger.flush();
 
   // Generate run-review.md for every run.
   try {
-    const review = generateRunReview({ workflowId, runDir, filled, skipped, errors, startUrl, dryRun });
+    const review = generateRunReview({ workflowId, runDir, filled, skipped, errors, startUrl, dryRun, runtimeVars });
     writeRunArtifact(runDir, 'run-review.md', review);
   } catch (err) {
     console.warn('[WARN] Could not generate run-review.md: ' + err.message);

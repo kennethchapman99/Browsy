@@ -15,7 +15,8 @@ const EXPECTED_ARTIFACTS = [
 
 // Generate run-review.md text from run artifacts and metadata.
 // All arguments are plain data — no filesystem reads here.
-export function generateRunReview({ workflowId, runDir, filled = [], skipped = [], errors = [], startUrl = '', dryRun = true }) {
+// runtimeVars: optional object of captured/derived variable values from the run.
+export function generateRunReview({ workflowId, runDir, filled = [], skipped = [], errors = [], startUrl = '', dryRun = true, runtimeVars = null }) {
   const runId = runDir.split(/[\\/]/).pop() || runDir;
 
   const status = errors.length
@@ -39,6 +40,7 @@ export function generateRunReview({ workflowId, runDir, filled = [], skipped = [
 
   const ambiguities = buildAmbiguities(filled, skipped, errors);
   const recommendations = buildRecommendations(filled, skipped, errors);
+  const runtimeVarLines = buildRuntimeVarSection(runtimeVars, skipped);
 
   const lines = [
     `# Run Review: ${workflowId}`,
@@ -71,6 +73,7 @@ export function generateRunReview({ workflowId, runDir, filled = [], skipped = [
     '',
     ...errorLines,
     '',
+    ...runtimeVarLines,
     '## Ambiguities',
     '',
     ...ambiguities,
@@ -120,7 +123,62 @@ function buildAmbiguities(filled, skipped, errors) {
   return items;
 }
 
+function buildRuntimeVarSection(runtimeVars, skipped) {
+  // Only emit the section if variables were declared or something is missing
+  const missingVarSkipped = skipped.filter(s => s.reason?.startsWith('missing runtime variable'));
+  if (!runtimeVars && !missingVarSkipped.length) return [];
+
+  const lines = ['## Runtime variables', ''];
+
+  if (runtimeVars && Object.keys(runtimeVars).length) {
+    lines.push('Variables captured during this run:');
+    lines.push('');
+    for (const [k, v] of Object.entries(runtimeVars)) {
+      lines.push(`- **${k}**: \`${v}\``);
+    }
+    lines.push('');
+    lines.push(`_Written to \`runtime-vars.json\` in the run directory._`);
+    lines.push('');
+  } else if (!missingVarSkipped.length) {
+    lines.push('_No runtime variables captured this run._');
+    lines.push('');
+  }
+
+  if (missingVarSkipped.length) {
+    lines.push('⚠ **Missing required runtime variables:**');
+    lines.push('');
+    for (const s of missingVarSkipped) {
+      const varName = s.reason.replace('missing runtime variable: ', '');
+      lines.push(`- \`${varName}\` — could not be captured from the page`);
+    }
+    lines.push('');
+    lines.push('The run stopped safely because a required variable could not be resolved.');
+    lines.push('Check that the page navigation succeeded and the URL or page text contains the expected value.');
+    lines.push('');
+  }
+
+  return lines;
+}
+
 function buildRecommendations(filled, skipped, errors) {
+  if (skipped.some(s => s.reason?.startsWith('missing runtime variable'))) {
+    return [
+      '1. A required runtime variable could not be captured — see **Runtime variables** section above.',
+      '2. Verify the step that generates the ID completed successfully (check screenshots).',
+      '3. Update the capture spec in `workflow.json` (correct `source`, `regex`, or `selector`).',
+      '4. Re-run with `--dry-run` to confirm capture works before live mode.'
+    ];
+  }
+
+  if (errors.some(e => /unresolved template variable/i.test(e.error))) {
+    return [
+      '1. A URL template could not be resolved — a required variable was not yet captured.',
+      '2. Ensure the capture step runs before the navigation that uses the variable.',
+      '3. Check `runtime-vars.json` to see which variables were captured.',
+      '4. Update the workflow step order or capture spec as needed.'
+    ];
+  }
+
   if (errors.some(e => /selector|locator|not found|timeout/i.test(e.error))) {
     return [
       '1. Re-run discovery with `--candidates` to get updated selectors:',

@@ -22,6 +22,7 @@ export function parseRequest(text) {
   const targetUrls = extractTableRows(sections['3. Target websites / pages'] || '');
   const apis = extractTableRows(sections['4. Existing APIs or local systems'] || '');
   const inputDataContract = extractJsonBlock(sections['5. Input data contract'] || '');
+  const runtimeVariablesResult = extractJsonBlockSafe(sections['5a. Runtime variables'] || '');
   const desiredSteps = extractListItems(sections['6. Desired workflow steps'] || '');
   const fieldsActions = extractTableRows(sections['7. Fields to fill or upload'] || '');
   const manualOnlyActions = extractListItems(sections['8. Actions that must stay manual'] || '');
@@ -35,10 +36,12 @@ export function parseRequest(text) {
   const walkthroughText = (sections['16. Narrated walkthrough'] || '').trim();
 
   const workflowId = toWorkflowId(workflowName);
+  const runtimeVariables = runtimeVariablesResult.value || { input: [], captured: [], derived: [] };
 
   const issues = validate({
     workflowName, workflowId, goal, targetUrls, fieldsActions,
-    manualOnlyActions, safetyPolicyResult, acceptanceCriteria, walkthroughText
+    manualOnlyActions, safetyPolicyResult, acceptanceCriteria, walkthroughText,
+    runtimeVariables
   });
 
   return {
@@ -48,6 +51,7 @@ export function parseRequest(text) {
     targetUrls,
     apis,
     inputDataContract,
+    runtimeVariables,
     desiredSteps,
     fieldsActions,
     manualOnlyActions,
@@ -79,8 +83,8 @@ function splitSections(text) {
   const buffer = [];
 
   for (const line of lines) {
-    // Match "## N. Section Title" — keep the number prefix so keys are like "1. Workflow name"
-    const m = line.match(/^##\s+(\d+\.\s*.+)$/);
+    // Match "## N. Title" and "## Na. Title" (e.g. "## 5a. Runtime variables")
+    const m = line.match(/^##\s+(\d+[a-z]?\.\s*.+)$/i);
     if (m) {
       if (currentKey !== null) result[currentKey] = buffer.join('\n').trim();
       currentKey = m[1].trim();
@@ -165,6 +169,16 @@ function toWorkflowId(name) {
   return String(name || '').toLowerCase().replace(/[^a-z0-9-_]+/g, '-').replace(/^-+|-+$/g, '') || 'workflow';
 }
 
+// --- Template variable helpers ---
+
+function extractTemplateVarsFromString(s) {
+  const seen = new Set();
+  const re = /\{\{([^}]+)\}\}/g;
+  let m;
+  while ((m = re.exec(s)) !== null) seen.add(m[1].trim());
+  return [...seen];
+}
+
 // --- Validation ---
 
 function isPlaceholderGoal(goal) {
@@ -182,7 +196,7 @@ function isPlaceholderFieldsTable(rows) {
   return rows.every(row => Object.values(row).some(v => v.startsWith('(')));
 }
 
-function validate({ workflowName, workflowId, goal, targetUrls, fieldsActions, manualOnlyActions, safetyPolicyResult, acceptanceCriteria, walkthroughText }) {
+function validate({ workflowName, workflowId, goal, targetUrls, fieldsActions, manualOnlyActions, safetyPolicyResult, acceptanceCriteria, walkthroughText, runtimeVariables }) {
   const issues = [];
 
   const err = (field, message, fix) => issues.push({ level: 'error', field, message, fix });
@@ -235,6 +249,26 @@ function validate({ workflowName, workflowId, goal, targetUrls, fieldsActions, m
   // Walkthrough
   if (isPlaceholderWalkthrough(walkthroughText)) {
     warn('walkthrough', '## 16. Narrated walkthrough is empty or placeholder.', 'Run the Browsy wizard (npm run wizard) to record a walkthrough, or write one manually.');
+  }
+
+  // Runtime variable template references: every {{x}} in a URL must be declared
+  if (runtimeVariables) {
+    const declaredNames = new Set([
+      ...(runtimeVariables.input    || []).map(v => v.name),
+      ...(runtimeVariables.captured || []).map(v => v.name),
+      ...(runtimeVariables.derived  || []).map(v => v.name),
+    ]);
+    const urlStrings = targetUrls.map(r => r.url || '').filter(Boolean);
+    for (const url of urlStrings) {
+      for (const varName of extractTemplateVarsFromString(url)) {
+        if (!declaredNames.has(varName)) {
+          err('runtime_variables',
+            `URL template uses {{${varName}}} but it is not declared in ## 5a. Runtime variables.`,
+            `Add "${varName}" to the input, captured, or derived list in ## 5a. Runtime variables.`
+          );
+        }
+      }
+    }
   }
 
   return issues;
