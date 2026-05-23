@@ -1,0 +1,28 @@
+{
+  "_notes": "Field map for the song-creator fixture. The 'btn_create' field uses type:click with a stepId so that variables declared with captureAfter:'create-song' are captured immediately after the click.",
+  "fields": {
+    "song_title": {
+      "selector": "#song-title",
+      "type": "text",
+      "source": "title",
+      "required": false,
+      "safety_category": null
+    },
+    "artist_name": {
+      "selector": "#artist-name",
+      "type": "text",
+      "source": "artistName",
+      "required": false,
+      "safety_category": null
+    },
+    "btn_create": {
+      "selector": "#btn-create",
+      "type": "click",
+      "stepId": "create-song",
+      "source": null,
+      "waitAfterMs": 300,
+      "safety_category": null,
+      "_notes": "Clicking this button generates a SONG_ ID and updates the URL hash to #/songs/<id>. captureAfter:'create-song' variables are captured after this step."
+    }
+  }
+}

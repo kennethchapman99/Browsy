@@ -1,6 +1,39 @@
 import { join } from 'path';
 import { exists, readJson, writeJson } from './paths.mjs';
 
+// Valid captureAfter timing mode keywords (as opposed to named step IDs).
+const CAPTURE_TIMING_MODES = new Set(['initial_navigation', 'each_navigation', 'each_action', 'each_step']);
+
+// Filter a captured-variable spec list to those that should be attempted
+// given the current trigger event.
+//
+// trigger: { event: 'initial_navigation' | 'navigation' | 'action', stepId?: string }
+// captureAfter defaults to 'each_step' when not set.
+export function filterCapturedByTiming(capturedDefs, trigger) {
+  return (capturedDefs || []).filter(def => {
+    const timing = def.captureAfter || 'each_step';
+    switch (timing) {
+      case 'each_step':          return true;
+      case 'initial_navigation': return trigger.event === 'initial_navigation';
+      case 'each_navigation':    return trigger.event === 'navigation' || trigger.event === 'initial_navigation';
+      case 'each_action':        return trigger.event === 'action';
+      default:                   return timing === trigger.stepId; // named step ID
+    }
+  });
+}
+
+// Return true if a missing variable with this captureAfter timing should stop
+// the run immediately (vs. being retried on a later step).
+// Named step IDs and initial_navigation are "strict" — the var had one
+// designated opportunity to be captured; if it is still missing, the run
+// cannot safely continue.
+// each_step / each_action / each_navigation are "lenient" — they keep trying
+// and only become fatal when the variable is actually needed (e.g. in a URL template).
+export function isFatalCaptureTiming(timing) {
+  const t = timing || 'each_step';
+  return t === 'initial_navigation' || !CAPTURE_TIMING_MODES.has(t);
+}
+
 // Resolve {{varName}} tokens in a template string.
 // Throws with the variable name if any token is unresolved.
 export function resolveTemplate(template, vars) {

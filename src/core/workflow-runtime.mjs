@@ -4,7 +4,8 @@ import { defaultSafetyPolicy } from './safety.mjs';
 import { generateRunReview } from './run-review.mjs';
 export { saveRuntimeVars, loadRuntimeVars, resolveTemplate, tryResolveTemplate,
          extractTemplateVars, hasTemplateVars, validateTemplateVars,
-         captureVariables, computeDerived } from './runtime-vars.mjs';
+         captureVariables, computeDerived,
+         filterCapturedByTiming, isFatalCaptureTiming } from './runtime-vars.mjs';
 
 // Load the machine-readable workflow config (workflow.json, created by init:workflow).
 // Falls back to safe defaults if file is missing.

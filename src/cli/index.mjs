@@ -603,7 +603,8 @@ import {
   createRunDir, createRunLogger, writeRunArtifact, saveScreenshot,
   recordFilledField, recordSkippedField, recordError, finalizeRun,
   getManifestValue,
-  resolveTemplate, hasTemplateVars, captureVariables, computeDerived, saveRuntimeVars
+  resolveTemplate, hasTemplateVars, captureVariables, computeDerived, saveRuntimeVars,
+  filterCapturedByTiming, isFatalCaptureTiming
 } from '../../src/core/workflow-runtime.mjs';
 import { isDangerousText, isManualOnly } from '../../src/core/safety.mjs';
 import { PlaywrightAdapter } from '../../src/adapters/playwright-adapter.mjs';
@@ -648,6 +649,7 @@ for (const def of (varDefs.input || [])) {
 }
 
 // Helper: resolve a URL template if it contains {{...}} tokens, or return it as-is.
+// Throws with a clear message if a required variable is missing.
 function resolveUrl(urlTemplate) {
   if (!hasTemplateVars(urlTemplate)) return urlTemplate;
   try {
@@ -657,21 +659,36 @@ function resolveUrl(urlTemplate) {
   }
 }
 
-// Helper: run variable capture + derive after a navigation step.
-async function captureAndDerive(label) {
-  if (!(varDefs.captured || []).length) return;
-  const { vars: updated, missing } = await captureVariables(adapter.page, varDefs.captured, runtimeVars);
+// Helper: capture + derive variables whose timing matches the current trigger.
+// trigger: { event: 'initial_navigation'|'navigation'|'action', stepId?: string }
+// Returns the list of required variable names that could not be captured.
+async function captureAndDerive(trigger) {
+  const toCapture = filterCapturedByTiming(varDefs.captured || [], trigger);
+  if (!toCapture.length) return [];
+  const { vars: updated, missing } = await captureVariables(adapter.page, toCapture, runtimeVars);
   runtimeVars = computeDerived(varDefs.derived || [], updated);
   saveRuntimeVars(runDir, runtimeVars);
+  const label = trigger.stepId || trigger.event;
   if (missing.length) {
-    logger.log('warn', \`[CAPTURE] Missing required variable(s) after \${label}: \${missing.join(', ')}\`);
+    logger.log('warn', \`[CAPTURE] Missing variable(s) after \${label}: \${missing.join(', ')}\`);
     for (const name of missing) {
-      recordSkippedField(skipped, name, \`missing runtime variable: \${name}\`);
+      if (!skipped.some(s => s.field === name)) {
+        recordSkippedField(skipped, name, \`missing runtime variable: \${name}\`);
+      }
     }
     return missing;
   }
-  logger.log('info', \`[CAPTURE] Variables captured after \${label}: \${Object.keys(runtimeVars).join(', ')}\`);
+  logger.log('info', \`[CAPTURE] Captured after \${label}: \${Object.keys(runtimeVars).join(', ')}\`);
   return [];
+}
+
+// Helper: stop the run safely when a required runtime variable could not be captured.
+async function stopMissingVars(missing, label) {
+  logger.log('error', \`Stopping: required variable(s) not captured after \${label}: \${missing.join(', ')}\`);
+  logger.log('info', 'Tip: verify the step that generates the ID ran, the regex matches the URL, and captureAfter names the right step.');
+  finalizeRun(runDir, { logger, filled, skipped, errors, workflowId: WORKFLOW_ID, startUrl: config.targets?.start_url || '', dryRun, runtimeVars: Object.keys(runtimeVars).length ? runtimeVars : null });
+  await adapter.close().catch(() => {});
+  process.exit(1);
 }
 
 try {
@@ -685,13 +702,15 @@ try {
   await adapter.page.goto(startUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await adapter.snapshot(runDir, 'screenshot-start.png');
 
-  // Capture runtime variables from the start page if any capture specs are declared.
-  const missingAfterStart = await captureAndDerive('start page');
-  if (missingAfterStart?.length) {
-    logger.log('error', 'Stopping: required runtime variable(s) could not be captured from start page.');
-    finalizeRun(runDir, { logger, filled, skipped, errors, workflowId: WORKFLOW_ID, startUrl, dryRun, runtimeVars });
-    await adapter.close().catch(() => {});
-    process.exit(1);
+  // Capture variables declared with captureAfter:'initial_navigation' or 'each_step'/'each_navigation'.
+  const missingAfterStart = await captureAndDerive({ event: 'initial_navigation' });
+  // Stop immediately if a variable that was supposed to arrive on the start page is missing.
+  const fatalAfterStart = missingAfterStart.filter(name => {
+    const def = (varDefs.captured || []).find(d => d.name === name);
+    return def && isFatalCaptureTiming(def.captureAfter);
+  });
+  if (fatalAfterStart.length) {
+    await stopMissingVars(fatalAfterStart, 'start page');
   }
 
   writeRunArtifact(runDir, 'page-text-snapshot.txt', await adapter.text());
@@ -704,6 +723,8 @@ try {
 
   for (const [fieldName, fieldConfig] of fields) {
     const { selector, type, source, safety_category, redact } = fieldConfig;
+    // stepId identifies this action for captureAfter matching; defaults to fieldName.
+    const stepId = fieldConfig.stepId || fieldName;
 
     // Safety: skip manual-only fields
     if (safety_category && isManualOnly(safety_category, policy)) {
@@ -713,48 +734,83 @@ try {
     }
 
     // Safety: skip buttons with dangerous text
-    if ((type === 'button' || type === 'submit') && isDangerousText(fieldName, policy)) {
+    if ((type === 'button' || type === 'click' || type === 'submit') && isDangerousText(fieldName, policy)) {
       logger.log('info', \`Skipped (dangerous text): \${fieldName}\`);
       recordSkippedField(skipped, fieldName, 'dangerous text', selector);
       continue;
     }
 
-    const value = getManifestValue(manifest, source);
-    if (value === undefined || value === null) {
-      if (source) {
-        logger.log('warn', \`No value in manifest for: \${fieldName} (source: \${source})\`);
-      }
-      recordSkippedField(skipped, fieldName, \`no manifest value (source: \${source || 'none'})\`, selector);
-      continue;
-    }
-
     if (dryRun) {
-      logger.log('info', \`[DRY-RUN] Would \${type} "\${fieldName}" = \${redact ? '[REDACTED]' : JSON.stringify(value)}\`, { selector });
-      recordFilledField(filled, fieldName, selector, value, !!redact);
+      if (type === 'click' || type === 'button') {
+        logger.log('info', \`[DRY-RUN] Would click "\${fieldName}"\`, { selector });
+        recordFilledField(filled, fieldName, selector, '(clicked)', false);
+      } else {
+        const value = getManifestValue(manifest, source);
+        if (value === undefined || value === null) {
+          if (source) logger.log('warn', \`No value in manifest for: \${fieldName} (source: \${source})\`);
+          recordSkippedField(skipped, fieldName, \`no manifest value (source: \${source || 'none'})\`, selector);
+          continue;
+        }
+        logger.log('info', \`[DRY-RUN] Would \${type} "\${fieldName}" = \${redact ? '[REDACTED]' : JSON.stringify(value)}\`, { selector });
+        recordFilledField(filled, fieldName, selector, value, !!redact);
+      }
       continue;
     }
 
+    // ── Live mode ────────────────────────────────────────────────────────────
     try {
-      if (type === 'text' || type === 'email' || type === 'url') {
-        await adapter.fill(selector, value);
-      } else if (type === 'textarea') {
-        await adapter.fill(selector, value);
-      } else if (type === 'select') {
-        await adapter.selectOption(selector, value);
-      } else if (type === 'file') {
-        await adapter.upload(selector, value);
-      } else if (type === 'checkbox') {
-        await adapter.setChecked(selector, Boolean(value));
+      if (type === 'click' || type === 'button') {
+        await adapter.page.click(selector);
+        // Wait for any navigation or DOM state changes triggered by the click.
+        const waitMs = fieldConfig.waitAfterMs ?? 500;
+        if (waitMs > 0) await adapter.page.waitForTimeout(waitMs);
+        logger.log('info', \`Clicked: \${fieldName}\`, { selector });
+        recordFilledField(filled, fieldName, selector, '(clicked)', false);
       } else {
-        logger.log('warn', \`Unsupported field type "\${type}" for \${fieldName}\`);
-        recordSkippedField(skipped, fieldName, \`unsupported type: \${type}\`, selector);
-        continue;
+        const value = getManifestValue(manifest, source);
+        if (value === undefined || value === null) {
+          if (source) logger.log('warn', \`No value in manifest for: \${fieldName} (source: \${source})\`);
+          recordSkippedField(skipped, fieldName, \`no manifest value (source: \${source || 'none'})\`, selector);
+          continue;
+        }
+        if (type === 'text' || type === 'email' || type === 'url') {
+          await adapter.fill(selector, value);
+        } else if (type === 'textarea') {
+          await adapter.fill(selector, value);
+        } else if (type === 'select') {
+          await adapter.selectOption(selector, value);
+        } else if (type === 'file') {
+          await adapter.upload(selector, value);
+        } else if (type === 'checkbox') {
+          await adapter.setChecked(selector, Boolean(value));
+        } else {
+          logger.log('warn', \`Unsupported field type "\${type}" for \${fieldName}\`);
+          recordSkippedField(skipped, fieldName, \`unsupported type: \${type}\`, selector);
+          continue;
+        }
+        logger.log('info', \`Filled: \${fieldName}\`, { selector, type });
+        recordFilledField(filled, fieldName, selector, value, !!redact);
       }
-      logger.log('info', \`Filled: \${fieldName}\`, { selector, type });
-      recordFilledField(filled, fieldName, selector, value, !!redact);
+
+      // After each live action, capture variables whose captureAfter matches this step.
+      const missingAfterAction = await captureAndDerive({ event: 'action', stepId });
+      if (missingAfterAction.length) {
+        const fatalMissing = missingAfterAction.filter(name => {
+          const def = (varDefs.captured || []).find(d => d.name === name);
+          return def && isFatalCaptureTiming(def.captureAfter);
+        });
+        if (fatalMissing.length) {
+          await stopMissingVars(fatalMissing, stepId);
+        }
+      }
+
     } catch (err) {
-      logger.log('error', \`Failed to fill \${fieldName}: \${err.message}\`, { selector });
+      logger.log('error', \`Failed to execute \${fieldName}: \${err.message}\`, { selector });
       recordError(errors, fieldName, err, selector);
+      // If the error is an unresolved template variable, stop safely.
+      if (/unresolved template variable/i.test(err.message) || /Cannot navigate/i.test(err.message)) {
+        await stopMissingVars([err.message], fieldName);
+      }
     }
   }
 
