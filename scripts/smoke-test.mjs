@@ -566,7 +566,8 @@ section('Runtime variable engine (no browser)');
 try {
   const {
     resolveTemplate, tryResolveTemplate, extractTemplateVars, hasTemplateVars,
-    validateTemplateVars, computeDerived, saveRuntimeVars, loadRuntimeVars
+    validateTemplateVars, computeDerived, saveRuntimeVars, loadRuntimeVars,
+    filterCapturedByTiming, isFatalCaptureTiming
   } = await import('../src/core/runtime-vars.mjs');
   const { join: pjoin } = await import('path');
   const { ensureDir, writeJson } = await import('../src/core/paths.mjs');
@@ -652,6 +653,85 @@ try {
   if (typeof empty !== 'object' || Object.keys(empty).length !== 0)
     fail('loadRuntimeVars: should return {} when file missing');
   else pass('loadRuntimeVars: returns {} when runtime-vars.json absent');
+
+  // ── filterCapturedByTiming ──────────────────────────────────────────────────
+  const capturedDefs = [
+    { name: 'v_init',   captureAfter: 'initial_navigation' },
+    { name: 'v_nav',    captureAfter: 'each_navigation' },
+    { name: 'v_action', captureAfter: 'each_action' },
+    { name: 'v_step',   captureAfter: 'each_step' },
+    { name: 'v_named',  captureAfter: 'create-song' },
+    { name: 'v_default' /* no captureAfter → defaults to each_step */ },
+  ];
+
+  // initial_navigation: init + nav + step + default; NOT action, NOT named
+  const atInit = filterCapturedByTiming(capturedDefs, { event: 'initial_navigation' });
+  const atInitNames = atInit.map(d=>d.name);
+  if (!atInitNames.includes('v_init'))   fail('filterCapturedByTiming: initial_navigation should include v_init');
+  else pass('filterCapturedByTiming: v_init captured at initial_navigation');
+  if (!atInitNames.includes('v_nav'))    fail('filterCapturedByTiming: initial_navigation should include v_nav (each_navigation)');
+  else pass('filterCapturedByTiming: v_nav captured at initial_navigation (each_navigation matches)');
+  if (!atInitNames.includes('v_step'))   fail('filterCapturedByTiming: initial_navigation should include v_step (each_step)');
+  else pass('filterCapturedByTiming: v_step captured at initial_navigation (each_step matches)');
+  if (!atInitNames.includes('v_default')) fail('filterCapturedByTiming: v_default (no captureAfter) should be included everywhere');
+  else pass('filterCapturedByTiming: v_default included at initial_navigation');
+  if (atInitNames.includes('v_action'))  fail('filterCapturedByTiming: v_action should NOT be captured at initial_navigation');
+  else pass('filterCapturedByTiming: v_action excluded at initial_navigation');
+  if (atInitNames.includes('v_named'))   fail('filterCapturedByTiming: named step v_named should NOT be captured at initial_navigation');
+  else pass('filterCapturedByTiming: v_named excluded at initial_navigation');
+
+  // action trigger with matching stepId
+  const atAction = filterCapturedByTiming(capturedDefs, { event: 'action', stepId: 'create-song' });
+  const atActionNames = atAction.map(d=>d.name);
+  if (!atActionNames.includes('v_action')) fail('filterCapturedByTiming: v_action should be captured at action event');
+  else pass('filterCapturedByTiming: v_action captured at action event');
+  if (!atActionNames.includes('v_named'))  fail('filterCapturedByTiming: v_named should match when stepId=create-song');
+  else pass('filterCapturedByTiming: v_named captured when stepId matches');
+  if (!atActionNames.includes('v_step'))   fail('filterCapturedByTiming: v_step (each_step) should be captured at any event');
+  else pass('filterCapturedByTiming: v_step captured at action event');
+  if (atActionNames.includes('v_init'))    fail('filterCapturedByTiming: v_init should NOT be captured at action event');
+  else pass('filterCapturedByTiming: v_init excluded at action event');
+
+  // action trigger with non-matching stepId
+  const atWrongStep = filterCapturedByTiming(capturedDefs, { event: 'action', stepId: 'other-step' });
+  if (atWrongStep.some(d=>d.name==='v_named')) fail('filterCapturedByTiming: v_named should NOT be captured for a different stepId');
+  else pass('filterCapturedByTiming: v_named excluded when stepId does not match');
+
+  // empty capturedDefs
+  const emptyResult = filterCapturedByTiming([], { event: 'action' });
+  if (emptyResult.length !== 0) fail('filterCapturedByTiming: should return [] for empty input');
+  else pass('filterCapturedByTiming: returns [] for empty capturedDefs');
+
+  // ── isFatalCaptureTiming ────────────────────────────────────────────────────
+  if (!isFatalCaptureTiming('initial_navigation')) fail('isFatalCaptureTiming: initial_navigation should be fatal');
+  else pass('isFatalCaptureTiming: initial_navigation is fatal');
+  if (!isFatalCaptureTiming('create-song')) fail('isFatalCaptureTiming: named step should be fatal');
+  else pass('isFatalCaptureTiming: named step ID is fatal');
+  if (isFatalCaptureTiming('each_step'))   fail('isFatalCaptureTiming: each_step should NOT be fatal');
+  else pass('isFatalCaptureTiming: each_step is not fatal');
+  if (isFatalCaptureTiming('each_action')) fail('isFatalCaptureTiming: each_action should NOT be fatal');
+  else pass('isFatalCaptureTiming: each_action is not fatal');
+  if (isFatalCaptureTiming('each_navigation')) fail('isFatalCaptureTiming: each_navigation should NOT be fatal');
+  else pass('isFatalCaptureTiming: each_navigation is not fatal');
+  if (isFatalCaptureTiming(undefined))     fail('isFatalCaptureTiming: undefined (defaults to each_step) should NOT be fatal');
+  else pass('isFatalCaptureTiming: undefined timing is not fatal (defaults to each_step)');
+
+  // ── song-creator field-map fixture ─────────────────────────────────────────
+  const songFmPath = join(REPO_ROOT, 'fixtures/song-creator/field-map.json');
+  if (!fs.existsSync(songFmPath)) {
+    fail('song-creator fixture: field-map.json missing');
+  } else {
+    const sfm = JSON.parse(fs.readFileSync(songFmPath, 'utf8'));
+    const btnCreate = sfm.fields?.btn_create;
+    if (!btnCreate) fail('song-creator field-map: btn_create field missing');
+    else {
+      pass('song-creator field-map: btn_create field present');
+      if (btnCreate.type !== 'click') fail('song-creator field-map: btn_create type should be click, got ' + btnCreate.type);
+      else pass('song-creator field-map: btn_create has type:click');
+      if (btnCreate.stepId !== 'create-song') fail('song-creator field-map: btn_create stepId should be create-song, got ' + btnCreate.stepId);
+      else pass('song-creator field-map: btn_create stepId=create-song');
+    }
+  }
 
   // id-gen-fixture file exists
   const fixturePath = join(REPO_ROOT, 'fixtures/id-gen-fixture/index.html');

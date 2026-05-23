@@ -1151,24 +1151,75 @@ function renderParams() {
 
 // ── Captured variables ────────────────────────────────────────────────────────
 function addCaptured(d={}) {
-  S.runtimeVars.captured.push({ name: d.name||'', source: d.source||'current_url', regex: d.regex||'', selector: d.selector||'', example: d.example||'', required: d.required!==false });
+  S.runtimeVars.captured.push({ name: d.name||'', source: d.source||'current_url', regex: d.regex||'', selector: d.selector||'', example: d.example||'', required: d.required!==false, captureAfter: d.captureAfter||'each_step' });
   renderCaptured();
 }
+
+// Test a regex against an example string; return { matched, value } or { matched:false }.
+function previewRegex(regex, example) {
+  if (!regex || !example) return null;
+  try {
+    const re = new RegExp(regex);
+    const m = example.match(re);
+    if (!m) return { matched: false };
+    return { matched: true, value: m[1] !== undefined ? m[1] : m[0] };
+  } catch { return null; }
+}
+
 function renderCaptured() {
   const el = document.getElementById('captured-list');
   if (!el) return;
-  el.innerHTML = S.runtimeVars.captured.map((c,i) => `
-    <div class="table-row" style="grid-template-columns:1fr 1fr 1.5fr 1fr auto;row-gap:4px">
+  const timingOptions = [
+    ['each_step',          'each step (default)'],
+    ['initial_navigation', 'initial navigation'],
+    ['each_navigation',    'each navigation'],
+    ['each_action',        'each action'],
+    ['__custom__',         'named step ID…'],
+  ];
+  el.innerHTML = S.runtimeVars.captured.map((c,i) => {
+    const useRegex = c.source==='current_url'||c.source==='page_text';
+    const regexVal = esc(useRegex ? c.regex : c.selector);
+    const regexPh  = useRegex ? 'regex (e.g. /songs/(SONG_[A-Z0-9_]+))' : 'CSS selector';
+    const stdTimings = new Set(['each_step','initial_navigation','each_navigation','each_action']);
+    const isCustom = c.captureAfter && !stdTimings.has(c.captureAfter);
+    const selectVal = isCustom ? '__custom__' : (c.captureAfter || 'each_step');
+
+    // Regex preview badge
+    let previewHtml = '';
+    if (useRegex && c.regex && c.example) {
+      const p = previewRegex(c.regex, c.example);
+      if (p === null) {
+        previewHtml = '<span style="color:#c00;font-size:.75rem">⚠ invalid regex</span>';
+      } else if (!p.matched) {
+        previewHtml = '<span style="color:#c00;font-size:.75rem">⚠ regex does not match example</span>';
+      } else {
+        previewHtml = `<span style="color:#156648;font-size:.75rem">✓ captures: <code>${esc(p.value)}</code></span>`;
+      }
+    }
+
+    return `<div style="display:grid;grid-template-columns:1fr 1fr 1.5fr 1fr auto;gap:6px;align-items:start;margin-bottom:10px;padding:8px;background:#f9f9f9;border-radius:6px;border:1px solid #eee">
       <input type="text" placeholder="name (e.g. songId)" value="${esc(c.name)}" oninput="S.runtimeVars.captured[${i}].name=this.value;validateVarRefs()">
       <select onchange="S.runtimeVars.captured[${i}].source=this.value;renderCaptured()">
         ${['current_url','page_text','selector_text','selector_attribute'].map(s=>`<option value="${s}"${c.source===s?' selected':''}>${s}</option>`).join('')}
       </select>
-      <input type="text" placeholder="${c.source==='current_url'||c.source==='page_text' ? 'regex (e.g. /songs/(SONG_[A-Z0-9_]+))' : 'CSS selector'}"
-        value="${esc(c.source==='selector_text'||c.source==='selector_attribute' ? c.selector : c.regex)}"
-        oninput="S.runtimeVars.captured[${i}][${JSON.stringify(c.source==='selector_text'||c.source==='selector_attribute'?'selector':'regex')}]=this.value">
-      <input type="text" placeholder="Example value" value="${esc(c.example)}" oninput="S.runtimeVars.captured[${i}].example=this.value">
-      <button class="btn-remove" onclick="S.runtimeVars.captured.splice(${i},1);renderCaptured()">×</button>
-    </div>`).join('') || '<p style="color:var(--muted);font-size:.85rem;margin:4px 0">No captured variables yet.</p>';
+      <div>
+        <input type="text" placeholder="${regexPh}" value="${regexVal}"
+          oninput="S.runtimeVars.captured[${i}][${JSON.stringify(useRegex?'regex':'selector')}]=this.value;renderCaptured()" style="width:100%">
+        ${previewHtml ? `<div style="margin-top:3px">${previewHtml}</div>` : ''}
+      </div>
+      <div>
+        <input type="text" placeholder="Example value" value="${esc(c.example)}" oninput="S.runtimeVars.captured[${i}].example=this.value;renderCaptured()" style="width:100%">
+        <div style="margin-top:4px">
+          <label style="font-size:.75rem;color:var(--muted)">Capture timing</label>
+          <select style="width:100%;font-size:.8rem;margin-top:2px" onchange="(function(v){S.runtimeVars.captured[${i}].captureAfter=v==='__custom__'?'':v;renderCaptured()})(this.value)">
+            ${timingOptions.map(([v,l])=>`<option value="${v}"${selectVal===v?' selected':''}>${l}</option>`).join('')}
+          </select>
+          ${isCustom ? `<input type="text" placeholder="step ID (e.g. create-song)" value="${esc(c.captureAfter)}" style="width:100%;font-size:.8rem;margin-top:3px" oninput="S.runtimeVars.captured[${i}].captureAfter=this.value">` : ''}
+        </div>
+      </div>
+      <button class="btn-remove" onclick="S.runtimeVars.captured.splice(${i},1);renderCaptured()" style="margin-top:2px">×</button>
+    </div>`;
+  }).join('') || '<p style="color:var(--muted);font-size:.85rem;margin:4px 0">No captured variables yet.</p>';
 }
 
 // ── Derived variables ─────────────────────────────────────────────────────────
@@ -1266,6 +1317,7 @@ function generateMarkdown() {
         else { if(c.regex) v.regex=c.regex; }
         if(c.example) v.example=c.example;
         if(c.required===false) v.required=false;
+        if(c.captureAfter && c.captureAfter !== 'each_step') v.captureAfter=c.captureAfter;
         return v;
       }),
       derived: rv.derived.filter(d=>d.name&&d.template).map(d=>({ name:d.name, template:d.template })),

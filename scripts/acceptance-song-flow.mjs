@@ -368,6 +368,55 @@ try {
   fail('Check 5: threw — ' + e.message);
 }
 
+section('11', 'captureAfter timing filter (non-browser)');
+try {
+  const { filterCapturedByTiming, isFatalCaptureTiming } = await import('../src/core/runtime-vars.mjs');
+
+  // Variable declared with captureAfter: "create-song" should only match an action trigger
+  // with that stepId — not an initial_navigation trigger.
+  const songIdSpec = [{ name: 'songId', source: 'current_url', regex: '/songs/(SONG_[A-Z0-9_]+)', required: true, captureAfter: 'create-song' }];
+
+  const atInit = filterCapturedByTiming(songIdSpec, { event: 'initial_navigation' });
+  if (atInit.length > 0)
+    fail('Check 11: songId with captureAfter:create-song should NOT be attempted at initial_navigation');
+  else pass('Check 11: songId excluded from initial_navigation capture ✓');
+
+  const atWrongStep = filterCapturedByTiming(songIdSpec, { event: 'action', stepId: 'other-step' });
+  if (atWrongStep.length > 0)
+    fail('Check 11: songId should NOT be captured for stepId=other-step');
+  else pass('Check 11: songId excluded for non-matching stepId ✓');
+
+  const atRightStep = filterCapturedByTiming(songIdSpec, { event: 'action', stepId: 'create-song' });
+  if (!atRightStep.find(d => d.name === 'songId'))
+    fail('Check 11: songId should be captured for stepId=create-song');
+  else pass('Check 11: songId included for stepId=create-song ✓');
+
+  // A named step is fatal (missing after that step = stop)
+  if (!isFatalCaptureTiming('create-song'))
+    fail('Check 11: named step timing should be fatal');
+  else pass('Check 11: isFatalCaptureTiming("create-song") = true ✓');
+
+  // each_step default is not fatal (opportunistic)
+  if (isFatalCaptureTiming('each_step'))
+    fail('Check 11: each_step should not be fatal');
+  else pass('Check 11: isFatalCaptureTiming("each_step") = false ✓');
+
+  // Verify the song-creator field-map has the expected stepId
+  const fmPath = path.join(REPO_ROOT, 'fixtures/song-creator/field-map.json');
+  if (!fs.existsSync(fmPath)) {
+    fail('Check 11: song-creator/field-map.json missing');
+  } else {
+    const fm = JSON.parse(fs.readFileSync(fmPath, 'utf8'));
+    const btn = fm.fields?.btn_create;
+    if (!btn) fail('Check 11: btn_create not in field-map.json');
+    else if (btn.stepId !== 'create-song') fail('Check 11: btn_create.stepId should be create-song, got ' + btn.stepId);
+    else pass('Check 11: song-creator field-map btn_create.stepId = create-song ✓');
+  }
+} catch (e) {
+  fail('Check 11: threw — ' + e.message);
+  if (process.env.BROWSY_DEBUG) console.error(e.stack);
+}
+
 section(9, 'Missing songId stops run safely with actionable feedback (non-browser)');
 try {
   const { captureVariables } = await import('../src/core/runtime-vars.mjs');
@@ -425,10 +474,10 @@ if (withBrowser) {
   console.log('\n── Browser checks (fixture: song-creator) ──');
   await runBrowserChecks();
 } else {
-  console.log('\n── Browser checks (6, 7, 8, 9b) ──');
+  console.log('\n── Browser checks (6, 7, 8, 9b, 12) ──');
   console.log('  (skipped — run with --browser to include)');
   // Mark browser checks as skipped in report
-  for (const n of [6, 7, 8]) report.checks.push({ status: 'SKIP', label: `Check ${n}: browser required` });
+  for (const n of [6, 7, 8, 12]) report.checks.push({ status: 'SKIP', label: `Check ${n}: browser required` });
 }
 
 // ── Check 10: smoke tests ──────────────────────────────────────────────────────
@@ -623,6 +672,45 @@ async function runBrowserChecks() {
 
     await plainPage.close();
 
+    // ── Check 12 (browser): captureAfter named step — only captures after the right action ──
+    section('12', 'captureAfter named step — capture only fires after correct action (browser)');
+    const page12 = await context.newPage();
+    await page12.goto(fixtureBase, { waitUntil: 'domcontentloaded' });
+
+    const specWithTiming = [{ name: 'songId', source: 'current_url', regex: '/songs/(SONG_[A-Z0-9_]+)', required: true, captureAfter: 'create-song' }];
+
+    // Simulate an action trigger that does NOT match — nothing should be captured
+    const { filterCapturedByTiming: fbt12 } = await import('../src/core/runtime-vars.mjs');
+    const toCapture12Pre = fbt12(specWithTiming, { event: 'initial_navigation' });
+    if (toCapture12Pre.length > 0)
+      fail('Check 12: capture spec should not fire at initial_navigation');
+    else pass('Check 12: capture spec correctly skipped at initial_navigation ✓');
+
+    // Now click Create Song and simulate the matching action trigger
+    await page12.click('#btn-create');
+    await page12.waitForFunction(() => window.location.hash.startsWith('#/songs/'));
+
+    const toCapture12Post = fbt12(specWithTiming, { event: 'action', stepId: 'create-song' });
+    if (!toCapture12Post.find(d => d.name === 'songId'))
+      fail('Check 12: capture spec should fire for event:action stepId:create-song');
+    else pass('Check 12: capture spec fires for correct stepId ✓');
+
+    const { captureVariables: cv12, computeDerived: cd12 } = await import('../src/core/runtime-vars.mjs');
+    const { vars: v12, missing: m12 } = await cv12(page12, toCapture12Post, {});
+    if (m12.includes('songId'))
+      fail('Check 12: songId should be captured after click + correct trigger, got missing: ' + m12.join(', '));
+    else pass('Check 12: songId captured after matching action trigger ✓');
+
+    const derived12 = cd12([{ name: 'songUrl', template: 'http://localhost:3737/songs/{{songId}}' }], v12);
+    if (!derived12.songUrl?.includes(v12.songId))
+      fail('Check 12: derived songUrl should include captured songId');
+    else pass('Check 12: derived songUrl recomputed after late capture ✓');
+
+    console.log('  Captured after action: songId=' + v12.songId);
+    console.log('  Derived: songUrl=' + derived12.songUrl);
+
+    await page12.close();
+
   } catch (e) {
     fail('Browser checks threw: ' + e.message);
     if (process.env.BROWSY_DEBUG) console.error(e.stack);
@@ -665,18 +753,14 @@ function printFinalReport() {
 
   console.log('\n### Known gaps\n');
   const gaps = [
-    'Multi-step capture: run.mjs only captures after the START page navigation.',
-    'A workflow where songId is captured after an explicit "click Create" step requires',
-    'hand-editing run.mjs to insert captureAndDerive() after the click — not yet automatic.',
-    '',
     'Selector-based capture (selector_text, selector_attribute) is implemented in',
     'runtime-vars.mjs but has no fixture coverage in the smoke tests yet.',
     '',
-    'The wizard UI for captured variables has no live preview of the regex result.',
-    'Users cannot test their regex against a sample URL without running the full workflow.',
+    'The "navigate" field type (goto a new URL mid-workflow) is not yet supported.',
+    'Multi-page workflows where a new URL must be navigated mid-run require hand-editing run.mjs.',
     '',
-    'Derived variable computation is not retried if a dependency was captured later',
-    'in the same run — computeDerived must be called again after each capture step.',
+    'each_navigation capture does not yet fire after mid-run page.goto() calls (only after',
+    'start-page navigation). Would require a Playwright route/event listener.',
   ];
   for (const g of gaps) console.log('  ' + (g ? '• ' + g : ''));
 
