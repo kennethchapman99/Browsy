@@ -1,0 +1,174 @@
+{
+  "ok": true,
+  "dryRun": false,
+  "generatedAt": "2026-05-24T13:42:23.741Z",
+  "package": {
+    "path": "/Users/kchapman/browsy/fixtures/generic-repeat-group/package.json",
+    "workflowId": "project-budget-submission",
+    "targetName": "Project Budget Submission Form",
+    "itemCount": 2,
+    "repeatGroupCount": 1
+  },
+  "runPlan": {
+    "stepCount": 8,
+    "globalStepCount": 5,
+    "itemStepCount": 10,
+    "uploadStepCount": 3,
+    "checkpointStepCount": 1,
+    "warnings": []
+  },
+  "execution": {
+    "executedStepCount": 17,
+    "skippedStepCount": 0,
+    "checkpointReached": true,
+    "blockedActions": [
+      "Submit",
+      "Confirm",
+      "Finalize",
+      "Distribute",
+      "Release",
+      "Send"
+    ],
+    "executedSteps": [
+      {
+        "type": "fill_global",
+        "source": "projectName",
+        "value": "Acme Redesign 2026"
+      },
+      {
+        "type": "fill_global",
+        "source": "clientName",
+        "value": "Acme Corp"
+      },
+      {
+        "type": "fill_global",
+        "source": "dueDate",
+        "value": "2026-07-01"
+      },
+      {
+        "type": "fill_global",
+        "source": "department",
+        "value": "Design"
+      },
+      {
+        "type": "upload_global",
+        "source": "projectBrief",
+        "value": "./project-doc.txt",
+        "resolvedPath": "/Users/kchapman/browsy/fixtures/generic-repeat-group/project-doc.txt"
+      },
+      {
+        "type": "ensure_section",
+        "itemIndex": 0,
+        "action": "verified-exists"
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 0,
+        "fieldName": "category",
+        "value": "Labor",
+        "fromDefault": true
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 0,
+        "fieldName": "itemName",
+        "value": "UX Research",
+        "fromDefault": false
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 0,
+        "fieldName": "quantity",
+        "value": "40",
+        "fromDefault": false
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 0,
+        "fieldName": "unitPrice",
+        "value": "150",
+        "fromDefault": false
+      },
+      {
+        "type": "upload_item",
+        "itemIndex": 0,
+        "fieldName": "itemAttachment",
+        "value": "./item-alpha.txt",
+        "resolvedPath": "/Users/kchapman/browsy/fixtures/generic-repeat-group/item-alpha.txt"
+      },
+      {
+        "type": "ensure_section",
+        "itemIndex": 1,
+        "action": "clicked-add",
+        "selector": "[data-browsy-action='add-item']"
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 1,
+        "fieldName": "category",
+        "value": "Design",
+        "fromDefault": false
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 1,
+        "fieldName": "itemName",
+        "value": "UI Design",
+        "fromDefault": false
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 1,
+        "fieldName": "quantity",
+        "value": "80",
+        "fromDefault": false
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 1,
+        "fieldName": "unitPrice",
+        "value": "125",
+        "fromDefault": false
+      },
+      {
+        "type": "upload_item",
+        "itemIndex": 1,
+        "fieldName": "itemAttachment",
+        "value": "./item-beta.txt",
+        "resolvedPath": "/Users/kchapman/browsy/fixtures/generic-repeat-group/item-beta.txt"
+      }
+    ],
+    "finalState": {
+      "pageTitle": "Browsy Generic Repeat-Group Fixture",
+      "globalFields": {
+        "projectName": "Acme Redesign 2026",
+        "clientName": "Acme Corp",
+        "dueDate": "2026-07-01",
+        "department": "Design",
+        "projectBrief": "C:\\fakepath\\project-doc.txt"
+      },
+      "itemSections": [
+        {
+          "itemName": "UX Research",
+          "quantity": "40",
+          "unitPrice": "150",
+          "category": "Labor",
+          "itemAttachment": "C:\\fakepath\\item-alpha.txt"
+        },
+        {
+          "itemName": "UI Design",
+          "quantity": "80",
+          "unitPrice": "125",
+          "category": "Design",
+          "itemAttachment": "C:\\fakepath\\item-beta.txt"
+        }
+      ],
+      "itemSectionCount": 2,
+      "finalActionClicked": null,
+      "submitClicked": false,
+      "releaseClicked": false,
+      "legalCertChecked": false
+    },
+    "error": null
+  }
+}

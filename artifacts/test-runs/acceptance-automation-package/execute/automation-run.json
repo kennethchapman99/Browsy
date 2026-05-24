@@ -1,0 +1,189 @@
+{
+  "ok": true,
+  "mode": "fixture",
+  "dryRun": false,
+  "generatedAt": "2026-05-24T13:42:25.501Z",
+  "request": {
+    "path": "/Users/kchapman/browsy/fixtures/album-upload/AUTOMATION_REQUEST.md",
+    "workflowId": "album-upload",
+    "workflowName": "album-upload",
+    "validationErrors": [],
+    "validationWarnings": []
+  },
+  "manifest": {
+    "path": "/Users/kchapman/browsy/fixtures/album-upload/manifest.json",
+    "itemCount": 2
+  },
+  "runPlan": {
+    "stepCount": 10,
+    "globalStepCount": 7,
+    "itemStepCount": 10,
+    "uploadStepCount": 3,
+    "checkpointStepCount": 1
+  },
+  "execution": {
+    "executedStepCount": 19,
+    "skippedStepCount": 0,
+    "checkpointReached": true,
+    "blockedActions": [
+      "Submit",
+      "Upload to stores",
+      "Release",
+      "Distribute",
+      "Send to stores"
+    ],
+    "executedSteps": [
+      {
+        "type": "fill_global",
+        "source": "album.artistName",
+        "value": "Pancake Robot"
+      },
+      {
+        "type": "fill_global",
+        "source": "album.releaseTitle",
+        "value": "Breakfast Beats"
+      },
+      {
+        "type": "fill_global",
+        "source": "album.primaryGenre",
+        "value": "Children's Music"
+      },
+      {
+        "type": "fill_global",
+        "source": "album.language",
+        "value": "English"
+      },
+      {
+        "type": "fill_global",
+        "source": "album.releaseDate",
+        "value": "2026-06-26"
+      },
+      {
+        "type": "fill_global",
+        "source": "album.labelName",
+        "value": "Figment Factory"
+      },
+      {
+        "type": "upload_global",
+        "source": "album.albumArtPath",
+        "value": "./album-cover.png",
+        "resolvedPath": "/Users/kchapman/browsy/fixtures/album-upload/album-cover.png"
+      },
+      {
+        "type": "ensure_section",
+        "itemIndex": 0,
+        "action": "verified-exists"
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 0,
+        "fieldName": "trackTitle",
+        "value": "Tiny Robot Parade",
+        "fromDefault": false
+      },
+      {
+        "type": "upload_item",
+        "itemIndex": 0,
+        "fieldName": "audioUpload",
+        "value": "./01-tiny-robot-parade.wav",
+        "resolvedPath": "/Users/kchapman/browsy/fixtures/album-upload/01-tiny-robot-parade.wav"
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 0,
+        "fieldName": "trackNumber",
+        "value": 1,
+        "fromDefault": false
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 0,
+        "fieldName": "songwriter",
+        "value": "Figment Factory",
+        "fromDefault": false
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 0,
+        "fieldName": "explicit",
+        "value": false,
+        "fromDefault": false
+      },
+      {
+        "type": "ensure_section",
+        "itemIndex": 1,
+        "action": "clicked-add",
+        "selector": "[data-testid='add-track']"
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 1,
+        "fieldName": "trackTitle",
+        "value": "Waffle Moon",
+        "fromDefault": false
+      },
+      {
+        "type": "upload_item",
+        "itemIndex": 1,
+        "fieldName": "audioUpload",
+        "value": "./02-waffle-moon.wav",
+        "resolvedPath": "/Users/kchapman/browsy/fixtures/album-upload/02-waffle-moon.wav"
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 1,
+        "fieldName": "trackNumber",
+        "value": 2,
+        "fromDefault": false
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 1,
+        "fieldName": "songwriter",
+        "value": "Figment Factory",
+        "fromDefault": false
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 1,
+        "fieldName": "explicit",
+        "value": false,
+        "fromDefault": false
+      }
+    ],
+    "finalState": {
+      "pageTitle": "Browsy Repeat-Group Fixture — Album Upload",
+      "globalFields": {
+        "releaseTitle": "Breakfast Beats",
+        "artistName": "Pancake Robot",
+        "primaryGenre": "Children's Music",
+        "language": "English",
+        "releaseDate": "2026-06-26",
+        "labelName": "Figment Factory",
+        "albumArtPath": "C:\\fakepath\\album-cover.png"
+      },
+      "itemSections": [
+        {
+          "trackTitle": "Tiny Robot Parade",
+          "audioUpload": "C:\\fakepath\\01-tiny-robot-parade.wav",
+          "trackNumber": "1",
+          "songwriter": "Figment Factory",
+          "explicit": false
+        },
+        {
+          "trackTitle": "Waffle Moon",
+          "audioUpload": "C:\\fakepath\\02-waffle-moon.wav",
+          "trackNumber": "2",
+          "songwriter": "Figment Factory",
+          "explicit": false
+        }
+      ],
+      "itemSectionCount": 2,
+      "finalActionClicked": null,
+      "submitClicked": false,
+      "releaseClicked": false,
+      "legalCertChecked": false
+    },
+    "error": null
+  }
+}

@@ -32,6 +32,7 @@ function printHelp() {
   console.log('  browsy auth save --workflow <id> --url <url>');
   console.log('  browsy auth check --workflow <id> --url <url>');
   console.log('  browsy discover --workflow <id> --url <url> [--candidates]');
+  console.log('  browsy discover:map --workflow <id> [--package <path>] [--model <model>]');
   console.log('  browsy generate-prompt             Print coding agent prompt');
   console.log('  browsy run --workflow <id> --manifest <path> [--dry-run]');
 }
@@ -1042,6 +1043,112 @@ async function discoverAll() {
 }
 
 // ---------------------------------------------------------------------------
+// discover:map — LLM-powered field mapping from latest discovery run
+// ---------------------------------------------------------------------------
+
+async function discoverMap() {
+  const workflow = safeId(requireArg(args, 'workflow'));
+  const { mapFieldsWithLLM, makeAnthropicCaller, extractPackageFields } = await import('../core/field-map-llm.mjs');
+  const { generateCandidates: gc } = await import('../core/field-map-candidates.mjs');
+
+  // 1. Find latest discovered-fields.json for this workflow
+  const runsBase = join(OUTPUT_DIR, 'runs', workflow);
+  if (!exists(runsBase)) {
+    throw new Error(`No run output found for workflow "${workflow}". Run: browsy discover --workflow ${workflow} --url <url>`);
+  }
+  const runDirs = fs.readdirSync(runsBase)
+    .map(d => ({ name: d, path: join(runsBase, d) }))
+    .filter(d => {
+      try { return fs.statSync(d.path).isDirectory(); } catch { return false; }
+    })
+    .sort((a, b) => {
+      try {
+        return fs.statSync(b.path).mtimeMs - fs.statSync(a.path).mtimeMs;
+      } catch { return 0; }
+    });
+
+  let discoveryData = null;
+  let discoveryRunDir = null;
+  for (const rd of runDirs) {
+    const dfPath = join(rd.path, 'discovered-fields.json');
+    if (exists(dfPath)) {
+      discoveryData = readJson(dfPath);
+      discoveryRunDir = rd.path;
+      break;
+    }
+  }
+  if (!discoveryData) {
+    throw new Error(`No discovered-fields.json found for workflow "${workflow}". Run: browsy discover --workflow ${workflow} --url <url>`);
+  }
+  console.log(`Discovery: ${discoveryRunDir}`);
+
+  // 2. Load package JSON
+  const pkgFlag = args.package;
+  const pkgPaths = pkgFlag
+    ? [resolve(pkgFlag)]
+    : [
+        join(workflowDir(workflow), 'sample-package.json'),
+        join(workflowDir(workflow), 'package.json'),
+      ];
+  let pkg = null;
+  for (const p of pkgPaths) {
+    if (exists(p)) { pkg = readJson(p); break; }
+  }
+  if (!pkg) {
+    throw new Error(
+      `No package JSON found for workflow "${workflow}". ` +
+      `Create workflows/${workflow}/sample-package.json or pass --package <path>.`
+    );
+  }
+
+  // 3. Extract fields and generate candidates
+  const packageFields = extractPackageFields(pkg);
+  if (!packageFields.length) {
+    throw new Error('Package has no fields (globals, assets, defaults, or repeatGroups). Nothing to map.');
+  }
+  console.log(`Package fields: ${packageFields.map(f => f.fieldName).join(', ')}`);
+
+  const candidates = gc(discoveryData).candidates;
+  console.log(`DOM candidates: ${candidates.length} (${candidates.filter(c => !c.isDangerous).length} safe)`);
+
+  // 4. Call LLM
+  const modelArg = args.model || 'claude-haiku-4-5-20251001';
+  const callLLM  = makeAnthropicCaller({ model: modelArg });
+  console.log(`Mapping with LLM (${modelArg})…`);
+
+  const { fieldMap, unmapped, confidence } = await mapFieldsWithLLM({
+    packageFields,
+    candidates,
+    callLLM,
+  });
+
+  // 5. Write field-map.local.json
+  const outPath = join(workflowDir(workflow), 'field-map.local.json');
+  const output  = {
+    generatedAt:  new Date().toISOString(),
+    workflowId:   workflow,
+    discoveryRun: discoveryRunDir,
+    model:        modelArg,
+    fields:       fieldMap,
+    unmapped,
+    confidence,
+  };
+  writeJson(outPath, output);
+
+  // 6. Report
+  const mapped = Object.keys(fieldMap).length;
+  console.log(`\nMapped:   ${mapped}/${packageFields.length} fields`);
+  if (unmapped.length) {
+    console.log(`Unmapped: ${unmapped.join(', ')}`);
+    console.log(`  (Edit ${outPath} to add selectors manually)`);
+  }
+  console.log(`Output:   ${outPath}`);
+  if (unmapped.length === 0) {
+    console.log('\n✓ All fields mapped. Ready to run.');
+  }
+}
+
+// ---------------------------------------------------------------------------
 // review — display or generate run-review.md for a specific run
 // ---------------------------------------------------------------------------
 
@@ -1213,6 +1320,7 @@ try {
   else if (command === 'auth' && subcommand === 'check') await authCheck();
   else if (command === 'discover') await discover();
   else if (command === 'discover:all') await discoverAll();
+  else if (command === 'discover:map') await discoverMap();
   else if (command === 'generate-prompt') generatePrompt();
   else if (command === 'run') await runWorkflow();
   else if (command === 'review') await reviewRun();

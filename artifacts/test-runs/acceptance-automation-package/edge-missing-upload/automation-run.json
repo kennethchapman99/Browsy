@@ -1,0 +1,64 @@
+{
+  "ok": false,
+  "mode": "fixture",
+  "dryRun": false,
+  "generatedAt": "2026-05-24T13:42:25.784Z",
+  "request": {
+    "path": "/Users/kchapman/browsy/fixtures/album-upload/AUTOMATION_REQUEST.md",
+    "workflowId": "album-upload",
+    "workflowName": "album-upload",
+    "validationErrors": [],
+    "validationWarnings": []
+  },
+  "manifest": {
+    "path": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-automation-package/bad-manifest.json",
+    "itemCount": 1
+  },
+  "runPlan": {
+    "stepCount": 9,
+    "globalStepCount": 7,
+    "itemStepCount": 5,
+    "uploadStepCount": 2,
+    "checkpointStepCount": 1
+  },
+  "execution": {
+    "executedStepCount": 6,
+    "skippedStepCount": 0,
+    "checkpointReached": false,
+    "blockedActions": [],
+    "executedSteps": [
+      {
+        "type": "fill_global",
+        "source": "album.artistName",
+        "value": "Pancake Robot"
+      },
+      {
+        "type": "fill_global",
+        "source": "album.releaseTitle",
+        "value": "Breakfast Beats"
+      },
+      {
+        "type": "fill_global",
+        "source": "album.primaryGenre",
+        "value": "Children's Music"
+      },
+      {
+        "type": "fill_global",
+        "source": "album.language",
+        "value": "English"
+      },
+      {
+        "type": "fill_global",
+        "source": "album.releaseDate",
+        "value": "2026-06-26"
+      },
+      {
+        "type": "fill_global",
+        "source": "album.labelName",
+        "value": "Figment Factory"
+      }
+    ],
+    "finalState": null,
+    "error": "upload_global[album.albumArtPath]: upload file not found at \"/Users/kchapman/browsy/artifacts/test-runs/acceptance-automation-package/album-cover.png\""
+  }
+}

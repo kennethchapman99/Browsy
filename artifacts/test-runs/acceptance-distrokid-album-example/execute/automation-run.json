@@ -1,0 +1,186 @@
+{
+  "ok": true,
+  "dryRun": false,
+  "generatedAt": "2026-05-24T13:42:24.503Z",
+  "package": {
+    "path": "/Users/kchapman/browsy/examples/workflows/distrokid-album-upload/sample-package.json",
+    "workflowId": "distrokid-album-upload",
+    "targetName": "DistroKid-like Album Upload",
+    "itemCount": 2,
+    "repeatGroupCount": 1
+  },
+  "runPlan": {
+    "stepCount": 10,
+    "globalStepCount": 7,
+    "itemStepCount": 10,
+    "uploadStepCount": 3,
+    "checkpointStepCount": 1,
+    "warnings": []
+  },
+  "execution": {
+    "executedStepCount": 19,
+    "skippedStepCount": 0,
+    "checkpointReached": true,
+    "blockedActions": [
+      "Submit",
+      "Confirm",
+      "Finalize",
+      "Distribute",
+      "Release",
+      "Send"
+    ],
+    "executedSteps": [
+      {
+        "type": "fill_global",
+        "source": "releaseTitle",
+        "value": "Sunrise Sessions"
+      },
+      {
+        "type": "fill_global",
+        "source": "artistName",
+        "value": "Example Artist"
+      },
+      {
+        "type": "fill_global",
+        "source": "primaryGenre",
+        "value": "Pop"
+      },
+      {
+        "type": "fill_global",
+        "source": "language",
+        "value": "English"
+      },
+      {
+        "type": "fill_global",
+        "source": "releaseDate",
+        "value": "2026-09-01"
+      },
+      {
+        "type": "fill_global",
+        "source": "labelName",
+        "value": "Independent"
+      },
+      {
+        "type": "upload_global",
+        "source": "coverArt",
+        "value": "./assets/cover.png",
+        "resolvedPath": "/Users/kchapman/browsy/examples/workflows/distrokid-album-upload/assets/cover.png"
+      },
+      {
+        "type": "ensure_section",
+        "itemIndex": 0,
+        "action": "verified-exists"
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 0,
+        "fieldName": "songwriter",
+        "value": "Example Artist",
+        "fromDefault": true
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 0,
+        "fieldName": "language",
+        "value": "English",
+        "fromDefault": true
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 0,
+        "fieldName": "trackTitle",
+        "value": "Morning Light",
+        "fromDefault": false
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 0,
+        "fieldName": "trackNumber",
+        "value": "1",
+        "fromDefault": false
+      },
+      {
+        "type": "upload_item",
+        "itemIndex": 0,
+        "fieldName": "audioFile",
+        "value": "./assets/track-01.wav",
+        "resolvedPath": "/Users/kchapman/browsy/examples/workflows/distrokid-album-upload/assets/track-01.wav"
+      },
+      {
+        "type": "ensure_section",
+        "itemIndex": 1,
+        "action": "clicked-add",
+        "selector": "[data-browsy-action='add-track']"
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 1,
+        "fieldName": "songwriter",
+        "value": "Jane Composer",
+        "fromDefault": false
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 1,
+        "fieldName": "language",
+        "value": "English",
+        "fromDefault": true
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 1,
+        "fieldName": "trackTitle",
+        "value": "Evening Calm",
+        "fromDefault": false
+      },
+      {
+        "type": "fill_item",
+        "itemIndex": 1,
+        "fieldName": "trackNumber",
+        "value": "2",
+        "fromDefault": false
+      },
+      {
+        "type": "upload_item",
+        "itemIndex": 1,
+        "fieldName": "audioFile",
+        "value": "./assets/track-02.wav",
+        "resolvedPath": "/Users/kchapman/browsy/examples/workflows/distrokid-album-upload/assets/track-02.wav"
+      }
+    ],
+    "finalState": {
+      "pageTitle": "Browsy Example — DistroKid-like Album Upload",
+      "globalFields": {
+        "releaseTitle": "Sunrise Sessions",
+        "artistName": "Example Artist",
+        "primaryGenre": "Pop",
+        "language": "English",
+        "releaseDate": "2026-09-01",
+        "labelName": "Independent",
+        "coverArt": "C:\\fakepath\\cover.png"
+      },
+      "itemSections": [
+        {
+          "trackTitle": "Morning Light",
+          "audioFile": "C:\\fakepath\\track-01.wav",
+          "trackNumber": "1",
+          "songwriter": "Example Artist",
+          "language": "English"
+        },
+        {
+          "trackTitle": "Evening Calm",
+          "audioFile": "C:\\fakepath\\track-02.wav",
+          "trackNumber": "2",
+          "songwriter": "Jane Composer",
+          "language": "English"
+        }
+      ],
+      "itemSectionCount": 2,
+      "finalActionClicked": null,
+      "submitClicked": false,
+      "releaseClicked": false,
+      "legalCertChecked": false
+    },
+    "error": null
+  }
+}
