@@ -1,41 +1,42 @@
-# Browsy Agent Instructions — v0.2
+# Browsy Agent Instructions — v0.3
 
-Browsy is a developer-facing browser automation harness factory.
+Browsy is an automation project intake and harness factory.
 
-Treat `AUTOMATION_REQUEST.md` as the single source of truth for the requested automation. Generate a safe, inspectable, deterministic automation harness. **Do not claim success when a step fails or a selector is unverified.**
+Treat `AUTOMATION_REQUEST.md` plus `workflows/<workflow-id>/project.json` as the source of truth for the requested automation. Generate a safe, inspectable, deterministic automation harness. **Do not claim success when a step fails, a selector is unverified, or a live action has not been tested.**
 
 ---
 
 ## Operating principles
 
-1. **APIs first.** When a stable REST or GraphQL API exists for the target action, use it.
+1. **APIs first.** When a stable REST, GraphQL, or official integration API exists for the target action, prefer it.
 2. **Playwright for deterministic browser steps.** Fill, select, upload, safe navigation click, screenshot, logging.
-3. **Adapter placeholders for dynamic flows.** Use `BrowserAgentAdapter` placeholder only when CSS selectors are genuinely unreliable. Never default to this — it requires human configuration.
-4. **human checkpoints for final actions.** Any action that is externally visible, financially consequential, legally binding, or destructive must stay behind a manual-only human checkpoint.
-5. **dry-run defaults to true.** Every generated automation must default to `--dry-run true` with no override unless the user explicitly sets `--dry-run false` AND `--allow-final-action`.
-6. **Log everything.** Every run must produce `run-log.json`, `filled-fields.json`, `skipped-fields.json`, `errors.json`, screenshots, page text, and HTML snapshot.
-7. **never claim success when selectors are missing.** If a selector is a placeholder, say so. Report what was filled, skipped, and failed.
-8. **Never click dangerous actions.** Not even in tests. Not even with `--allow-final-action` unless the workflow safety policy explicitly permits it.
-9. **Use the shared runtime.** Generated `run.mjs` files must use `src/core/workflow-runtime.mjs` primitives, not re-implement logging or artifact writing.
-10. **Run smoke tests before reporting done.** Run `npm run smoke` and report the output.
+3. **Browser-agent adapter only when needed.** Use adapter-based browser control only when deterministic selectors are insufficient and the workflow explicitly needs semantic/browser-agent help.
+4. **Atlas observation enriches discovery.** Use Atlas/Codex observation docs when available. Observation captures workflow meaning, gotchas, page state, labels, and validation behavior; Playwright discovery captures DOM and selector candidates.
+5. **Do not guess selectors.** If observation and discovery are missing, document that selectors are unverified and run/ask for observation/discovery.
+6. **External sites are execution targets, not source of truth.** Canonical project data lives in local project/package/manifest files and run artifacts.
+7. **Human checkpoints for final actions.** Any action that is externally visible, financially consequential, legally binding, publishing-related, or otherwise high-impact must stay behind a manual-only checkpoint.
+8. **Dry-run defaults to true.** Every generated automation must default to dry-run unless the user explicitly requests live execution and the safety policy allows it.
+9. **Log everything.** Every run must produce run logs, filled fields, skipped fields, errors, screenshots, page text, HTML, and captured outputs when relevant.
+10. **Run tests before reporting done.** Run the repo's relevant acceptance/smoke commands and report exact output.
 
 ---
 
-## Agent workflow
+## Separate the lifecycle stages
 
-When asked to build an automation:
+Do not collapse these into a one-off script:
 
-1. Read `AUTOMATION_REQUEST.md` using `npm run validate:request`.
-2. Run `npm run plan` to generate the build plan.
-3. Run `npm run init:workflow -- --from-request` (or `--id <id>`) to scaffold workflow files.
-4. Save auth if the target requires login: `npm run auth:save`.
-5. Discover the live page DOM: `npm run discover -- --candidates`.
-6. Review `field-map.candidates.md`. Pick verified selectors.
-7. Write `workflows/<id>/field-map.local.json` with verified selectors only.
-8. Implement `workflows/<id>/run.mjs` using `src/core/workflow-runtime.mjs`.
-9. Run `npm run run -- --workflow <id> --dry-run` and review output.
-10. Run `npm run smoke`.
-11. Report exactly what was done, what succeeded, what was skipped, and what remains for a human.
+1. Intake generation
+2. Atlas/Codex observation
+3. Canonical package/project generation
+4. Discovery
+5. Field-map candidate generation
+6. Field-map verification
+7. Harness scaffolding
+8. Dry-run validation
+9. Human review
+10. Live gated run
+11. Output capture
+12. Promotion to reusable workflow
 
 ---
 
@@ -43,74 +44,119 @@ When asked to build an automation:
 
 ```text
 workflows/<workflow-id>/
-  workflow.yaml              human-readable config
-  workflow.json              machine-readable config (used by loadWorkflowConfig)
-  manifest.schema.json       JSON schema for input data
-  manifest.example.json      example manifest values
-  safety-policy.json         danger rules (never_click_text, etc.)
-  field-map.example.json     placeholder field map (from request fields table)
-  field-map.local.json       verified field map (created after discovery)
-  field-map.local.json.example  copy template
-  walkthrough.md             narrated walkthrough
-  README.md                  purpose, auth, commands, manual checkpoints, limitations
-  run.mjs                    the automation runner (uses workflow-runtime)
-  smoke-test.mjs             workflow-specific smoke checks
+  project.json                     canonical project/readiness state
+  workflow.yaml                    human-readable config
+  workflow.json                    machine-readable config
+  manifest.schema.json             JSON schema for run manifest/package
+  manifest.example.json            example manifest values
+  workflow-package.example.json    example automation package; do not call this package.json
+  safety-policy.json               danger rules and checkpoints
+  field-map.example.json           candidate/placeholder field map
+  field-map.local.json.example     local verified-field-map template
+  field-map.local.json             verified field map, created after discovery
+  walkthrough.md                   workflow expert narrative
+  observations/
+    atlas-observation-template.md
+    observation-YYYY-MM-DD.md
+    observation-checklist.md
+  fixtures/
+    observed-form.html
+    observed-review.html
+    observed-success.html
+  README.md
+  run.mjs
+  smoke-test.mjs
 ```
 
 Generated runs write to:
+
 ```text
 output/runs/<workflow-id>/<timestamp>/
 ```
+
+Observation artifacts may also write to:
+
+```text
+output/observations/<workflow-id>/
+```
+
+---
+
+## Data model rules
+
+Keep these separate:
+
+| Bucket | Rule |
+| --- | --- |
+| Global fields | Filled once per run |
+| Repeated item fields | Filled once per item in a repeat group |
+| Global assets | Uploaded once per run |
+| Item assets | Uploaded once per repeated item |
+| Captured outputs | Extracted from page text, URL, selectors, success pages, dashboards |
+| Derived fields | Computed from input/captured data |
+| External links | Captured URLs created/discovered by the target site |
+| Gates | Downstream unlock rules that require captured outputs to exist and verify |
+
+Do not let global fields leak into item fields. Do not let item fields leak into globals.
+
+---
+
+## Observation rules
+
+Use `docs/atlas-codex-observation.md` and `templates/observation/atlas-observation-template.md`.
+
+Each observation should capture:
+
+- workflow id, date, observer, site/page, URL pattern, auth state
+- visible labels and field groups
+- global fields and repeated item fields
+- add/remove item behavior
+- file upload behavior
+- buttons/actions and dangerous actions
+- validation messages
+- success indicators
+- captured output candidates
+- selector candidates
+- screenshot, page text, and HTML snapshot paths
+- unclear/gotcha notes
+- recommended strategy: API, Playwright, browser-agent adapter, human checkpoint
+
+Observation does not replace Playwright discovery. Use both.
 
 ---
 
 ## Safety baseline — hard rules
 
-The following text must NEVER be clicked by automation under any circumstances:
+The following text must NEVER be clicked by automation under normal operation:
 
 - Submit, Finalize, Release, Pay, Purchase, Checkout, Confirm order
 - Upload to stores, Send to stores
 - Continue & submit, Continue and submit, Save and submit
 - Send, Delete, Remove, Publish
+- I agree, I certify
 
-These are enforced by `isDangerousText()` in `src/core/safety.mjs`. Do not bypass them.
+The following categories must ALWAYS be skipped and recorded in `skipped-fields.json` unless there is an explicit human-approved final-action path and a new test proving the behavior:
 
-The following field categories must ALWAYS be skipped and recorded in `skipped-fields.json`:
+- legal certification
+- payment
+- paid extras
+- final submission
+- high-impact publishing
 
-- `legal certification` — I certify / I agree / terms / rights
-- `payment` — pay / purchase / billing / credit card
-- `paid extras` — paid add-on / upgrade / premium / price
-- `final submission` — any final submit action
-- `destructive action` — delete / remove / wipe / purge
-
-A workflow may add stricter rules. It must not loosen these without an explicit human-approved request AND a new test proving the behavior.
+Preserve dangerous-action gates in `safety-policy.json` and generated code.
 
 ---
 
 ## Selector quality rules
 
-1. Prefer `data-testid` and `data-*` attributes (stability ≥ 80).
-2. Prefer `aria-label` (stability 75).
-3. Use `#id` only for non-generated IDs (stability 70 stable, 40 generated).
-4. Use `[name]` as fallback (stability 65).
-5. Use `[placeholder]` only when nothing else is available (stability 50).
-6. Use XPath or index-based selectors only as last resort — document why.
-7. Mark placeholder selectors as `"(run discovery to find selector)"`. Never fabricate a selector.
-
----
-
-## Auth baseline
-
-Support these modes as documented in the request:
-
-| Mode | Implementation |
-|---|---|
-| `manual-save-state` | `npm run auth:save`, saves Playwright storage state |
-| `none` | No auth needed |
-| `api-key` | Set in manifest or env var, pass via API adapter |
-| `oauth` | Manual login, save state |
-
-For browser auth: save state on each page load event, not only on browser close. Context shutdown can race against storage-state persistence.
+1. Prefer stable `data-testid` and `data-*` attributes.
+2. Prefer `aria-label` when semantically stable.
+3. Use stable `#id` only if not generated.
+4. Use `[name]` as a fallback.
+5. Use visible label mapping when Playwright can reliably bind label to control.
+6. Use XPath or index-based selectors only as a last resort and document why.
+7. Mark placeholder selectors as `"(run discovery to find selector)"`.
+8. Never fabricate selectors.
 
 ---
 
@@ -118,41 +164,56 @@ For browser auth: save state on each page load event, not only on browser close.
 
 Return a structured final response:
 
-**A. Files created or changed** (list every file)
+**A. Files created or changed**
 
-**B. Commands to run**
+**B. New/updated data structures**
+
+**C. Commands run**
+
 ```bash
 npm run validate:request
-npm run discover -- --workflow <id> --url <url> --candidates
-npm run run -- --workflow <id> --dry-run
 npm run smoke
+npm run smoke:browser
+npm run test
 ```
 
-**C. What was filled** (field names, types, selector used)
+Add targeted commands when relevant:
 
-**D. What was skipped** (field name + reason)
+```bash
+npm run acceptance:repeat-groups
+npm run acceptance:automation-package
+npm run acceptance:generic-repeat-package
+npm run acceptance:wizard-package-gen
+npm run acceptance:distrokid-album-wizard
+npm run acceptance:project-lifecycle
+```
 
-**E. What failed** (field name + error message + selector tried)
+**D. Test results**
 
-**F. Manual checkpoints** (exactly what the human must do, and when)
+**E. What was filled or generated**
 
-**G. Smoke test output** (exact output of `npm run smoke`)
+**F. What was skipped for safety**
 
-**H. Limitations and assumptions** (unverified selectors, missing auth, unresolved fields)
+**G. What failed or remains unverified**
 
-**Never summarize a step as "done" without reporting the actual outcome.**
+**H. Manual checkpoints**
+
+**I. What still requires live Atlas observation**
+
+Never summarize a step as “done” without reporting the actual outcome.
 
 ---
 
 ## Acceptance criteria for generated automations
 
-- `npm run smoke` passes (non-browser).
+- `npm run smoke` passes.
 - Discovery writes readable `discovered-fields.json` and `discovered-fields.md`.
-- Field map candidates are generated when `--candidates` is passed.
-- `run.mjs` imports from `src/core/workflow-runtime.mjs` and uses its primitives.
+- Field-map candidates are generated when `--candidates` is passed.
+- `run.mjs` imports/uses shared runtime or clearly documents why a scaffold is still draft-only.
 - Dry-run does not take dangerous actions.
-- `skipped-fields.json` records every field that was skipped and why.
-- `errors.json` records every field that failed and the error message.
+- `skipped-fields.json` records every skipped field and reason.
+- `errors.json` records every failed field and selector tried.
+- Captured outputs are stored in run artifacts.
+- Gates block downstream stages until required captured outputs verify.
 - The workflow README explains exactly how to run and verify the workflow.
-- No placeholder success claims remain (`console.log('TODO')`, fake PASS, etc.).
-- Any limitation is documented explicitly.
+- No placeholder success claims remain.
