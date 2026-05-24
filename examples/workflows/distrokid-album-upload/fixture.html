@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Browsy Example — DistroKid-like Album Upload</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; background: #f5f5f5; }
+    h1, h2 { color: #222; }
+    h2 { font-size: 1.1rem; margin: 1.6em 0 .5em; border-bottom: 1px solid #ddd; padding-bottom: .3em; }
+    .form-group { margin: 1em 0; }
+    label { display: block; font-weight: 600; margin-bottom: .35em; color: #333; font-size: .9rem; }
+    input[type="text"], input[type="date"], select {
+      width: 100%; padding: .5em .7em; border: 1px solid #ccc; border-radius: 4px;
+      font-size: 1em; box-sizing: border-box;
+    }
+    input[type="file"] { width: 100%; }
+    .track-section {
+      border: 2px solid #b0c4de; border-radius: 8px; padding: 1.2em; margin: 1em 0;
+      background: #fff; position: relative;
+    }
+    .track-section h3 { margin: 0 0 .8em; font-size: .95rem; color: #334; }
+    .btn { padding: .55em 1.4em; border-radius: 4px; font-size: 1em; cursor: pointer; border: none; }
+    #btn-add-track { background: #2c7; color: white; margin: 1em 0; }
+    .danger-zone { border: 2px solid #e55; padding: 1em; border-radius: 6px; background: #fff5f5; margin-top: 2em; }
+    .danger-zone legend { color: #c00; font-weight: bold; }
+    #btn-final-submit { background: #c33; color: white; }
+    #status { margin: 1em 0; padding: .7em 1em; border-radius: 4px; display: none; font-weight: 600; }
+    .status-ok { background: #d4edda; color: #155724; }
+  </style>
+</head>
+<body>
+  <h1>Album Upload (DistroKid-like Example)</h1>
+  <p style="color:#666;font-size:.9rem">Browsy example workflow. Uses generic data-browsy-* attributes throughout.</p>
+
+  <div id="status"></div>
+
+  <h2>Album details</h2>
+
+  <div class="form-group">
+    <label>Release title</label>
+    <input type="text" data-browsy-field="releaseTitle" placeholder="e.g. My Album">
+  </div>
+
+  <div class="form-group">
+    <label>Artist name</label>
+    <input type="text" data-browsy-field="artistName" placeholder="e.g. Example Artist">
+  </div>
+
+  <div class="form-group">
+    <label>Primary genre</label>
+    <select data-browsy-field="primaryGenre">
+      <option value="">-- Select --</option>
+      <option>Pop</option>
+      <option>Rock</option>
+      <option>Electronic</option>
+      <option>Classical</option>
+      <option>Jazz</option>
+      <option>Children's Music</option>
+      <option>Other</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>Language</label>
+    <input type="text" data-browsy-field="language" placeholder="e.g. English">
+  </div>
+
+  <div class="form-group">
+    <label>Release date</label>
+    <input type="date" data-browsy-field="releaseDate">
+  </div>
+
+  <div class="form-group">
+    <label>Label name</label>
+    <input type="text" data-browsy-field="labelName" placeholder="e.g. Independent">
+  </div>
+
+  <div class="form-group">
+    <label>Cover art <span style="font-weight:normal;color:#666">(PNG or JPG)</span></label>
+    <input type="file" data-browsy-field="coverArt" accept="image/png,image/jpeg">
+  </div>
+
+  <h2>Tracks</h2>
+
+  <div id="tracks-container">
+    <!-- First track pre-exists in DOM -->
+    <div class="track-section" data-browsy-item-section id="track-1">
+      <h3>Track 1</h3>
+
+      <div class="form-group">
+        <label>Track title</label>
+        <input type="text" data-browsy-item-field="trackTitle" placeholder="e.g. My Song">
+      </div>
+
+      <div class="form-group">
+        <label>Audio file <span style="font-weight:normal;color:#666">(WAV or MP3)</span></label>
+        <input type="file" data-browsy-item-field="audioFile" accept="audio/wav,audio/mpeg">
+      </div>
+
+      <div class="form-group">
+        <label>Track number</label>
+        <input type="text" data-browsy-item-field="trackNumber" value="1" style="width:80px">
+      </div>
+
+      <div class="form-group">
+        <label>Songwriter</label>
+        <input type="text" data-browsy-item-field="songwriter" placeholder="e.g. A. Composer">
+      </div>
+
+      <div class="form-group">
+        <label>Language</label>
+        <input type="text" data-browsy-item-field="language" placeholder="e.g. English">
+      </div>
+    </div>
+  </div>
+
+  <button class="btn" id="btn-add-track" data-browsy-action="add-track" onclick="addTrack()">+ Add another track</button>
+
+  <fieldset class="danger-zone">
+    <legend>Final release actions — stay manual</legend>
+    <p style="font-size:.88rem;color:#666;margin:.3em 0 1em">Blocked by Browsy safety policy. A human must review and click these.</p>
+    <button class="btn" id="btn-final-submit" data-browsy-action="final-submit" onclick="handleFinal('submit')">Submit / Upload to stores</button>
+  </fieldset>
+
+  <script>
+    let trackCount = 1;
+
+    function addTrack() {
+      trackCount++;
+      const container = document.getElementById('tracks-container');
+      const section = document.createElement('div');
+      section.className = 'track-section';
+      section.setAttribute('data-browsy-item-section', '');
+      section.id = 'track-' + trackCount;
+      section.innerHTML = `
+        <h3>Track ${trackCount}</h3>
+
+        <div class="form-group">
+          <label>Track title</label>
+          <input type="text" data-browsy-item-field="trackTitle" placeholder="e.g. My Song">
+        </div>
+
+        <div class="form-group">
+          <label>Audio file <span style="font-weight:normal;color:#666">(WAV or MP3)</span></label>
+          <input type="file" data-browsy-item-field="audioFile" accept="audio/wav,audio/mpeg">
+        </div>
+
+        <div class="form-group">
+          <label>Track number</label>
+          <input type="text" data-browsy-item-field="trackNumber" value="${trackCount}" style="width:80px">
+        </div>
+
+        <div class="form-group">
+          <label>Songwriter</label>
+          <input type="text" data-browsy-item-field="songwriter" placeholder="e.g. A. Composer">
+        </div>
+
+        <div class="form-group">
+          <label>Language</label>
+          <input type="text" data-browsy-item-field="language" placeholder="e.g. English">
+        </div>
+      `;
+      container.appendChild(section);
+      section.querySelector('input[type="text"]').focus();
+    }
+
+    function handleFinal(action) {
+      const status = document.getElementById('status');
+      status.className = 'status-ok';
+      status.style.display = 'block';
+      status.textContent = '[FIXTURE] ' + action + ' triggered — manual-only action in a real workflow.';
+      window.lastFinalAction = action;
+    }
+  </script>
+</body>
+</html>

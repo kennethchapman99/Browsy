@@ -1,0 +1,34 @@
+{
+  "id": "ALBUM_001",
+  "album": {
+    "artistName": "Pancake Robot",
+    "releaseTitle": "Breakfast Beats",
+    "primaryGenre": "Children's Music",
+    "language": "English",
+    "releaseDate": "2026-06-26",
+    "labelName": "Figment Factory",
+    "albumArtPath": "./album-cover.png",
+    "explicit": false
+  },
+  "tracks": [
+    {
+      "trackNumber": 1,
+      "trackTitle": "Tiny Robot Parade",
+      "audioPath": "./01-tiny-robot-parade.wav",
+      "songwriter": "Figment Factory",
+      "performer": "Pancake Robot",
+      "explicit": false,
+      "instrumental": false
+    },
+    {
+      "trackNumber": 2,
+      "trackTitle": "Waffle Moon",
+      "audioPath": "./02-waffle-moon.wav",
+      "songwriter": "Figment Factory",
+      "performer": "Pancake Robot",
+      "explicit": false,
+      "instrumental": false
+    }
+  ],
+  "dryRun": true
+}

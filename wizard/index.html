@@ -782,7 +782,7 @@ body {
 
   <!-- Step 1: Mission -->
   <div class="step active" data-step="1">
-    <div class="step-badge">Step 1 of 7 · Mission</div>
+    <div class="step-badge">Step 1 of 10 · Mission</div>
     <h1 class="step-title">What are you automating?</h1>
     <p class="step-hint">Give this workflow a short name and describe what it should accomplish in plain English.</p>
 
@@ -805,7 +805,7 @@ body {
 
   <!-- Step 2: Pages & Auth -->
   <div class="step" data-step="2">
-    <div class="step-badge">Step 2 of 7 · Target Pages</div>
+    <div class="step-badge">Step 2 of 10 · Target Pages</div>
     <h1 class="step-title">Where does it happen?</h1>
     <p class="step-hint">List every page the automation will touch. The agent needs to run discovery on all of them.</p>
 
@@ -824,9 +824,19 @@ body {
     </div>
   </div>
 
-  <!-- Step 3: Walkthrough -->
+  <!-- Step 3: Data Sources -->
   <div class="step" data-step="3">
-    <div class="step-badge">Step 3 of 7 · Walkthrough</div>
+    <div class="step-badge">Step 3 of 10 · Data Sources</div>
+    <h1 class="step-title">What data does it use?</h1>
+    <p class="step-hint">Describe every local folder, file, CSV, JSON, or external system the automation reads from or uploads to. This becomes the source-of-truth for your manifest.</p>
+
+    <div class="table-builder" id="data-sources-list"></div>
+    <button class="btn-add" onclick="addDataSource()">+ Add data source</button>
+  </div>
+
+  <!-- Step 4: Walkthrough -->
+  <div class="step" data-step="4">
+    <div class="step-badge">Step 4 of 10 · Walkthrough</div>
     <h1 class="step-title">Walk me through it</h1>
     <p class="step-hint">Hit record, switch to the site, and narrate as you go. Explain <em>why</em> you make each choice — not just what you click. Save each page as a step.</p>
 
@@ -850,9 +860,9 @@ body {
     <div class="steps-list" id="steps-list"></div>
   </div>
 
-  <!-- Step 4: Parameters / Runtime Variables -->
-  <div class="step" data-step="4">
-    <div class="step-badge">Step 4 of 7 · Variables</div>
+  <!-- Step 5: Parameters / Runtime Variables -->
+  <div class="step" data-step="5">
+    <div class="step-badge">Step 5 of 10 · Variables</div>
     <h1 class="step-title">What changes each run?</h1>
     <p class="step-hint">Declare all variables the automation needs. <strong>Input</strong> = provided before the run. <strong>Captured</strong> = extracted from the page during the run (e.g. a generated ID in the URL). <strong>Derived</strong> = computed from input + captured.</p>
 
@@ -871,21 +881,52 @@ body {
     <div id="var-validation" style="margin-top:20px;font-size:.85rem;color:var(--coral);display:none"></div>
   </div>
 
-  <!-- Step 5: Data wiring -->
-  <div class="step" data-step="5">
-    <div class="step-badge">Step 5 of 7 · Data Wiring</div>
-    <h1 class="step-title">Where does data come from — and go?</h1>
-    <p class="step-hint">Describe what system feeds data in, and what should happen when a run finishes.</p>
+  <!-- Step 6: Run Inputs / Manifest Builder -->
+  <div class="step" data-step="6">
+    <div class="step-badge">Step 6 of 10 · Run Inputs</div>
+    <h1 class="step-title">What goes into each run?</h1>
+    <p class="step-hint">Define every field in the manifest — the document that drives each automation run. Use <strong>scope</strong> to mark which fields fill once globally and which repeat for every item.</p>
 
-    <div class="field voice-field">
-      <label>Data source</label>
-      <textarea id="dataSource" rows="3" placeholder="e.g. Local manifest JSON built by Pancake Robot. Lives at output/releases/<id>/manifest.json"></textarea>
-      <button class="btn-voice" title="Dictate" onclick="toggleVoice('dataSource',this)">🎤</button>
+    <div class="section-label">Manifest fields</div>
+    <div id="run-inputs-list"></div>
+    <button class="btn-add" onclick="addRunInput()">+ Add field</button>
+
+    <div style="margin-top:28px;display:flex;align-items:center;gap:10px">
+      <div class="section-label" style="margin-bottom:0">Raw JSON preview</div>
+      <button onclick="toggleRawManifest()" style="font-size:.78rem;padding:4px 10px;border:1.5px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;font-family:inherit">toggle</button>
     </div>
+    <div id="raw-manifest-wrap" style="display:none;margin-top:10px">
+      <textarea id="raw-manifest-json" rows="12" style="width:100%;font-family:'SF Mono','Fira Code',monospace;font-size:.82rem;padding:14px;border:2px solid var(--border);border-radius:14px;background:#1c1936;color:#a8f0e8;resize:vertical" placeholder="Advanced: edit raw JSON here" oninput="S.rawManifestJson=this.value"></textarea>
+    </div>
+    <div id="manifest-preview" style="margin-top:10px;font-family:'SF Mono','Fira Code',monospace;font-size:.78rem;background:#1c1936;color:#a8f0e8;padding:16px;border-radius:14px;white-space:pre-wrap;max-height:200px;overflow-y:auto"></div>
+  </div>
+
+  <!-- Step 7: Repeat Groups -->
+  <div class="step" data-step="7">
+    <div class="step-badge">Step 7 of 10 · Repeat Groups</div>
+    <h1 class="step-title">Does any part repeat?</h1>
+    <p class="step-hint">If the workflow fills a form section once for each item in a list (e.g. one section per track, one row per product), describe the repeat pattern here. Browsy uses this to fill <strong>fields once globally</strong> and <strong>fields individually for each item</strong>.</p>
+
+    <div class="toggle-row" style="margin-bottom:28px;gap:14px">
+      <input type="checkbox" class="toggle" id="has-repeat-groups" onchange="S.hasRepeatGroups=this.checked;renderRepeatGroups()">
+      <label for="has-repeat-groups" style="font-size:1rem;font-weight:700;cursor:pointer">Yes — part of this workflow repeats for each item in a list</label>
+    </div>
+
+    <div id="repeat-groups-wrap" style="display:none">
+      <div id="repeat-groups-list"></div>
+      <button class="btn-add" onclick="addRepeatGroup()">+ Add repeat group</button>
+    </div>
+  </div>
+
+  <!-- Step 8: Data wiring (completion / outputs) -->
+  <div class="step" data-step="8">
+    <div class="step-badge">Step 8 of 10 · Data Wiring</div>
+    <h1 class="step-title">Where does data come from — and go?</h1>
+    <p class="step-hint">Describe what happens when a run finishes and any final wiring between your data sources and the automation output.</p>
 
     <div class="field voice-field">
       <label>What happens when it finishes?</label>
-      <textarea id="completionAction" rows="3" placeholder="e.g. POST to http://localhost:3000/api/complete with run status. Or: update column D in Google Sheet row matching songId."></textarea>
+      <textarea id="completionAction" rows="3" placeholder="e.g. POST to http://localhost:3000/api/complete with run status. Or: update a spreadsheet row matching the run ID."></textarea>
       <button class="btn-voice" title="Dictate" onclick="toggleVoice('completionAction',this)">🎤</button>
     </div>
 
@@ -893,15 +934,21 @@ body {
       <label>Callback URL <span>(optional)</span></label>
       <input type="url" id="callbackUrl" placeholder="http://localhost:3000/api/complete">
     </div>
+
+    <div class="section-label" style="margin-top:28px">Field scope summary <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.82rem;color:var(--muted)">— how fields from your Run Inputs are used</span></div>
+    <div id="field-scope-summary" style="font-size:.87rem;color:var(--muted);margin-bottom:8px;line-height:1.6">
+      (Defined in Step 6 — Run Inputs)
+    </div>
   </div>
 
-  <!-- Step 6: Safety -->
-  <div class="step" data-step="6">
-    <div class="step-badge">Step 6 of 7 · Safety</div>
+  <!-- Step 9: Safety -->
+  <div class="step" data-step="9">
+    <div class="step-badge">Step 9 of 10 · Safety</div>
     <h1 class="step-title">What stays manual?</h1>
-    <p class="step-hint">The automation will block these and pause for a human. Add or remove anything that fits your workflow.</p>
+    <p class="step-hint">The automation will block these actions and pause for a human. These are workflow-specific safety rules — add or remove anything that fits your workflow.</p>
 
     <div class="section-label">Manual-only action categories</div>
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:10px;line-height:1.5">Actions that must always require a human. The automation stops and waits before these.</p>
     <div class="chip-list" id="manual-chips"></div>
     <div class="field-row cols-2" style="margin-bottom:28px">
       <input type="text" id="new-manual-action" placeholder="Add manual action…" style="padding:10px 14px;border:2px solid var(--border);border-radius:12px;font-size:.95rem;font-family:inherit;" onkeydown="if(event.key==='Enter')addChip('manual')">
@@ -909,22 +956,49 @@ body {
     </div>
 
     <div class="section-label">Danger words (block buttons / text matching these)</div>
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:10px;line-height:1.5">Browsy will never click any button whose visible text matches one of these — even in a live run.</p>
     <div class="chip-list" id="danger-chips"></div>
-    <div class="field-row cols-2">
+    <div class="field-row cols-2" style="margin-bottom:28px">
       <input type="text" id="new-danger-word" placeholder="Add danger word…" style="padding:10px 14px;border:2px solid var(--border);border-radius:12px;font-size:.95rem;font-family:inherit;" onkeydown="if(event.key==='Enter')addChip('danger')">
       <button class="btn-add" style="border-radius:12px;padding:10px 16px" onclick="addChip('danger')">+ Add</button>
     </div>
+
+    <div class="section-label">Manual checkpoints</div>
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:10px;line-height:1.5">Named steps where the automation must pause and wait for a human to review before continuing.</p>
+    <div class="chip-list" id="checkpoint-chips"></div>
+    <div class="field-row cols-2">
+      <input type="text" id="new-checkpoint" placeholder="e.g. Before final release…" style="padding:10px 14px;border:2px solid var(--border);border-radius:12px;font-size:.95rem;font-family:inherit;" onkeydown="if(event.key==='Enter')addChip('checkpoint')">
+      <button class="btn-add" style="border-radius:12px;padding:10px 16px" onclick="addChip('checkpoint')">+ Add</button>
+    </div>
   </div>
 
-  <!-- Step 7: Generate -->
-  <div class="step" data-step="7">
-    <div class="step-badge">Step 7 of 7 · Generate</div>
+  <!-- Step 10: Generate -->
+  <div class="step" data-step="10">
+    <div class="step-badge">Step 10 of 10 · Generate</div>
     <h1 class="step-title">Ready to build</h1>
     <p class="step-hint">This is your <code style="background:var(--bg);padding:2px 6px;border-radius:6px;font-size:.92em">AUTOMATION_REQUEST.md</code>. Review it, then write it — your coding agent reads this file and builds the full harness.</p>
 
-    <div class="preview-box" id="preview-box">Generating preview…</div>
-    <button class="btn-write" id="btn-write" onclick="writeRequest()">✦ Write AUTOMATION_REQUEST.md</button>
-    <div class="write-status" id="write-status"></div>
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <button id="tab-md" onclick="switchPreviewTab('md')" style="flex:1;padding:10px 16px;border-radius:10px;border:2px solid var(--accent);background:var(--accent);color:white;font-size:.85rem;font-weight:800;cursor:pointer;font-family:inherit">AUTOMATION_REQUEST.md</button>
+      <button id="tab-pkg" onclick="switchPreviewTab('pkg')" style="flex:1;padding:10px 16px;border-radius:10px;border:2px solid var(--border);background:transparent;color:var(--muted);font-size:.85rem;font-weight:800;cursor:pointer;font-family:inherit">Package JSON</button>
+    </div>
+
+    <div id="preview-box" class="preview-box">Generating preview…</div>
+
+    <div id="pkg-preview-wrap">
+      <div class="preview-box" id="pkg-preview-box" style="display:none">Generating package preview…</div>
+    </div>
+
+    <div id="actions-md">
+      <button class="btn-write" id="btn-write" onclick="writeRequest()">✦ Write AUTOMATION_REQUEST.md</button>
+      <div class="write-status" id="write-status"></div>
+    </div>
+
+    <div id="actions-pkg" style="display:none">
+      <button class="btn-write" id="btn-write-package" onclick="writePackage()" style="background:var(--purple)">✦ Save Package JSON</button>
+      <div class="write-status" id="package-write-status"></div>
+      <p style="font-size:.82rem;color:var(--muted);margin-top:8px;line-height:1.5">The package JSON is saved as <code style="background:var(--bg);padding:1px 5px;border-radius:4px">package.json</code> in your workflow directory. Edit it to add real field values and additional items before running.</p>
+    </div>
 
     <div id="lifecycle-wrap" style="display:none">
       <div class="lifecycle-intro">
@@ -966,7 +1040,7 @@ body {
 <!-- ── Nav bar ── -->
 <div class="nav-bar">
   <button class="btn-back" id="btn-back" onclick="prevStep()" disabled>← Back</button>
-  <span class="step-counter" id="step-counter">Step 1 of 7</span>
+  <span class="step-counter" id="step-counter">Step 1 of 10</span>
   <button class="btn-next" id="btn-next" onclick="nextStep()">Next →</button>
 </div>
 
@@ -975,23 +1049,36 @@ body {
 <script>
 // ── State ───────────────────────────────────────────────────────────────────
 const S = {
-  step: 1, totalSteps: 7,
+  step: 1, totalSteps: 10,
   workflowName: '', goal: '', startUrl: '',
   pages: [], authMode: 'manual-save-state',
   walkthroughSteps: [], parameters: [],
   // Runtime variables: input (user-provided), captured (from page), derived (computed)
   runtimeVars: { input: [], captured: [], derived: [] },
-  dataSource: '', completionAction: '', callbackUrl: '',
+  // Data Sources (Step 3)
+  dataSources: [],
+  // Run Inputs / Manifest Builder (Step 6)
+  runInputs: [],
+  rawManifestJson: '',
+  // Repeat Groups (Step 7)
+  hasRepeatGroups: false,
+  repeatGroups: [],
+  // Data Wiring (Step 8)
+  completionAction: '', callbackUrl: '',
+  // Safety (Step 9)
   manualActions: [
     'Final submit','Payment or purchase',
     'Legal certification checkboxes','Paid extras or add-ons',
     'Deletion or destructive changes'
   ],
-  dangerText: ['Submit','Finalize','Pay','Purchase','Release','Send','Delete','Checkout','Continue & submit'],
+  dangerText: ['Submit','Finalize','Pay','Purchase','Release','Checkout',
+    'Upload to stores','Send to stores','I agree','I certify','Finalize','Done',
+    'Delete','Continue & submit'],
+  checkpoints: ['Stop before final release / payment / legal certification'],
 };
 
-const STEP_NAMES  = ['','Mission','Target Pages','Walkthrough','Parameters','Data Wiring','Safety','Generate'];
-const STEP_COLORS = ['','var(--teal)','var(--orange)','var(--purple)','var(--green)','var(--yellow)','var(--coral)','var(--navy)'];
+const STEP_NAMES  = ['','Mission','Target Pages','Data Sources','Walkthrough','Variables','Run Inputs','Repeat Groups','Data Wiring','Safety','Generate'];
+const STEP_COLORS = ['','var(--teal)','var(--orange)','#5b9bd5','var(--purple)','var(--green)','#7b4fc8','var(--yellow)','var(--coral)','#c0392b','var(--navy)'];
 
 // ── Voice (field dictation) ─────────────────────────────────────────────────
 let activeVoiceBtn = null;
@@ -1268,14 +1355,655 @@ function renderChips() {
     <div class="chip"><span>${esc(a)}</span><button onclick="S.manualActions.splice(${i},1);renderChips()">×</button></div>`).join('');
   document.getElementById('danger-chips').innerHTML = S.dangerText.map((w,i) => `
     <div class="chip danger"><span>${esc(w)}</span><button onclick="S.dangerText.splice(${i},1);renderChips()">×</button></div>`).join('');
+  const cpEl = document.getElementById('checkpoint-chips');
+  if (cpEl) cpEl.innerHTML = S.checkpoints.map((c,i) => `
+    <div class="chip"><span>${esc(c)}</span><button onclick="S.checkpoints.splice(${i},1);renderChips()">×</button></div>`).join('');
 }
 function addChip(type) {
-  const id = type==='manual' ? 'new-manual-action' : 'new-danger-word';
-  const val = document.getElementById(id).value.trim();
+  const ids = { manual:'new-manual-action', danger:'new-danger-word', checkpoint:'new-checkpoint' };
+  const val = document.getElementById(ids[type]).value.trim();
   if (!val) return;
-  if (type==='manual') S.manualActions.push(val); else S.dangerText.push(val);
-  document.getElementById(id).value = '';
+  if (type==='manual') S.manualActions.push(val);
+  else if (type==='danger') S.dangerText.push(val);
+  else if (type==='checkpoint') S.checkpoints.push(val);
+  document.getElementById(ids[type]).value = '';
   renderChips();
+}
+
+// ── Data Sources (Step 3) ──────────────────────────────────────────────────────
+const DS_TYPES = ['local_folder','local_file','csv','json','app_output_folder','web_page','api','other'];
+const DS_USAGES = ['read files','infer metadata from filenames','load JSON manifest','upload file','use as source of truth','pass path into manifest'];
+
+function addDataSource(d={}) {
+  S.dataSources.push({
+    name: d.name||'', type: d.type||'local_folder', examplePath: d.examplePath||'',
+    contains: d.contains||'', required: d.required!==false, usage: d.usage||'use as source of truth',
+  });
+  renderDataSources();
+}
+
+function renderDataSources() {
+  const el = document.getElementById('data-sources-list');
+  if (!el) return;
+  if (!S.dataSources.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:.87rem;margin:0 0 14px">No data sources yet — add a local folder, file, CSV, or other system the workflow depends on.</p>';
+    return;
+  }
+  el.innerHTML = S.dataSources.map((ds, i) => `
+    <div class="table-row" style="grid-template-columns:1fr 1fr;row-gap:8px;margin-bottom:12px">
+      <input type="text" placeholder="Source name (e.g. Local album folder)" value="${esc(ds.name)}"
+        oninput="S.dataSources[${i}].name=this.value" style="grid-column:1/-1">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Type</label>
+        <select onchange="S.dataSources[${i}].type=this.value">
+          ${DS_TYPES.map(t=>`<option value="${t}"${ds.type===t?' selected':''}>${t.replace(/_/g,' ')}</option>`).join('')}
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">How Browsy uses it</label>
+        <select onchange="S.dataSources[${i}].usage=this.value">
+          ${DS_USAGES.map(u=>`<option value="${u}"${ds.usage===u?' selected':''}>${u}</option>`).join('')}
+        </select>
+      </div>
+      <input type="text" placeholder="Example path or URL" value="${esc(ds.examplePath)}"
+        oninput="S.dataSources[${i}].examplePath=this.value" style="grid-column:1/-1">
+      <textarea placeholder="What it contains (e.g. album metadata, track audio files, artwork)" rows="2"
+        style="resize:vertical;width:100%;padding:8px 12px;font-size:.9rem;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;grid-column:1/-1"
+        oninput="S.dataSources[${i}].contains=this.value">${esc(ds.contains)}</textarea>
+      <div style="display:flex;align-items:center;gap:8px;grid-column:1/-1;justify-content:space-between">
+        <label class="toggle-row" style="gap:8px;font-size:.88rem">
+          <input type="checkbox" class="toggle" ${ds.required?'checked':''} onchange="S.dataSources[${i}].required=this.checked">
+          Required
+        </label>
+        <button class="btn-remove" onclick="S.dataSources.splice(${i},1);renderDataSources()">× Remove</button>
+      </div>
+    </div>`).join('');
+}
+
+// ── Run Inputs / Manifest Builder (Step 6) ────────────────────────────────────
+const RI_TYPES  = ['text','number','boolean','date','file path','folder path','object','list / array'];
+const RI_SCOPES = ['global','album-level','item-level / repeated','shared default','captured at runtime','derived'];
+
+// ── Friendly-label helpers ────────────────────────────────────────────────────
+// Convert a plain label ("Release title") or slug to camelCase ("releaseTitle").
+// Passes through strings that have no spaces or hyphens (already camelCase / slug).
+function toCamel(str) {
+  if (!str) return '';
+  if (!str.includes(' ') && !str.includes('-')) return str.charAt(0).toLowerCase() + str.slice(1);
+  return str.trim().toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean)
+    .map((w, i) => i === 0 ? w : w.charAt(0).toUpperCase() + w.slice(1)).join('');
+}
+
+// Derive the package key for a runInput entry.
+// Honours advancedName override first, then dotted name (last segment), then toCamel of plain label.
+function getRunInputKey(r) {
+  const src = r.advancedName || r.name || '';
+  if (!src) return '';
+  return src.includes('.') ? src.split('.').pop() : toCamel(src);
+}
+
+function addRunInput(d={}) {
+  S.runInputs.push({
+    name: d.name||'', inputType: d.inputType||'text', exampleValue: d.exampleValue||'',
+    required: d.required!==false, scope: d.scope||'global', notes: d.notes||'',
+  });
+  renderRunInputs();
+  updateManifestPreview();
+}
+
+function renderRunInputs() {
+  const el = document.getElementById('run-inputs-list');
+  if (!el) return;
+  if (!S.runInputs.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:.87rem;margin:0 0 14px">No fields yet — add the inputs that drive each run.</p>';
+    return;
+  }
+  const FRIENDLY_TYPES = [
+    ['text','Text'],['file path','File'],['number','Number'],['date','Date'],
+    ['folder path','Folder'],['boolean','Yes / No'],['list / array','List'],['object','Object'],
+  ];
+  const FRIENDLY_SCOPES = [
+    ['album-level',   'Fills once — whole workflow'],
+    ['item-level / repeated', 'Fills once per item (repeats)'],
+    ['shared default','Same default for every item'],
+    ['global',        'Global (whole workflow)'],
+    ['captured at runtime','Captured during run'],
+    ['derived',       'Derived value'],
+  ];
+  const scopeColors = {
+    'global':'var(--teal)','album-level':'var(--orange)',
+    'item-level / repeated':'var(--purple)','shared default':'#9b7fd4',
+    'captured at runtime':'var(--green)','derived':'var(--muted)',
+  };
+  const iStyle = 'padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:.9rem;font-family:inherit;width:100%;box-sizing:border-box;background:var(--bg);color:var(--dark)';
+  el.innerHTML = S.runInputs.map((r, i) => `
+    <div class="table-row" style="grid-template-columns:1fr;row-gap:0;padding:14px;margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:8px;align-items:center;margin-bottom:8px">
+        <input type="text" placeholder="Field label (e.g. Release title)"
+          value="${esc(r.name)}"
+          oninput="S.runInputs[${i}].name=this.value;updateManifestPreview()"
+          style="${iStyle}">
+        <select onchange="S.runInputs[${i}].inputType=this.value;updateManifestPreview()"
+          style="${iStyle}">
+          ${FRIENDLY_TYPES.map(([v,l])=>`<option value="${v}"${r.inputType===v?' selected':''}>${l}</option>`).join('')}
+        </select>
+        <div style="display:flex;align-items:center;gap:6px">
+          <label style="display:flex;align-items:center;gap:4px;font-size:.8rem;color:var(--muted);cursor:pointer;white-space:nowrap">
+            <input type="checkbox" ${r.required?'checked':''} onchange="S.runInputs[${i}].required=this.checked"> Req
+          </label>
+          <button class="btn-remove" onclick="S.runInputs.splice(${i},1);renderRunInputs();updateManifestPreview()">×</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <input type="text" placeholder="Example value"
+          value="${esc(r.exampleValue)}"
+          oninput="S.runInputs[${i}].exampleValue=this.value;updateManifestPreview()"
+          style="${iStyle}">
+        <select onchange="S.runInputs[${i}].scope=this.value;updateManifestPreview()"
+          style="${iStyle};border-color:${scopeColors[r.scope]||'var(--border)'}">
+          ${FRIENDLY_SCOPES.map(([v,l])=>`<option value="${v}"${r.scope===v?' selected':''}>${l}</option>`).join('')}
+        </select>
+      </div>
+      <details>
+        <summary style="font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);cursor:pointer;user-select:none;list-style:none;padding:2px 0">&#9656; Advanced field mapping</summary>
+        <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+          <input type="text"
+            placeholder="Dotted-name override (e.g. album.releaseTitle) — leave blank to derive from label"
+            value="${esc(r.advancedName||'')}"
+            oninput="S.runInputs[${i}].advancedName=this.value;updateManifestPreview()"
+            style="${iStyle};font-family:'SF Mono','Fira Code',monospace;font-size:.82rem;border-style:dashed">
+          <input type="text" placeholder="Notes (optional)"
+            value="${esc(r.notes)}"
+            oninput="S.runInputs[${i}].notes=this.value"
+            style="${iStyle}">
+        </div>
+      </details>
+    </div>`).join('');
+}
+
+function buildManifestJson() {
+  const obj = { id: 'ITEM_123' };
+  for (const r of S.runInputs) {
+    if (!r.name) continue;
+    const parts = r.name.split('.');
+    let cur = obj;
+    for (let j = 0; j < parts.length - 1; j++) {
+      if (!cur[parts[j]] || typeof cur[parts[j]] !== 'object') cur[parts[j]] = {};
+      cur = cur[parts[j]];
+    }
+    const leaf = parts[parts.length - 1];
+    let val = r.exampleValue || '';
+    if (r.inputType === 'boolean') val = r.exampleValue === 'true' || r.exampleValue === true ? true : false;
+    else if (r.inputType === 'number') val = Number(r.exampleValue) || 0;
+    else if (r.inputType === 'list / array') val = [];
+    else if (r.inputType === 'object') val = {};
+    if (r.scope === 'item-level / repeated') {
+      const arrField = parts[0];
+      if (!obj[arrField]) obj[arrField] = [];
+      if (!obj[arrField][0]) obj[arrField][0] = {};
+      let arrCur = obj[arrField][0];
+      for (let j = 1; j < parts.length - 1; j++) {
+        if (!arrCur[parts[j]]) arrCur[parts[j]] = {};
+        arrCur = arrCur[parts[j]];
+      }
+      arrCur[leaf] = val;
+      continue;
+    }
+    cur[leaf] = val;
+  }
+  if (S.callbackUrl) obj.callback_url = S.callbackUrl;
+  obj.dryRun = true;
+  return obj;
+}
+
+function updateManifestPreview() {
+  const el = document.getElementById('manifest-preview');
+  if (!el) return;
+  try {
+    const obj = buildManifestJson();
+    el.textContent = JSON.stringify(obj, null, 2);
+  } catch(e) { el.textContent = '(preview error)'; }
+}
+
+function toggleRawManifest() {
+  const wrap = document.getElementById('raw-manifest-wrap');
+  if (!wrap) return;
+  const open = wrap.style.display === 'none';
+  wrap.style.display = open ? '' : 'none';
+  if (open) {
+    const ta = document.getElementById('raw-manifest-json');
+    if (ta && !S.rawManifestJson) ta.value = JSON.stringify(buildManifestJson(), null, 2);
+  }
+}
+
+// ── Repeat Groups (Step 7) ─────────────────────────────────────────────────────
+function addRepeatGroup(g={}) {
+  const singular = g.itemSingular || g.itemName || 'item';
+  S.repeatGroups.push({
+    // Friendly fields (primary)
+    itemSingular:         g.itemSingular         || g.itemName || 'item',
+    itemPlural:           g.itemPlural            || '',
+    sourceFriendly:       g.sourceFriendly        || '',
+    addButtonText:        g.addButtonText         || g.repeatActionDescription || '',
+    friendlyGlobalFields: g.friendlyGlobalFields  || [],
+    friendlyItemFields:   g.friendlyItemFields    || [],
+    friendlyItems:        g.friendlyItems         || [],
+    // Advanced overrides (hidden by default)
+    name:                 g.name                  || '',
+    source:               g.source                || '',
+    itemName:             g.itemName              || singular,
+    sectionDescription:   g.sectionDescription    || '',
+    repeatActionDescription: g.repeatActionDescription || g.addButtonText || '',
+    repeatActionSelector: g.repeatActionSelector   || '',
+    globalFields:         g.globalFields           || [],
+    itemFields:           g.itemFields             || [],
+  });
+  renderRepeatGroups();
+}
+
+function renderRepeatGroups() {
+  const wrap = document.getElementById('repeat-groups-wrap');
+  const cb   = document.getElementById('has-repeat-groups');
+  if (wrap) wrap.style.display = S.hasRepeatGroups ? '' : 'none';
+  if (cb)   cb.checked = S.hasRepeatGroups;
+
+  const el = document.getElementById('repeat-groups-list');
+  if (!el) return;
+
+  const lbl  = 'font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:block;margin-bottom:5px';
+  const inp  = 'width:100%;padding:8px 12px;font-size:.9rem;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;background:var(--bg);color:var(--dark);box-sizing:border-box';
+  const srcLabels = { folder:'📁 A folder', manifest:'📄 A manifest file', manual:'📝 I\'ll list them' };
+
+  el.innerHTML = S.repeatGroups.map((g, gi) => {
+    const singular = g.itemSingular || g.itemName || 'item';
+    const plural   = g.itemPlural   || (singular + 's');
+    const autoId   = toCamel(plural);
+    const autoSel  = `[data-browsy-action="add-${toCamel(singular)}"]`;
+
+    const srcBtns = Object.entries(srcLabels).map(([k,label]) => {
+      const active = g.sourceFriendly === k;
+      return `<button type="button"
+        onclick="S.repeatGroups[${gi}].sourceFriendly='${k}';renderRepeatGroups()"
+        style="flex:1;padding:10px 8px;border-radius:10px;border:2px solid ${active?'var(--accent)':'var(--border)'};
+          background:${active?'color-mix(in srgb,var(--accent) 12%,transparent)':'transparent'};
+          cursor:pointer;font-size:.85rem;font-family:inherit;font-weight:${active?'700':'400'};color:var(--dark)"
+        >${label}</button>`;
+    }).join('');
+
+    const fgfChips = (g.friendlyGlobalFields||[]).map((f,fi)=>
+      `<div class="chip"><span>${esc(f)}</span><button onclick="S.repeatGroups[${gi}].friendlyGlobalFields.splice(${fi},1);renderRepeatGroups()">×</button></div>`
+    ).join('');
+    const fifChips = (g.friendlyItemFields||[]).map((f,fi)=>
+      `<div class="chip" style="background:color-mix(in srgb,var(--purple) 12%,transparent)"><span>${esc(f)}</span><button onclick="S.repeatGroups[${gi}].friendlyItemFields.splice(${fi},1);renderRepeatGroups()">×</button></div>`
+    ).join('');
+
+    // Legacy dotted-name chips (shown inside Advanced)
+    const legacyGlobalChips = (g.globalFields||[]).map((f,fi)=>
+      `<div class="chip"><span>${esc(f)}</span><button onclick="S.repeatGroups[${gi}].globalFields.splice(${fi},1);renderRepeatGroups()">×</button></div>`
+    ).join('');
+    const legacyItemChips = (g.itemFields||[]).map((f,fi)=>
+      `<div class="chip" style="background:color-mix(in srgb,var(--purple) 12%,transparent)"><span>${esc(typeof f==='string'?f:f.name)}</span><button onclick="S.repeatGroups[${gi}].itemFields.splice(${fi},1);renderRepeatGroups()">×</button></div>`
+    ).join('');
+
+    return `
+    <div style="background:var(--card);border:2px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+        <span style="font-size:.8rem;font-weight:900;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Repeat group ${gi+1}</span>
+        <button class="btn-remove" onclick="S.repeatGroups.splice(${gi},1);renderRepeatGroups()">× Remove group</button>
+      </div>
+
+      <!-- ① What is it called? -->
+      <div style="margin-bottom:16px">
+        <label style="${lbl}">What is this repeated thing called?</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div style="font-size:.72rem;color:var(--muted);margin-bottom:4px">One (singular)</div>
+            <input type="text" placeholder="e.g. track"
+              value="${esc(singular)}"
+              oninput="S.repeatGroups[${gi}].itemSingular=this.value;S.repeatGroups[${gi}].itemName=this.value;renderRepeatGroups()"
+              style="${inp}">
+          </div>
+          <div>
+            <div style="font-size:.72rem;color:var(--muted);margin-bottom:4px">Many (plural) — auto-derived, override if needed</div>
+            <input type="text" placeholder="e.g. tracks"
+              value="${esc(g.itemPlural||(singular+'s'))}"
+              oninput="S.repeatGroups[${gi}].itemPlural=this.value"
+              style="${inp}">
+          </div>
+        </div>
+      </div>
+
+      <!-- ② Source -->
+      <div style="margin-bottom:16px">
+        <label style="${lbl}">Where does the list of ${esc(plural)} come from?</label>
+        <div style="display:flex;gap:8px;margin-top:6px">${srcBtns}</div>
+      </div>
+
+      <!-- ③ Global fields -->
+      <div style="margin-bottom:14px">
+        <label style="${lbl}">What fields are filled once for the whole workflow?</label>
+        <p style="font-size:.82rem;color:var(--muted);margin:0 0 6px;line-height:1.4">Use plain names — e.g. <em>Release title</em>, <em>Artist name</em>, <em>Cover art</em></p>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">${fgfChips||'<span style="color:var(--muted);font-size:.83rem">None yet</span>'}</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="rg-fgf-${gi}" placeholder="e.g. Release title"
+            style="flex:1;padding:7px 11px;font-size:.88rem;border:1.5px solid var(--border);border-radius:9px;font-family:inherit;background:var(--bg);color:var(--dark)"
+            onkeydown="if(event.key==='Enter')addRgFriendlyField(${gi},'global')">
+          <button class="btn-add" style="padding:7px 14px;border-radius:9px" onclick="addRgFriendlyField(${gi},'global')">+ Add</button>
+        </div>
+      </div>
+
+      <!-- ④ Per-item fields -->
+      <div style="margin-bottom:14px">
+        <label style="${lbl}">What fields change for each ${esc(singular)}?</label>
+        <p style="font-size:.82rem;color:var(--muted);margin:0 0 6px;line-height:1.4">Use plain names — e.g. <em>Track title</em>, <em>Audio file</em>, <em>Track number</em></p>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">${fifChips||'<span style="color:var(--muted);font-size:.83rem">None yet</span>'}</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="rg-fif-${gi}" placeholder="e.g. Track title"
+            style="flex:1;padding:7px 11px;font-size:.88rem;border:1.5px solid var(--border);border-radius:9px;font-family:inherit;background:var(--bg);color:var(--dark)"
+            onkeydown="if(event.key==='Enter')addRgFriendlyField(${gi},'item')">
+          <button class="btn-add" style="padding:7px 14px;border-radius:9px" onclick="addRgFriendlyField(${gi},'item')">+ Add</button>
+        </div>
+      </div>
+
+      <!-- ⑤ Add-another button -->
+      <div style="margin-bottom:16px">
+        <label style="${lbl}">How is a new ${esc(singular)} added on the page?</label>
+        <input type="text" placeholder='e.g. "Add another ${esc(singular)}" (what the button says)'
+          value="${esc(g.addButtonText||g.repeatActionDescription||'')}"
+          oninput="S.repeatGroups[${gi}].addButtonText=this.value;S.repeatGroups[${gi}].repeatActionDescription=this.value"
+          style="${inp}">
+      </div>
+
+      <!-- ⑥ Advanced disclosure -->
+      <details>
+        <summary style="font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);cursor:pointer;user-select:none;list-style:none;padding:3px 0">&#9656; Advanced mapping</summary>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;padding:14px;background:var(--bg);border-radius:12px;border:1.5px dashed var(--border)">
+          <p style="font-size:.8rem;color:var(--muted);margin:0;line-height:1.5">These are auto-derived. Only fill them in if you need to override.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <label style="${lbl}">Group ID override <span style="font-weight:400;text-transform:none;letter-spacing:0">(auto: "${esc(autoId)}")</span></label>
+              <input type="text" placeholder="${esc(autoId)}" value="${esc(g.name)}"
+                oninput="S.repeatGroups[${gi}].name=this.value"
+                style="${inp};font-family:'SF Mono','Fira Code',monospace;font-size:.82rem">
+            </div>
+            <div>
+              <label style="${lbl}">Source array path <span style="font-weight:400;text-transform:none;letter-spacing:0">(auto: "${esc(autoId)}[]")</span></label>
+              <input type="text" placeholder="${esc(autoId)}[]" value="${esc(g.source)}"
+                oninput="S.repeatGroups[${gi}].source=this.value"
+                style="${inp};font-family:'SF Mono','Fira Code',monospace;font-size:.82rem">
+            </div>
+          </div>
+          <div>
+            <label style="${lbl}">CSS selector for add button <span style="font-weight:400;text-transform:none;letter-spacing:0">(auto: ${esc(autoSel)})</span></label>
+            <input type="text" placeholder="${esc(autoSel)}" value="${esc(g.repeatActionSelector||'')}"
+              oninput="S.repeatGroups[${gi}].repeatActionSelector=this.value"
+              style="${inp};font-family:'SF Mono','Fira Code',monospace;font-size:.82rem">
+          </div>
+          <div>
+            <label style="${lbl}">Section description (for docs)</label>
+            <input type="text" placeholder="e.g. Song/track entry section" value="${esc(g.sectionDescription||'')}"
+              oninput="S.repeatGroups[${gi}].sectionDescription=this.value"
+              style="${inp}">
+          </div>
+          <details>
+            <summary style="font-size:.72rem;font-weight:700;color:var(--muted);cursor:pointer;list-style:none;padding:2px 0">&#9656; Legacy dotted-name field mapping</summary>
+            <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">
+              <div>
+                <label style="${lbl}">Global fields (dotted names)</label>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">${legacyGlobalChips||'<span style="color:var(--muted);font-size:.8rem">None</span>'}</div>
+                <div style="display:flex;gap:8px">
+                  <input type="text" id="rg-gf-input-${gi}" placeholder="e.g. album.artistName"
+                    style="flex:1;padding:6px 10px;font-size:.82rem;border:1.5px solid var(--border);border-radius:8px;font-family:'SF Mono','Fira Code',monospace;background:var(--bg);color:var(--dark)"
+                    onkeydown="if(event.key==='Enter')addRgField(${gi},'global')">
+                  <button class="btn-add" style="padding:6px 12px;border-radius:8px;font-size:.82rem" onclick="addRgField(${gi},'global')">+ Add</button>
+                </div>
+              </div>
+              <div>
+                <label style="${lbl}">Per-item fields (dotted names)</label>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">${legacyItemChips||'<span style="color:var(--muted);font-size:.8rem">None</span>'}</div>
+                <div style="display:flex;gap:8px">
+                  <input type="text" id="rg-if-input-${gi}" placeholder="e.g. track.trackTitle"
+                    style="flex:1;padding:6px 10px;font-size:.82rem;border:1.5px solid var(--border);border-radius:8px;font-family:'SF Mono','Fira Code',monospace;background:var(--bg);color:var(--dark)"
+                    onkeydown="if(event.key==='Enter')addRgField(${gi},'item')">
+                  <button class="btn-add" style="padding:6px 12px;border-radius:8px;font-size:.82rem" onclick="addRgField(${gi},'item')">+ Add</button>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+      </details>
+    </div>`;
+  }).join('') || '<p style="color:var(--muted);font-size:.87rem">No repeat groups yet.</p>';
+}
+
+function addRgField(gi, type) {
+  const id = `rg-${type==='global'?'gf':'if'}-input-${gi}`;
+  const val = document.getElementById(id)?.value.trim();
+  if (!val) return;
+  if (type === 'global') S.repeatGroups[gi].globalFields.push(val);
+  else S.repeatGroups[gi].itemFields.push({ name: val, source: val, description: val });
+  document.getElementById(id).value = '';
+  renderRepeatGroups();
+}
+
+function addRgFriendlyField(gi, type) {
+  const id = type === 'global' ? `rg-fgf-${gi}` : `rg-fif-${gi}`;
+  const val = document.getElementById(id)?.value.trim();
+  if (!val) return;
+  const rg = S.repeatGroups[gi];
+  if (type === 'global') {
+    if (!rg.friendlyGlobalFields) rg.friendlyGlobalFields = [];
+    rg.friendlyGlobalFields.push(val);
+  } else {
+    if (!rg.friendlyItemFields) rg.friendlyItemFields = [];
+    rg.friendlyItemFields.push(val);
+  }
+  document.getElementById(id).value = '';
+  renderRepeatGroups();
+}
+
+// ── Package generator ────────────────────────────────────────────────────────
+// Produces the generic automation package JSON from wizard state.
+// This is the new single-file format consumed by src/core/package-runner.mjs.
+function generatePackage() {
+  const id = (S.workflowName || 'my-workflow')
+    .toLowerCase().replace(/[^a-z0-9-_]+/g, '-').replace(/^-+|-+$/g, '') || 'my-workflow';
+  const startUrl = S.startUrl || S.pages[0]?.url || '';
+
+  // Separate runInputs by scope
+  const globals = {}, assets = {}, defaults = {};
+  const exampleItemFields = {}, exampleItemAssets = {};
+
+  for (const r of S.runInputs) {
+    const key = getRunInputKey(r);
+    if (!key) continue;
+    const value = r.exampleValue || '';
+    const isFile = r.inputType === 'file path' || r.inputType === 'folder path';
+
+    if (r.scope === 'global' || r.scope === 'album-level') {
+      if (isFile) assets[key] = value;
+      else globals[key] = value;
+    } else if (r.scope === 'shared default') {
+      defaults[key] = value;
+    } else if (r.scope === 'item-level / repeated') {
+      if (isFile) exampleItemAssets[key] = value;
+      else exampleItemFields[key] = value;
+    }
+  }
+
+  // Build repeat groups
+  const repeatGroups = (S.hasRepeatGroups ? S.repeatGroups : []).map(rg => {
+    // Helper: resolve a single set of item field values from a {label: value} map
+    function resolveItemFromMap(itemData) {
+      const flds = {}, asets = {};
+      for (const [label, value] of Object.entries(itemData)) {
+        const key  = toCamel(label);
+        const ri   = S.runInputs.find(r => getRunInputKey(r) === key);
+        const isF  = ri ? (ri.inputType === 'file path' || ri.inputType === 'folder path') : false;
+        if (isF) asets[key] = value; else flds[key] = value;
+      }
+      const it = {};
+      if (Object.keys(flds).length)  it.fields = flds;
+      if (Object.keys(asets).length) it.assets = asets;
+      return it;
+    }
+
+    // Derive id, itemLabel, selector — advanced overrides take precedence
+    const itemLabel  = rg.itemName || rg.itemSingular || 'item';
+    const itemPlural = rg.itemPlural || (itemLabel + 's');
+    const groupId    = rg.name || toCamel(itemPlural);
+    const selector   = rg.repeatActionSelector ||
+      `[data-browsy-action="add-${toCamel(itemLabel)}"]`;
+
+    // Source contract
+    const sourceType = rg.sourceFriendly || (rg.source ? 'manifest' : '');
+    // Point sourceRef at the folder asset key when source is 'folder'
+    const folderAssetKey = sourceType === 'folder'
+      ? Object.keys(assets).find(k => {
+          const ri = S.runInputs.find(r => getRunInputKey(r) === k &&
+            r.inputType === 'folder path');
+          return !!ri;
+        })
+      : undefined;
+
+    // Build items list
+    // Priority: friendlyItems array (multi-track) > single example item from runInputs
+    let items;
+    if (rg.friendlyItems?.length) {
+      items = rg.friendlyItems.map(itemData => resolveItemFromMap(itemData));
+    } else {
+      const rgItemFields = {}, rgItemAssets = {};
+      const itemFieldSources = rg.itemFields?.length
+        ? rg.itemFields.map(f => ({ key: (typeof f === 'string' ? f : f.name).split('.').pop() }))
+        : (rg.friendlyItemFields || []).map(f => ({ key: toCamel(f) }));
+
+      for (const { key } of itemFieldSources) {
+        const ri    = S.runInputs.find(r => getRunInputKey(r) === key);
+        const value = ri ? (ri.exampleValue || '') : '(fill in)';
+        const isFile = ri ? (ri.inputType === 'file path' || ri.inputType === 'folder path') : false;
+        if (isFile) rgItemAssets[key] = value;
+        else rgItemFields[key] = value;
+      }
+
+      // Fall back to exampleItemFields when no per-group item fields are listed
+      const resolvedFields = Object.keys(rgItemFields).length ? rgItemFields : exampleItemFields;
+      const resolvedAssets = Object.keys(rgItemAssets).length ? rgItemAssets : exampleItemAssets;
+
+      const exampleItem = {};
+      if (Object.keys(resolvedFields).length) exampleItem.fields = resolvedFields;
+      if (Object.keys(resolvedAssets).length) exampleItem.assets = resolvedAssets;
+      items = Object.keys(exampleItem).length ? [exampleItem] : [];
+    }
+
+    const entry = {
+      id: groupId,
+      label: rg.sectionDescription || rg.name || itemPlural,
+      itemLabel,
+    };
+    if (sourceType)      entry.sourceType = sourceType;
+    if (folderAssetKey)  entry.sourceRef  = `assets.${folderAssetKey}`;
+    entry.createAction = { type: 'click', selector };
+    entry.items = items;
+    return entry;
+  });
+
+  // If no repeat groups defined yet but item fields exist, create a placeholder group
+  if (!repeatGroups.length && (Object.keys(exampleItemFields).length || Object.keys(exampleItemAssets).length)) {
+    const exampleItem = {};
+    if (Object.keys(exampleItemFields).length) exampleItem.fields = exampleItemFields;
+    if (Object.keys(exampleItemAssets).length) exampleItem.assets = exampleItemAssets;
+    repeatGroups.push({
+      id: 'items',
+      label: 'Repeated items',
+      itemLabel: 'item',
+      createAction: { type: 'click', selector: '[data-browsy-action="add-item"]' },
+      items: [exampleItem],
+    });
+  }
+
+  // Human checkpoints
+  const humanCheckpoints = S.checkpoints.filter(c => c).map((cp, i) => ({
+    id: `checkpoint-${i + 1}`,
+    label: cp,
+  }));
+  if (!humanCheckpoints.length) {
+    humanCheckpoints.push({ id: 'review-before-submit', label: 'Review before final submit' });
+  }
+
+  const pkg = {
+    workflowId: id,
+    target: { name: S.workflowName || 'My Workflow', url: startUrl },
+  };
+  if (Object.keys(globals).length) pkg.globals = globals;
+  if (Object.keys(defaults).length) pkg.defaults = defaults;
+  if (Object.keys(assets).length) pkg.assets = assets;
+  pkg.repeatGroups = repeatGroups;
+  pkg.humanCheckpoints = humanCheckpoints;
+
+  return pkg;
+}
+
+// ── Readable summary ──────────────────────────────────────────────────────────
+// Returns a plain-English markdown preview of the generated package so a
+// workflow expert can verify the automation plan before exporting.
+function generateReadableSummary() {
+  const pkg = generatePackage();
+  const parts = [];
+
+  // One-time album fields (globals + assets merged for display)
+  const oneTimeEntries = [
+    ...Object.entries(pkg.globals  || {}),
+    ...Object.entries(pkg.assets   || {}),
+    ...Object.entries(pkg.defaults || {}),
+  ];
+  if (oneTimeEntries.length) {
+    parts.push(
+      '## One-time album fields\n' +
+      oneTimeEntries.map(([k, v]) => `  - ${k}: ${v || '(fill in)'}`).join('\n')
+    );
+  }
+
+  // Per-item sections (one block per repeat group)
+  const stateGroups = S.hasRepeatGroups ? S.repeatGroups : [];
+  for (let i = 0; i < (pkg.repeatGroups || []).length; i++) {
+    const rg      = pkg.repeatGroups[i];
+    const sgState = stateGroups[i] || {};
+    const item    = rg.items?.[0] || {};
+
+    const itemEntries = [
+      ...Object.entries(item.fields || {}),
+      ...Object.entries(item.assets || {}),
+    ];
+    if (itemEntries.length) {
+      parts.push(
+        `## Repeated ${rg.itemLabel} fields\n` +
+        itemEntries.map(([k, v]) => `  - ${k}: ${v || '(fill in)'}`).join('\n')
+      );
+    }
+
+    // Track source
+    const sourceType = sgState.sourceFriendly || 'manifest';
+    const sourceDesc =
+      sourceType === 'folder'   ? 'A folder on your computer' :
+      sourceType === 'manifest' ? 'A list in your manifest file' :
+                                  'Provided manually';
+    parts.push(
+      `## ${rg.id} source\n` +
+      `  - Type: ${sourceType}\n` +
+      `  - Description: ${sourceDesc}`
+    );
+
+    // How to add another item
+    const addText = sgState.addButtonText || sgState.repeatActionDescription || `Add another ${rg.itemLabel}`;
+    parts.push(
+      `## How to add another ${rg.itemLabel}\n` +
+      `  - Button text: ${addText}\n` +
+      `  - Automation: click ${rg.createAction?.selector || '(selector)'}`
+    );
+  }
+
+  return parts.join('\n\n');
 }
 
 // ── Markdown generator ────────────────────────────────────────────────────────
@@ -1295,18 +2023,36 @@ function generateMarkdown() {
     ? `| Purpose | URL | Requires login? | Example URL | Notes |\n| --- | --- | --- | --- | --- |`
     : `| Purpose | URL | Requires login? | Notes |\n| --- | --- | --- | --- |`;
 
-  // Input contract — only input parameters (not captured vars)
-  const capturedNames = new Set(S.runtimeVars.captured.filter(c=>c.name).map(c=>c.name));
-  const contract = { id: 'ITEM_123' };
-  S.parameters.forEach(p => {
-    if (p.key && !capturedNames.has(p.key))
-      contract[p.key] = p.example || (p.type==='boolean'?false:p.type==='number'?0:'value');
-  });
+  // ## 4. Data sources — table + JSON block
+  const dsTable = S.dataSources.length
+    ? `| Name | Type | Usage | Contains | Example path | Required |\n| --- | --- | --- | --- | --- | --- |\n` +
+      S.dataSources.map(ds =>
+        `| ${ds.name} | ${ds.type.replace(/_/g,' ')} | ${ds.usage} | ${(ds.contains||'').replace(/\n/g,' ')} | ${ds.examplePath} | ${ds.required?'yes':'no'} |`
+      ).join('\n')
+    : `| Name | Type | Usage | Contains | Example path | Required |\n| --- | --- | --- | --- | --- | --- |\n| (add data sources in Step 3) | | | | | |`;
+  const dsJson = S.dataSources.length
+    ? `\n\`\`\`json\n${JSON.stringify(S.dataSources, null, 2)}\n\`\`\`` : '';
+
+  // ## 5. Input data contract — built from Run Inputs
+  let contract;
+  if (S.rawManifestJson.trim()) {
+    try { contract = JSON.parse(S.rawManifestJson); } catch { contract = buildManifestJson(); }
+  } else {
+    contract = S.runInputs.length ? buildManifestJson() : { id: 'ITEM_123' };
+  }
+  // Fall back to old-style parameters if runInputs is empty
+  if (!S.runInputs.length && S.parameters.length) {
+    const capturedNames = new Set(S.runtimeVars.captured.filter(c=>c.name).map(c=>c.name));
+    S.parameters.forEach(p => {
+      if (p.key && !capturedNames.has(p.key))
+        contract[p.key] = p.example || (p.type==='boolean'?false:p.type==='number'?0:'value');
+    });
+  }
   if (S.callbackUrl) contract.callback_url = S.callbackUrl;
 
-  // Runtime variables section (5a) — only emit if any are declared
+  // ## 5a. Runtime variables
   const rv = S.runtimeVars;
-  const hasRv = rv.input?.length || rv.captured?.length || rv.derived?.length || S.parameters.filter(p=>p.key).length;
+  const hasRv = rv.captured?.length || rv.derived?.length || S.parameters.filter(p=>p.key).length;
   let runtimeVarsSection = '';
   if (hasRv) {
     const rvObj = {
@@ -1322,7 +2068,6 @@ function generateMarkdown() {
       }),
       derived: rv.derived.filter(d=>d.name&&d.template).map(d=>({ name:d.name, template:d.template })),
     };
-    // Remove empty arrays
     if (!rvObj.input.length) delete rvObj.input;
     if (!rvObj.captured.length) delete rvObj.captured;
     if (!rvObj.derived.length) delete rvObj.derived;
@@ -1331,36 +2076,174 @@ function generateMarkdown() {
     }
   }
 
+  // ## 5b. Repeat groups
+  // Produces human-readable text + machine JSON.
+  // Uses friendly fields (itemSingular, friendlyGlobalFields, friendlyItemFields,
+  // sourceFriendly, addButtonText) when legacy fields are empty.
+  let repeatGroupsSection = '';
+  if (S.hasRepeatGroups && S.repeatGroups.length) {
+    const blocks = S.repeatGroups.map(g => {
+      const singular = g.itemSingular || g.itemName || 'item';
+      const plural   = g.itemPlural   || (singular + 's');
+
+      // Source: friendly first, legacy fallback
+      const sourceType = g.sourceFriendly ||
+        (g.source ? 'manifest' : '');
+      const sourceLabel =
+        sourceType === 'folder'   ? 'A folder on your computer' :
+        sourceType === 'manifest' ? 'A list in the manifest file' :
+        sourceType               ? sourceType : 'Not specified';
+
+      // Global fields: friendly first, legacy fallback
+      const globalLabels = g.friendlyGlobalFields?.length
+        ? g.friendlyGlobalFields
+        : (g.globalFields || []).map(f => typeof f === 'string' ? f : f.name || f);
+
+      // Item fields: friendly first, legacy fallback
+      const itemLabels = g.friendlyItemFields?.length
+        ? g.friendlyItemFields
+        : (g.itemFields || []).map(f => typeof f === 'string' ? f : f.name || f);
+
+      // Add action
+      const addText  = g.addButtonText || g.repeatActionDescription || `Add another ${singular}`;
+      const selector = g.repeatActionSelector ||
+        `[data-browsy-action="add-${toCamel(singular)}"]`;
+
+      // Machine-usable derived fields
+      const machineSource = g.source || `${toCamel(plural)}[]`;
+      const machineGlobal = globalLabels.map(f => ({
+        name: toCamel(f), label: f, source: `album.${toCamel(f)}`,
+      }));
+      const machineItem = itemLabels.map(f => ({
+        name: toCamel(f), label: f, source: `${singular}.${toCamel(f)}`,
+      }));
+
+      const rgMachine = {
+        name:          g.name || toCamel(plural),
+        itemSingular:  singular,
+        itemPlural:    plural,
+        source:        machineSource,
+        sourceType:    sourceType || 'manifest',
+        repeatAction: {
+          type: 'click', selector,
+          description: addText,
+          discover: !g.repeatActionSelector,
+        },
+        stopCondition: `index >= ${toCamel(plural)}.length`,
+        globalFields:  machineGlobal,
+        itemFields:    machineItem,
+      };
+
+      // Human-readable lines for the review doc
+      const humanLines = [
+        `**Repeated thing:** ${singular} (plural: ${plural})`,
+        `**Track source:** ${sourceLabel}${sourceType ? ` (type: ${sourceType})` : ''}`,
+        globalLabels.length
+          ? `**One-time album fields:** ${globalLabels.join(', ')}`
+          : '',
+        itemLabels.length
+          ? `**Repeated ${singular} fields:** ${itemLabels.join(', ')}`
+          : '',
+        `**How to add another ${singular}:** "${addText}" — \`click ${selector}\``,
+      ].filter(Boolean).join('\n\n');
+
+      return humanLines + '\n\n```json\n' + JSON.stringify({ repeatGroup: rgMachine }, null, 2) + '\n```';
+    });
+
+    repeatGroupsSection = `\n## 5b. Repeat groups\n\n${blocks.join('\n\n---\n\n')}\n`;
+  }
+
   const steps = S.walkthroughSteps.length
     ? S.walkthroughSteps.map((s,i)=>`${i+1}. **${s.title}**: ${s.transcript}`).join('\n')
-    : '1. Open the start page.\n2. Authenticate if needed.\n3. Fill, upload, or select fields.\n4. Stop before final action.\n5. Save artifacts and logs.';
-  const fieldsRows = S.parameters.filter(p=>p.key).length
-    ? S.parameters.filter(p=>p.key).map(p=>`| ${p.key} | \`${p.key}\` | unknown until discovery | ${p.description||'See walkthrough'} |`).join('\n')
-    : '| (Run discovery to identify fields) | | | |';
+    : '1. Open the start page.\n2. Authenticate if needed.\n3. Fill album / global fields once.\n4. For each item in the repeat group, add a section and fill item fields.\n5. Stop before final action.\n6. Save artifacts and logs.';
 
-  // Discovery URLs — use example URLs for templated pages
+  // ## 7. Fields — from run inputs with scope
+  const scopeLabel = { 'global':'global / fill once', 'album-level':'album-level / fill once',
+    'item-level / repeated':'item-level / repeat per item', 'captured at runtime':'runtime captured',
+    'derived':'derived', };
+  const fieldsRows = S.runInputs.filter(r=>r.name).length
+    ? S.runInputs.filter(r=>r.name).map(r =>
+        `| ${r.name} | \`${r.name}\` | unknown until discovery | ${scopeLabel[r.scope]||r.scope}${r.notes ? ' — '+r.notes : ''} |`
+      ).join('\n')
+    : S.parameters.filter(p=>p.key).length
+      ? S.parameters.filter(p=>p.key).map(p=>`| ${p.key} | \`${p.key}\` | unknown until discovery | ${p.description||'See walkthrough'} |`).join('\n')
+      : '| (Run discovery to identify fields) | | | |';
+
+  // Discovery URLs
   const discoveryUrls = S.pages.filter(p=>p.url).length
     ? S.pages.filter(p=>p.url).map(p => hasTemplateVars(p.url) && p.urlExample ? `- ${p.urlExample} _(example for: ${p.url})_` : `- ${p.url}`).join('\n')
     : `- ${startUrl}`;
 
-  const safetyJson = JSON.stringify({ never_click_text: S.dangerText, never_click_selectors: [], manual_only_categories: S.manualActions }, null, 2);
+  const safetyJson = JSON.stringify({
+    never_click_text: S.dangerText,
+    never_click_selectors: [],
+    manual_only_categories: S.manualActions,
+    checkpoints: S.checkpoints,
+  }, null, 2);
+
   const narration = S.walkthroughSteps.length
     ? S.walkthroughSteps.map((s,i)=>`**Step ${i+1}: ${s.title}**\n\n> ${s.transcript}`).join('\n\n')
     : '(No walkthrough recorded yet — run the wizard to add narration.)';
-  const dataSourceRow = S.dataSource
-    ? `| Local system | files/API | ${S.dataSource.slice(0,80)} | See walkthrough |`
-    : '| Local files | files | Source of truth | |';
+
   const completionNote = S.completionAction ? `\n**Completion action:** ${S.completionAction}` : '';
 
-  // Acceptance criteria — mention runtime vars if captured vars are declared
-  const capturedAC = rv.captured.filter(c=>c.name).length
+  const capturedAC = rv.captured?.filter(c=>c.name).length
     ? `\n- Captured variables are not required in the input manifest.\n- Missing captured variables produce useful run-review.md feedback.\n- runtime-vars.json is saved to the run directory after each capture step.`
     : '';
 
-  return `# Browsy Automation Request\n\n## 1. Workflow name\n\n\`${id}\`\n\n## 2. Goal\n\n${S.goal||'Describe the goal here.'}\n\n## 3. Target websites / pages\n\n${pagesHeader}\n${pagesRows}\n\n## 4. Existing APIs or local systems\n\n| System | Type | Purpose | Auth/notes |\n| --- | --- | --- | --- |\n${dataSourceRow}\n\n## 5. Input data contract\n\n\`\`\`json\n${JSON.stringify(contract, null, 2)}\n\`\`\`\n${runtimeVarsSection}\n## 6. Desired workflow steps\n\n${steps}\n\n## 7. Fields to fill or upload\n\n| Field / action | Source in input | Website field/page | Rule / why |\n| --- | --- | --- | --- |\n${fieldsRows}\n\n## 8. Actions that must stay manual\n\n${S.manualActions.map(a=>`- ${a}`).join('\n')}\n\n## 9. Human checkpoints\n\n- Stop before final submit.\n- Leave browser open by default.\n- Provide \`--no-pause\` only for non-destructive dry-runs.\n\n## 10. Authentication plan\n\n- ${S.authMode}\n\n## 11. Discovery needs\n\n${discoveryUrls}\n\nThe generated harness should produce:\n\n- discovered-fields.json\n- discovered-fields.md\n- screenshots\n- HTML snapshot\n- page text snapshot\n\n## 12. Safety policy\n\n\`\`\`json\n${safetyJson}\n\`\`\`\n\n## 13. Output artifacts expected\n\nEvery run should save:\n\n- run-log.json\n- filled-fields.json\n- skipped-fields.json\n- errors.json\n- runtime-vars.json (when runtime variables are captured)\n- screenshot-start.png\n- screenshot-after-fill.png\n- screenshot-final-review.png if reached\n- page-text-snapshot.txt\n- html-snapshot.html${completionNote}\n\n## 14. Test commands expected\n\n\`\`\`bash\nnpm install\nnpm run smoke\nnpm run auth:save -- --workflow ${id}\nnpm run auth:check -- --workflow ${id} --url ${startUrl}\nnpm run discover -- --workflow ${id} --url ${startUrl}\nnpm run run -- --workflow ${id} --manifest workflows/${id}/manifest.example.json --dry-run\n\`\`\`\n\n## 15. Acceptance criteria\n\n- Auth works or failure path is clearly documented.\n- DOM discovery works.\n- Dry-run fills/uploads safe fields.\n- Dangerous actions are blocked.\n- Browser pauses before manual checkpoint.\n- Logs/screenshots are saved.\n- A coding agent can rerun tests and understand failures.${capturedAC}\n\n## 16. Narrated walkthrough\n\n${narration}\n`;
+  const repeatGroupAC = (S.hasRepeatGroups && S.repeatGroups.length)
+    ? `\n- Repeat groups are preserved in workflow config.\n- Source arrays are validated against the manifest before each run.\n- Run-review includes repeat group plan.\n- Safety blocks all final submit / release actions.`
+    : '';
+
+  const checkpointLines = S.checkpoints.length
+    ? S.checkpoints.map(c=>`- ${c}`).join('\n')
+    : '- Stop before final submit.\n- Leave browser open by default.';
+
+  return `# Browsy Automation Request\n\n## 1. Workflow name\n\n\`${id}\`\n\n## 2. Goal\n\n${S.goal||'Describe the goal here.'}\n\n## 3. Target websites / pages\n\n${pagesHeader}\n${pagesRows}\n\n## 4. Existing APIs, files, or local systems\n\n${dsTable}${dsJson}\n\n## 5. Input data contract\n\n\`\`\`json\n${JSON.stringify(contract, null, 2)}\n\`\`\`\n${runtimeVarsSection}${repeatGroupsSection}\n## 6. Desired workflow steps\n\n${steps}\n\n## 7. Fields to fill or upload\n\n| Field / action | Source in input | Website field/page | Scope / rule |\n| --- | --- | --- | --- |\n${fieldsRows}\n\n## 8. Actions that must stay manual\n\n${S.manualActions.map(a=>`- ${a}`).join('\n')}\n\n## 9. Human checkpoints\n\n${checkpointLines}\n\n## 10. Authentication plan\n\n- ${S.authMode}\n\n## 11. Discovery needs\n\n${discoveryUrls}\n\nThe generated harness should produce:\n\n- discovered-fields.json\n- discovered-fields.md\n- screenshots\n- HTML snapshot\n- page text snapshot\n\n## 12. Safety policy\n\n\`\`\`json\n${safetyJson}\n\`\`\`\n\n## 13. Output artifacts expected\n\nEvery run should save:\n\n- run-log.json\n- filled-fields.json\n- skipped-fields.json\n- errors.json\n- runtime-vars.json (when runtime variables are captured)\n- screenshot-start.png\n- screenshot-after-fill.png\n- screenshot-final-review.png if reached\n- page-text-snapshot.txt\n- html-snapshot.html${completionNote}\n\n## 14. Test commands expected\n\n\`\`\`bash\nnpm install\nnpm run smoke\nnpm run auth:save -- --workflow ${id}\nnpm run auth:check -- --workflow ${id} --url ${startUrl}\nnpm run discover -- --workflow ${id} --url ${startUrl}\nnpm run run -- --workflow ${id} --manifest workflows/${id}/manifest.example.json --dry-run\n\`\`\`\n\n## 15. Acceptance criteria\n\n- Auth works or failure path is clearly documented.\n- DOM discovery works.\n- Dry-run fills/uploads safe fields.\n- Dangerous actions are blocked.\n- Browser pauses before manual checkpoint.\n- Logs/screenshots are saved.\n- A coding agent can rerun tests and understand failures.${capturedAC}${repeatGroupAC}\n\n## 16. Narrated walkthrough\n\n${narration}\n`;
 }
 
 // ── Write ─────────────────────────────────────────────────────────────────────
+function switchPreviewTab(tab) {
+  const ismd = tab === 'md';
+  document.getElementById('preview-box').style.display     = ismd ? '' : 'none';
+  document.getElementById('pkg-preview-box').style.display = ismd ? 'none' : '';
+  document.getElementById('actions-md').style.display      = ismd ? '' : 'none';
+  document.getElementById('actions-pkg').style.display     = ismd ? 'none' : '';
+  document.getElementById('tab-md').style.background       = ismd ? 'var(--accent)' : 'transparent';
+  document.getElementById('tab-md').style.color            = ismd ? 'white' : 'var(--muted)';
+  document.getElementById('tab-md').style.borderColor      = ismd ? 'var(--accent)' : 'var(--border)';
+  document.getElementById('tab-pkg').style.background      = ismd ? 'transparent' : 'var(--purple)';
+  document.getElementById('tab-pkg').style.color           = ismd ? 'var(--muted)' : 'white';
+  document.getElementById('tab-pkg').style.borderColor     = ismd ? 'var(--border)' : 'var(--purple)';
+  if (!ismd) {
+    document.getElementById('pkg-preview-box').textContent = JSON.stringify(generatePackage(), null, 2);
+  }
+}
+
+async function writePackage() {
+  const pkg = generatePackage();
+  const btn = document.getElementById('btn-write-package');
+  const status = document.getElementById('package-write-status');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  status.className = 'write-status'; status.textContent = '';
+  try {
+    const res = await fetch('/api/write-package', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ package: pkg, workflowId: pkg.workflowId }),
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Unknown error');
+    status.className = 'write-status success';
+    status.textContent = `✓ Package saved to ${json.path}`;
+    btn.textContent = '✓ Saved';
+  } catch(e) {
+    status.className = 'write-status error';
+    status.textContent = '✗ ' + e.message + (e.message.includes('fetch') ? ' — is the wizard server running?' : '');
+    btn.disabled = false; btn.textContent = '✦ Save Package JSON';
+  }
+}
+
 async function writeRequest() {
   const markdown = generateMarkdown();
   const btn = document.getElementById('btn-write');
@@ -1897,9 +2780,8 @@ function syncFromDOM() {
   S.workflowName    = document.getElementById('workflowName').value.trim();
   S.goal            = document.getElementById('goal').value.trim();
   S.startUrl        = document.getElementById('startUrl').value.trim();
-  S.dataSource      = document.getElementById('dataSource').value.trim();
-  S.completionAction= document.getElementById('completionAction').value.trim();
-  S.callbackUrl     = document.getElementById('callbackUrl').value.trim();
+  S.completionAction= document.getElementById('completionAction')?.value.trim() || '';
+  S.callbackUrl     = document.getElementById('callbackUrl')?.value.trim() || '';
 }
 
 function showStep(n) {
@@ -1908,7 +2790,13 @@ function showStep(n) {
   document.querySelector(`.step[data-step="${n}"]`).classList.add('active');
   S.step = n;
   updateNav();
-  if (n === 7) document.getElementById('preview-box').textContent = generateMarkdown();
+  if (n === 7) { renderRepeatGroups(); }
+  if (n === 6) { renderRunInputs(); updateManifestPreview(); }
+  if (n === 10) {
+    document.getElementById('preview-box').textContent = generateMarkdown();
+    // Reset to MD tab on entry
+    switchPreviewTab('md');
+  }
   window.scrollTo(0,0);
 }
 
@@ -1951,6 +2839,9 @@ function init() {
   renderChips();
   renderCaptured();
   renderDerived();
+  renderDataSources();
+  renderRunInputs();
+  renderRepeatGroups();
   if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
     document.getElementById('no-speech-note').style.display = '';
   }

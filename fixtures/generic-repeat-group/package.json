@@ -1,0 +1,60 @@
+{
+  "workflowId": "project-budget-submission",
+  "target": {
+    "name": "Project Budget Submission Form",
+    "url": "fixture://generic-repeat-group/index.html"
+  },
+  "globals": {
+    "projectName": "Acme Redesign 2026",
+    "clientName": "Acme Corp",
+    "dueDate": "2026-07-01",
+    "department": "Design"
+  },
+  "defaults": {
+    "category": "Labor"
+  },
+  "assets": {
+    "projectBrief": "./project-doc.txt"
+  },
+  "repeatGroups": [
+    {
+      "id": "items",
+      "label": "Budget Line Items",
+      "itemLabel": "Item",
+      "createAction": {
+        "type": "click",
+        "selector": "[data-browsy-action='add-item']"
+      },
+      "items": [
+        {
+          "fields": {
+            "itemName": "UX Research",
+            "quantity": "40",
+            "unitPrice": "150"
+          },
+          "assets": {
+            "itemAttachment": "./item-alpha.txt"
+          }
+        },
+        {
+          "fields": {
+            "itemName": "UI Design",
+            "quantity": "80",
+            "unitPrice": "125",
+            "category": "Design"
+          },
+          "assets": {
+            "itemAttachment": "./item-beta.txt"
+          }
+        }
+      ]
+    }
+  ],
+  "humanCheckpoints": [
+    {
+      "id": "review-before-submit",
+      "label": "Review all line items before submitting to client",
+      "stopBeforeSelector": "[data-browsy-action='final-submit']"
+    }
+  ]
+}

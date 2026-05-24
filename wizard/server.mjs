@@ -165,6 +165,34 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // POST /api/write-package — save generated package JSON for a workflow
+  if (req.method === 'POST' && url.pathname === '/api/write-package') {
+    try {
+      const { package: pkg, workflowId } = await readBody(req);
+      if (!pkg || typeof pkg !== 'object') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'package object required' }));
+        return;
+      }
+      if (!workflowId || !/^[a-z0-9][a-z0-9\-_]{0,63}$/.test(workflowId)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'valid workflowId required' }));
+        return;
+      }
+      const wfDir = path.join(REPO_ROOT, 'workflows', workflowId);
+      fs.mkdirSync(wfDir, { recursive: true });
+      const pkgPath = path.join(wfDir, 'package.json');
+      fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2), 'utf8');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, path: `workflows/${workflowId}/package.json` }));
+      console.log(`[wizard] Wrote ${pkgPath}`);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
   // GET /api/workflows — list all workflow IDs and their state
   if (req.method === 'GET' && url.pathname === '/api/workflows') {
     const ids = listWorkflows();

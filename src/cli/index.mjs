@@ -114,6 +114,8 @@ function generatePlan() {
     manual_only: req.manualOnlyActions,
     safety_constraints: req.safetyPolicy,
     runtime_variables: req.runtimeVariables,
+    repeat_groups: req.repeatGroups || [],
+    data_sources: req.dataSources || [],
     acceptance_criteria: req.acceptanceCriteria,
     required_workflow_files: [
       `workflows/${req.workflowId}/workflow.yaml`,
@@ -305,6 +307,8 @@ function initWorkflowFromRequest(req) {
     targets: req.targetUrls,
     discoveryUrls: req.discoveryNeeds,
     variables: req.runtimeVariables,
+    repeatGroups: req.repeatGroups || [],
+    dataSources: req.dataSources || [],
   });
 
   writeWorkflowFiles(id, dir, config, req);
@@ -323,7 +327,7 @@ function initWorkflowFromRequest(req) {
   }
 }
 
-function buildWorkflowConfig(id, { description, startUrl, startUrlExample, authMode, targets = [], discoveryUrls = [], variables = null }) {
+function buildWorkflowConfig(id, { description, startUrl, startUrlExample, authMode, targets = [], discoveryUrls = [], variables = null, repeatGroups = [], dataSources = [] }) {
   const config = {
     id,
     description,
@@ -356,6 +360,12 @@ function buildWorkflowConfig(id, { description, startUrl, startUrlExample, authM
   if (startUrlExample) config.targets.start_url_example = startUrlExample;
   if (variables && (variables.input?.length || variables.captured?.length || variables.derived?.length)) {
     config.variables = variables;
+  }
+  if (repeatGroups && repeatGroups.length) {
+    config.repeat_groups = repeatGroups;
+  }
+  if (dataSources && dataSources.length) {
+    config.data_sources = dataSources;
   }
   return config;
 }
@@ -715,6 +725,34 @@ try {
 
   writeRunArtifact(runDir, 'page-text-snapshot.txt', await adapter.text());
   writeRunArtifact(runDir, 'html-snapshot.html', await adapter.html());
+
+  // ── Repeat group validation ──────────────────────────────────────────────────
+  const repeatGroups = config.repeat_groups || [];
+  if (repeatGroups.length) {
+    logger.log('info', \`Repeat groups declared: \${repeatGroups.map(g => g.name).join(', ')}\`);
+    for (const rg of repeatGroups) {
+      const sourceKey = (rg.source || '').replace(/\\[\\]$/, '').split('.')[0];
+      const sourceArray = sourceKey ? manifest[sourceKey] : undefined;
+      if (!sourceKey) {
+        logger.log('warn', \`Repeat group "\${rg.name}" has no source array declared.\`);
+        recordSkippedField(skipped, \`repeat:\${rg.name}\`, 'no source array declared');
+        continue;
+      }
+      if (!Array.isArray(sourceArray)) {
+        logger.log('error', \`Repeat group "\${rg.name}" source "\${rg.source}" — manifest key "\${sourceKey}" is missing or not an array. Stopping safely.\`);
+        recordError(errors, \`repeat:\${rg.name}\`, new Error(\`manifest missing "\${sourceKey}" array\`));
+        finalizeRun(runDir, { logger, filled, skipped, errors, workflowId: WORKFLOW_ID, startUrl: config.targets?.start_url || '', dryRun, runtimeVars: Object.keys(runtimeVars).length ? runtimeVars : null });
+        await adapter.close().catch(() => {});
+        process.exit(1);
+      }
+      logger.log('info', \`Repeat group "\${rg.name}": \${sourceArray.length} item(s) from manifest.\${sourceKey}\`);
+      logger.log('info', \`  Global fields: \${(rg.globalFields || []).join(', ') || '(none)'}\`);
+      logger.log('info', \`  Item fields (per \${rg.itemName || 'item'}): \${(rg.itemFields || []).map(f => typeof f === 'string' ? f : f.name).join(', ') || '(none)'}\`);
+      logger.log('info', \`  Repeat action: \${rg.repeatAction?.description || '(not specified)'}\`);
+      logger.log('info', \`  NOTE: Full repeat-group execution not yet implemented. Planned actions logged above.\`);
+      recordSkippedField(skipped, \`repeat:\${rg.name}\`, \`repeat-group execution not yet implemented — \${sourceArray.length} item(s) planned\`);
+    }
+  }
 
   const fields = Object.entries(fieldMap.fields || {});
   if (!fields.length) {

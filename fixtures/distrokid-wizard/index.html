@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DistroKid-style Album Upload — Browsy Wizard Fixture</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; background: #f5f5f5; }
+    h1, h2 { color: #222; }
+    h2 { font-size: 1.1rem; margin: 1.6em 0 .5em; border-bottom: 1px solid #ddd; padding-bottom: .3em; }
+    .form-group { margin: 1em 0; }
+    label { display: block; font-weight: 600; margin-bottom: .35em; color: #333; font-size: .9rem; }
+    input[type="text"], input[type="date"], textarea, select {
+      width: 100%; padding: .5em .7em; border: 1px solid #ccc; border-radius: 4px;
+      font-size: 1em; box-sizing: border-box;
+    }
+    input[type="file"] { width: 100%; }
+    .track-section {
+      border: 2px solid #b0c4de; border-radius: 8px; padding: 1.2em; margin: 1em 0;
+      background: #fff; position: relative;
+    }
+    .track-section h3 { margin: 0 0 .8em; font-size: .95rem; color: #334; }
+    .track-section .remove-track {
+      position: absolute; top: .8em; right: .8em;
+      background: none; border: 1px solid #bbb; border-radius: 4px;
+      padding: .2em .6em; cursor: pointer; font-size: .8rem; color: #666;
+    }
+    .track-section .remove-track:hover { background: #fee; border-color: #c33; color: #c33; }
+    .checkbox-row { display: flex; align-items: center; gap: .6em; }
+    .checkbox-row input[type="checkbox"] { width: auto; }
+    .btn { padding: .55em 1.4em; border-radius: 4px; font-size: 1em; cursor: pointer; border: none; }
+    #btn-add-track { background: #2c7; color: white; margin: 1em 0; }
+    #btn-add-track:hover { background: #1a5; }
+    .danger-zone { border: 2px solid #e55; padding: 1em; border-radius: 6px; background: #fff5f5; margin-top: 2em; }
+    .danger-zone legend { color: #c00; font-weight: bold; }
+    #btn-submit { background: #c33; color: white; }
+    #btn-release { background: #c33; color: white; }
+    #status { margin: 1em 0; padding: .7em 1em; border-radius: 4px; display: none; font-weight: 600; }
+    .status-ok { background: #d4edda; color: #155724; }
+    .track-count { font-size: .82em; color: #666; margin-left: .5em; }
+    .attr-note { font-size: .76rem; color: #999; font-style: italic; margin-top: .2em; }
+  </style>
+</head>
+<body>
+  <h1>Album Upload</h1>
+  <p style="color:#666;font-size:.9rem">
+    Browsy wizard fixture — DistroKid-style album upload form.
+    Global album fields fill once; per-track sections repeat for each song.
+    Uses <code>data-browsy-field</code>, <code>data-browsy-item-field</code>,
+    <code>data-browsy-action</code>, and <code>data-browsy-repeat</code> attributes.
+  </p>
+
+  <div id="status"></div>
+
+  <!-- ── Global album fields ── -->
+  <h2>Album details</h2>
+
+  <div class="form-group">
+    <label for="release-title">Release title</label>
+    <input type="text" id="release-title" name="releaseTitle"
+      data-browsy-field="releaseTitle"
+      placeholder="e.g. Sunrise Sessions">
+  </div>
+
+  <div class="form-group">
+    <label for="artist-name">Artist name</label>
+    <input type="text" id="artist-name" name="artistName"
+      data-browsy-field="artistName"
+      placeholder="e.g. Example Artist">
+  </div>
+
+  <div class="form-group">
+    <label for="record-label">Record label</label>
+    <input type="text" id="record-label" name="recordLabel"
+      data-browsy-field="recordLabel"
+      placeholder="e.g. Independent Records">
+  </div>
+
+  <div class="form-group">
+    <label for="release-date">Release date</label>
+    <input type="date" id="release-date" name="releaseDate"
+      data-browsy-field="releaseDate">
+  </div>
+
+  <div class="form-group">
+    <label for="cover-art">Album cover art <span style="font-weight:normal;color:#666">(PNG or JPG, 3000×3000 recommended)</span></label>
+    <input type="file" id="cover-art" name="coverArt"
+      data-browsy-field="coverArt"
+      accept="image/png,image/jpeg">
+  </div>
+
+  <div class="form-group">
+    <label for="album-folder">Album folder <span style="font-weight:normal;color:#666">(local path containing audio files)</span></label>
+    <input type="text" id="album-folder" name="albumFolder"
+      data-browsy-field="albumFolder"
+      placeholder="e.g. /Users/me/my-album">
+    <p class="attr-note">Browsy reads this folder path to locate audio files for each track.</p>
+  </div>
+
+  <!-- ── Repeat group: tracks ── -->
+  <h2>Tracks <span class="track-count" id="track-count">(1 track)</span></h2>
+
+  <!--
+    data-browsy-repeat="tracks" marks this container as the source of the repeat group.
+    Browsy counts child [data-browsy-item-section] elements to know how many items exist.
+  -->
+  <div id="tracks-container" data-browsy-repeat="tracks">
+    <!-- First track pre-exists in DOM (DistroKid-style: form starts with one empty track row) -->
+    <div class="track-section" id="track-1" data-track-index="1" data-browsy-item-section>
+      <h3>Track 1</h3>
+      <button class="remove-track" type="button" onclick="removeTrack(1)">&#x2715; Remove</button>
+
+      <div class="form-group">
+        <label for="track-title-1">Track title</label>
+        <input type="text" id="track-title-1" name="trackTitle-1"
+          data-browsy-item-field="trackTitle"
+          placeholder="e.g. Morning Light">
+      </div>
+
+      <div class="form-group">
+        <label for="audio-file-1">Audio file <span style="font-weight:normal;color:#666">(WAV or MP3)</span></label>
+        <input type="file" id="audio-file-1" name="audioFile-1"
+          data-browsy-item-field="audioFile"
+          accept="audio/wav,audio/mpeg">
+      </div>
+
+      <div class="form-group">
+        <label for="track-number-1">Track number</label>
+        <input type="text" id="track-number-1" name="trackNumber-1"
+          data-browsy-item-field="trackNumber"
+          value="1" style="width:80px">
+      </div>
+
+      <div class="form-group">
+        <label for="songwriter-1">Songwriter</label>
+        <input type="text" id="songwriter-1" name="songwriter-1"
+          data-browsy-item-field="songwriter"
+          placeholder="e.g. A. Composer">
+      </div>
+
+      <div class="form-group">
+        <div class="checkbox-row">
+          <input type="checkbox" id="explicit-1" name="explicitLyrics-1"
+            data-browsy-item-field="explicitLyrics">
+          <label for="explicit-1" style="display:inline;font-weight:normal">Explicit lyrics</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    data-browsy-action="add-track" is the stable automation hook.
+    Browsy clicks this button to add a new track section before filling it.
+  -->
+  <button class="btn" id="btn-add-track" type="button"
+    data-browsy-action="add-track"
+    onclick="addTrack()">+ Add another track</button>
+
+  <!-- ── Final actions (manual-only / dangerous) ── -->
+  <fieldset class="danger-zone">
+    <legend>Final release actions — stay manual</legend>
+    <p style="font-size:.88rem;color:#666;margin:.3em 0 1em">
+      These actions are blocked by Browsy safety policy.
+      A human must review and click these.
+    </p>
+    <div style="display:flex;gap:1em;flex-wrap:wrap">
+      <button class="btn" id="btn-submit" type="button" onclick="handleFinal('submit')">Submit</button>
+      <button class="btn" id="btn-release" type="button" onclick="handleFinal('release')">Upload to stores</button>
+    </div>
+    <div class="form-group" style="margin-top:1em">
+      <div class="checkbox-row">
+        <input type="checkbox" id="legal-cert">
+        <label for="legal-cert" style="display:inline;font-weight:normal">
+          I certify I own or control all rights to this content
+        </label>
+      </div>
+    </div>
+  </fieldset>
+
+  <script>
+    let trackCount = 1;
+
+    function addTrack() {
+      trackCount++;
+      updateTrackCount();
+      const container = document.getElementById('tracks-container');
+      const section = document.createElement('div');
+      section.className = 'track-section';
+      section.id = 'track-' + trackCount;
+      section.dataset.trackIndex = trackCount;
+      section.setAttribute('data-browsy-item-section', '');
+      section.innerHTML = `
+        <h3>Track ${trackCount}</h3>
+        <button class="remove-track" type="button" onclick="removeTrack(${trackCount})">&#x2715; Remove</button>
+
+        <div class="form-group">
+          <label for="track-title-${trackCount}">Track title</label>
+          <input type="text" id="track-title-${trackCount}" name="trackTitle-${trackCount}"
+            data-browsy-item-field="trackTitle" placeholder="e.g. Morning Light">
+        </div>
+
+        <div class="form-group">
+          <label for="audio-file-${trackCount}">Audio file <span style="font-weight:normal;color:#666">(WAV or MP3)</span></label>
+          <input type="file" id="audio-file-${trackCount}" name="audioFile-${trackCount}"
+            data-browsy-item-field="audioFile" accept="audio/wav,audio/mpeg">
+        </div>
+
+        <div class="form-group">
+          <label for="track-number-${trackCount}">Track number</label>
+          <input type="text" id="track-number-${trackCount}" name="trackNumber-${trackCount}"
+            data-browsy-item-field="trackNumber" value="${trackCount}" style="width:80px">
+        </div>
+
+        <div class="form-group">
+          <label for="songwriter-${trackCount}">Songwriter</label>
+          <input type="text" id="songwriter-${trackCount}" name="songwriter-${trackCount}"
+            data-browsy-item-field="songwriter" placeholder="e.g. A. Composer">
+        </div>
+
+        <div class="form-group">
+          <div class="checkbox-row">
+            <input type="checkbox" id="explicit-${trackCount}" name="explicitLyrics-${trackCount}"
+              data-browsy-item-field="explicitLyrics">
+            <label for="explicit-${trackCount}" style="display:inline;font-weight:normal">Explicit lyrics</label>
+          </div>
+        </div>
+      `;
+      container.appendChild(section);
+      section.querySelector('input[type="text"]').focus();
+    }
+
+    function removeTrack(n) {
+      const el = document.getElementById('track-' + n);
+      if (el) el.remove();
+      updateTrackCount();
+    }
+
+    function updateTrackCount() {
+      const sections = document.querySelectorAll('.track-section');
+      document.getElementById('track-count').textContent =
+        '(' + sections.length + ' track' + (sections.length === 1 ? '' : 's') + ')';
+    }
+
+    function handleFinal(action) {
+      const status = document.getElementById('status');
+      status.className = 'status-ok';
+      status.style.display = 'block';
+      status.textContent = '[FIXTURE] ' + action + ' triggered — in a real workflow this is a manual-only action blocked by Browsy safety policy.';
+      window.lastFinalAction = action;
+    }
+  </script>
+</body>
+</html>

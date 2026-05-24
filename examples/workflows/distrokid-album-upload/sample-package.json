@@ -1,0 +1,61 @@
+{
+  "workflowId": "distrokid-album-upload",
+  "target": {
+    "name": "DistroKid-like Album Upload",
+    "url": "fixture://examples/workflows/distrokid-album-upload/fixture.html"
+  },
+  "globals": {
+    "releaseTitle": "Sunrise Sessions",
+    "artistName": "Example Artist",
+    "primaryGenre": "Pop",
+    "language": "English",
+    "releaseDate": "2026-09-01",
+    "labelName": "Independent"
+  },
+  "defaults": {
+    "songwriter": "Example Artist",
+    "language": "English"
+  },
+  "assets": {
+    "coverArt": "./assets/cover.png"
+  },
+  "repeatGroups": [
+    {
+      "id": "tracks",
+      "label": "Album Tracks",
+      "itemLabel": "Track",
+      "createAction": {
+        "type": "click",
+        "selector": "[data-browsy-action='add-track']"
+      },
+      "items": [
+        {
+          "fields": {
+            "trackTitle": "Morning Light",
+            "trackNumber": "1"
+          },
+          "assets": {
+            "audioFile": "./assets/track-01.wav"
+          }
+        },
+        {
+          "fields": {
+            "trackTitle": "Evening Calm",
+            "trackNumber": "2",
+            "songwriter": "Jane Composer"
+          },
+          "assets": {
+            "audioFile": "./assets/track-02.wav"
+          }
+        }
+      ]
+    }
+  ],
+  "humanCheckpoints": [
+    {
+      "id": "review-before-release",
+      "label": "Review all tracks and album details before final release submission",
+      "stopBeforeSelector": "[data-browsy-action='final-submit']"
+    }
+  ]
+}

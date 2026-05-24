@@ -1,0 +1,18 @@
+{
+  "id": "distrokid-album-upload",
+  "description": "Example workflow: upload an album to a DistroKid-like music distribution service. Demonstrates the generic Browsy repeat-group engine applied to a multi-track form.",
+  "target": "DistroKid-like album upload form",
+  "fixtureUrl": "fixture.html",
+  "samplePackage": "sample-package.json",
+  "browsy": {
+    "repeatGroups": 1,
+    "globalFields": 7,
+    "itemFields": 5,
+    "defaultFields": 2
+  },
+  "notes": [
+    "This is an EXAMPLE workflow only — not a production DistroKid integration.",
+    "The generic Browsy engine is not music-specific.",
+    "This example lives in examples/ not src/core/ — core has no music-domain knowledge."
+  ]
+}

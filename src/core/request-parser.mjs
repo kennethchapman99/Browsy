@@ -20,9 +20,19 @@ export function parseRequest(text) {
   const workflowName = extractWorkflowName(sections['1. Workflow name'] || '');
   const goal = extractGoal(sections['2. Goal'] || '');
   const targetUrls = extractTableRows(sections['3. Target websites / pages'] || '');
-  const apis = extractTableRows(sections['4. Existing APIs or local systems'] || '');
+
+  // ## 4 may be titled either old or new form
+  const sec4 = sections['4. Existing APIs, files, or local systems']
+    || sections['4. Existing APIs or local systems']
+    || '';
+  const dataSources = extractJsonBlockSafe(sec4);
+  const apis = dataSources.value && Array.isArray(dataSources.value)
+    ? dataSources.value
+    : extractTableRows(sec4);
+
   const inputDataContract = extractJsonBlock(sections['5. Input data contract'] || '');
   const runtimeVariablesResult = extractJsonBlockSafe(sections['5a. Runtime variables'] || '');
+  const repeatGroupsResult = extractJsonBlockSafe(sections['5b. Repeat groups'] || '');
   const desiredSteps = extractListItems(sections['6. Desired workflow steps'] || '');
   const fieldsActions = extractTableRows(sections['7. Fields to fill or upload'] || '');
   const manualOnlyActions = extractListItems(sections['8. Actions that must stay manual'] || '');
@@ -37,11 +47,12 @@ export function parseRequest(text) {
 
   const workflowId = toWorkflowId(workflowName);
   const runtimeVariables = runtimeVariablesResult.value || { input: [], captured: [], derived: [] };
+  const repeatGroups = repeatGroupsResult.value?.repeatGroups || [];
 
   const issues = validate({
     workflowName, workflowId, goal, targetUrls, fieldsActions,
     manualOnlyActions, safetyPolicyResult, acceptanceCriteria, walkthroughText,
-    runtimeVariables
+    runtimeVariables, repeatGroups, inputDataContract
   });
 
   return {
@@ -50,8 +61,10 @@ export function parseRequest(text) {
     goal,
     targetUrls,
     apis,
+    dataSources: Array.isArray(apis) ? apis : [],
     inputDataContract,
     runtimeVariables,
+    repeatGroups,
     desiredSteps,
     fieldsActions,
     manualOnlyActions,
@@ -196,7 +209,7 @@ function isPlaceholderFieldsTable(rows) {
   return rows.every(row => Object.values(row).some(v => v.startsWith('(')));
 }
 
-function validate({ workflowName, workflowId, goal, targetUrls, fieldsActions, manualOnlyActions, safetyPolicyResult, acceptanceCriteria, walkthroughText, runtimeVariables }) {
+function validate({ workflowName, workflowId, goal, targetUrls, fieldsActions, manualOnlyActions, safetyPolicyResult, acceptanceCriteria, walkthroughText, runtimeVariables, repeatGroups = [], inputDataContract }) {
   const issues = [];
 
   const err = (field, message, fix) => issues.push({ level: 'error', field, message, fix });
@@ -268,6 +281,74 @@ function validate({ workflowName, workflowId, goal, targetUrls, fieldsActions, m
           );
         }
       }
+    }
+  }
+
+  // Repeat group validation (warnings, not hard failures for early workflows)
+  for (const rg of repeatGroups) {
+    if (!rg.name) {
+      warn('repeat_groups', 'A repeat group is missing a name.', 'Add a "name" field to each repeat group in ## 5b. Repeat groups.');
+    }
+    if (!rg.itemName) {
+      warn('repeat_groups',
+        `Repeat group "${rg.name || '(unnamed)'}" is missing an item name.`,
+        'Add an "itemName" (singular noun, e.g. "track") to the repeat group.'
+      );
+    }
+    if (!rg.source) {
+      warn('repeat_groups',
+        `Repeat group "${rg.name || '(unnamed)'}" has no source array declared.`,
+        'Set "source" to the path of the array in the manifest (e.g. "tracks[]").'
+      );
+    } else {
+      // Check that the source array exists in the input data contract
+      const sourceKey = rg.source.replace(/\[\]$/, '').split('.')[0];
+      const contractHasKey = inputDataContract && typeof inputDataContract === 'object'
+        && (sourceKey in inputDataContract);
+      if (!contractHasKey) {
+        warn('repeat_groups',
+          `Repeat group "${rg.name}" source "${rg.source}" key "${sourceKey}" is not declared in ## 5. Input data contract.`,
+          `Add a "${sourceKey}" array to the input data contract, or mark it as inferred from a data source.`
+        );
+      }
+    }
+    if (!rg.itemFields || rg.itemFields.length === 0) {
+      warn('repeat_groups',
+        `Repeat group "${rg.name || '(unnamed)'}" has no item fields.`,
+        'Add "itemFields" listing the fields that fill once per item.'
+      );
+    }
+    // Every item-scoped field should reference the itemName
+    for (const f of (rg.itemFields || [])) {
+      const fieldName = typeof f === 'string' ? f : f.name;
+      const source = typeof f === 'string' ? f : f.source;
+      if (source && rg.itemName && !source.startsWith(rg.itemName)) {
+        warn('repeat_groups',
+          `Repeat group "${rg.name}" item field "${fieldName}" source "${source}" does not start with item name "${rg.itemName}".`,
+          `Use "${rg.itemName}.<fieldName>" as the source for item-scoped fields.`
+        );
+      }
+    }
+
+    // Every global field should NOT reference the itemName (cross-contamination)
+    if (rg.itemName) {
+      const itemPrefix = rg.itemName + '.';
+      for (const fieldSource of (rg.globalFields || [])) {
+        if (typeof fieldSource === 'string' && fieldSource.startsWith(itemPrefix)) {
+          warn('repeat_groups',
+            `Repeat group "${rg.name}" global field "${fieldSource}" starts with item alias "${rg.itemName}" — global fields must not reference per-item data.`,
+            `Move "${fieldSource}" to "itemFields", or change its source to a non-item path.`
+          );
+        }
+      }
+    }
+
+    // Repeat group must have a repeatAction (the "add another" mechanism)
+    if (!rg.repeatAction) {
+      warn('repeat_groups',
+        `Repeat group "${rg.name || '(unnamed)'}" has no "repeatAction" defined.`,
+        'Add a "repeatAction" object with at minimum { "type": "click", "description": "..." } so the executor knows how to add new sections.'
+      );
     }
   }
 
