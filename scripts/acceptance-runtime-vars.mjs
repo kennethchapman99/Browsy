@@ -271,6 +271,7 @@ async function runBrowserChecks() {
     fs.writeFileSync(detailPath, `<!doctype html><title>Detail</title><h1 data-browsy-output="detail">Song Detail ${songId}</h1>`);
 
     const createUrl = pathToFileURL(createPath).href + `#/songs/${songId}`;
+    const detailTemplate = pathToFileURL(path.join(dir, 'song-__SONG_ID__.html')).href.replace('__SONG_ID__', '{{songId}}');
 
     await checkAsync('Browser loads fixture page with generated URL', async () => {
       await page.goto(createUrl, { waitUntil: 'domcontentloaded' });
@@ -300,9 +301,10 @@ async function runBrowserChecks() {
       assert.deepEqual(result.missing, []);
       vars = computeDerived([
         { name: 'songUrl', template: 'http://localhost:3737/songs/{{songId}}' },
-        { name: 'detailFileUrl', template: pathToFileURL(path.join(dir, 'song-{{songId}}.html')).href },
+        { name: 'detailFileUrl', template: detailTemplate },
       ], result.vars);
       assert.equal(vars.songUrl, `http://localhost:3737/songs/${songId}`);
+      assert.ok(vars.detailFileUrl.endsWith(`song-${songId}.html`));
     });
     await checkAsync('Browser derived URL can drive next navigation', async () => {
       await page.goto(vars.detailFileUrl, { waitUntil: 'domcontentloaded' });
