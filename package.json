@@ -35,8 +35,9 @@
     "acceptance:distrokid-album-wizard": "node scripts/acceptance-distrokid-album-wizard.mjs",
     "acceptance:project-lifecycle": "node scripts/acceptance-project-lifecycle.mjs",
     "acceptance:runtime-vars": "node scripts/acceptance-runtime-vars.mjs",
+    "acceptance:observation-ingestion": "node scripts/acceptance-observation-ingestion.mjs",
     "acceptance:field-map-llm": "node scripts/acceptance-field-map-llm.mjs",
-    "test": "node scripts/acceptance-song-flow.mjs && node scripts/acceptance-repeat-groups.mjs && node scripts/acceptance-run-plan.mjs && node scripts/acceptance-playwright-executor.mjs && node scripts/acceptance-automation-package.mjs && node scripts/acceptance-generic-repeat-package.mjs && node scripts/acceptance-distrokid-album-example.mjs && node scripts/acceptance-wizard-package-gen.mjs && node scripts/acceptance-friendly-wizard.mjs && node scripts/acceptance-distrokid-album-wizard.mjs && node scripts/acceptance-project-lifecycle.mjs && node scripts/acceptance-runtime-vars.mjs && node scripts/acceptance-field-map-llm.mjs"
+    "test": "node scripts/acceptance-song-flow.mjs && node scripts/acceptance-repeat-groups.mjs && node scripts/acceptance-run-plan.mjs && node scripts/acceptance-playwright-executor.mjs && node scripts/acceptance-automation-package.mjs && node scripts/acceptance-generic-repeat-package.mjs && node scripts/acceptance-distrokid-album-example.mjs && node scripts/acceptance-wizard-package-gen.mjs && node scripts/acceptance-friendly-wizard.mjs && node scripts/acceptance-distrokid-album-wizard.mjs && node scripts/acceptance-project-lifecycle.mjs && node scripts/acceptance-runtime-vars.mjs && node scripts/acceptance-observation-ingestion.mjs && node scripts/acceptance-field-map-llm.mjs"
   },
   "engines": {
     "node": ">=22"
