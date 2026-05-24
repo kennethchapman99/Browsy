@@ -19,6 +19,7 @@
     "generate:prompt": "node src/cli/index.mjs generate-prompt",
     "run": "node src/cli/index.mjs run",
     "discover:all": "node src/cli/index.mjs discover:all",
+    "discover:map": "node src/cli/index.mjs discover:map",
     "review": "node src/cli/index.mjs review",
     "feedback": "node src/cli/index.mjs feedback",
     "promote": "node src/cli/index.mjs promote",
@@ -31,12 +32,14 @@
     "acceptance:distrokid-album-example": "node scripts/acceptance-distrokid-album-example.mjs",
     "acceptance:wizard-package-gen": "node scripts/acceptance-wizard-package-gen.mjs",
     "acceptance:distrokid-album-wizard": "node scripts/acceptance-distrokid-album-wizard.mjs",
-    "test": "node scripts/acceptance-song-flow.mjs && node scripts/acceptance-repeat-groups.mjs && node scripts/acceptance-run-plan.mjs && node scripts/acceptance-playwright-executor.mjs && node scripts/acceptance-automation-package.mjs && node scripts/acceptance-generic-repeat-package.mjs && node scripts/acceptance-distrokid-album-example.mjs && node scripts/acceptance-wizard-package-gen.mjs && node scripts/acceptance-distrokid-album-wizard.mjs"
+    "acceptance:field-map-llm": "node scripts/acceptance-field-map-llm.mjs",
+    "test": "node scripts/acceptance-song-flow.mjs && node scripts/acceptance-repeat-groups.mjs && node scripts/acceptance-run-plan.mjs && node scripts/acceptance-playwright-executor.mjs && node scripts/acceptance-automation-package.mjs && node scripts/acceptance-generic-repeat-package.mjs && node scripts/acceptance-distrokid-album-example.mjs && node scripts/acceptance-wizard-package-gen.mjs && node scripts/acceptance-distrokid-album-wizard.mjs && node scripts/acceptance-field-map-llm.mjs"
   },
   "engines": {
     "node": ">=22"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.98.0",
     "playwright": "^1.56.1"
   }
 }

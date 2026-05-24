@@ -1,0 +1,36 @@
+{
+  "ok": true,
+  "dryRun": true,
+  "generatedAt": "2026-05-24T13:42:24.044Z",
+  "package": {
+    "path": "/Users/kchapman/browsy/examples/workflows/distrokid-album-upload/sample-package.json",
+    "workflowId": "distrokid-album-upload",
+    "targetName": "DistroKid-like Album Upload",
+    "itemCount": 2,
+    "repeatGroupCount": 1
+  },
+  "runPlan": {
+    "stepCount": 10,
+    "globalStepCount": 7,
+    "itemStepCount": 10,
+    "uploadStepCount": 3,
+    "checkpointStepCount": 1,
+    "warnings": []
+  },
+  "execution": {
+    "executedStepCount": 0,
+    "skippedStepCount": 0,
+    "checkpointReached": true,
+    "blockedActions": [
+      "Submit",
+      "Confirm",
+      "Finalize",
+      "Distribute",
+      "Release",
+      "Send"
+    ],
+    "executedSteps": [],
+    "finalState": null,
+    "error": null
+  }
+}

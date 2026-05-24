@@ -1,0 +1,39 @@
+{
+  "ok": true,
+  "mode": "fixture",
+  "dryRun": true,
+  "generatedAt": "2026-05-24T13:42:25.040Z",
+  "request": {
+    "path": "/Users/kchapman/browsy/fixtures/album-upload/AUTOMATION_REQUEST.md",
+    "workflowId": "album-upload",
+    "workflowName": "album-upload",
+    "validationErrors": [],
+    "validationWarnings": []
+  },
+  "manifest": {
+    "path": "/Users/kchapman/browsy/fixtures/album-upload/manifest.json",
+    "itemCount": 2
+  },
+  "runPlan": {
+    "stepCount": 10,
+    "globalStepCount": 7,
+    "itemStepCount": 10,
+    "uploadStepCount": 3,
+    "checkpointStepCount": 1
+  },
+  "execution": {
+    "executedStepCount": 0,
+    "skippedStepCount": 0,
+    "checkpointReached": true,
+    "blockedActions": [
+      "Submit",
+      "Upload to stores",
+      "Release",
+      "Distribute",
+      "Send to stores"
+    ],
+    "executedSteps": [],
+    "finalState": null,
+    "error": null
+  }
+}

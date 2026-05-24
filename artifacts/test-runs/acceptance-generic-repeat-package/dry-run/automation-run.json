@@ -1,0 +1,36 @@
+{
+  "ok": true,
+  "dryRun": true,
+  "generatedAt": "2026-05-24T13:42:23.300Z",
+  "package": {
+    "path": "/Users/kchapman/browsy/fixtures/generic-repeat-group/package.json",
+    "workflowId": "project-budget-submission",
+    "targetName": "Project Budget Submission Form",
+    "itemCount": 2,
+    "repeatGroupCount": 1
+  },
+  "runPlan": {
+    "stepCount": 8,
+    "globalStepCount": 5,
+    "itemStepCount": 10,
+    "uploadStepCount": 3,
+    "checkpointStepCount": 1,
+    "warnings": []
+  },
+  "execution": {
+    "executedStepCount": 0,
+    "skippedStepCount": 0,
+    "checkpointReached": true,
+    "blockedActions": [
+      "Submit",
+      "Confirm",
+      "Finalize",
+      "Distribute",
+      "Release",
+      "Send"
+    ],
+    "executedSteps": [],
+    "finalState": null,
+    "error": null
+  }
+}

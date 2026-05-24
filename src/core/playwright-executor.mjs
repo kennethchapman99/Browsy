@@ -5,9 +5,9 @@
 // Stops unconditionally at the human_checkpoint — final submit is never automated.
 //
 // Selector strategy (generic first, legacy fallback):
-//   Global fields  → data-browsy-field="<fieldName>"
+//   Global fields  → fieldMap override → data-browsy-field="<fieldName>"
 //   Item sections  → [data-browsy-item-section] (fallback: .track-section)
-//   Item fields    → [data-browsy-item-field="<fieldName>"] (fallback: data-testid via ITEM_TESTID)
+//   Item fields    → fieldMap override → [data-browsy-item-field="<fieldName>"] (fallback: data-testid via ITEM_TESTID)
 //   Section add    → repeatAction.selector
 
 import { chromium } from 'playwright';
@@ -25,12 +25,18 @@ const ITEM_TESTID = {
   explicit:    'track-explicit',
 };
 
-function globalFieldSelector(source) {
+function globalFieldSelector(source, fieldMap) {
   const fieldName = source.split('.').pop();
+  if (fieldMap?.fields?.[fieldName]?.selector) {
+    return fieldMap.fields[fieldName].selector;
+  }
   return `[data-browsy-field="${fieldName}"]`;
 }
 
-function itemFieldSelector(fieldName) {
+function itemFieldSelector(fieldName, fieldMap) {
+  if (fieldMap?.fields?.[fieldName]?.selector) {
+    return fieldMap.fields[fieldName].selector;
+  }
   const legacyTestid = ITEM_TESTID[fieldName];
   if (legacyTestid) {
     return `[data-browsy-item-field="${fieldName}"],[data-testid="${legacyTestid}"]`;
@@ -152,6 +158,7 @@ export async function executeRunPlanWithPlaywright({
   headless = true,
   trace = false,
   safetyPolicy,
+  fieldMap,
 }) {
   const policy        = safetyPolicy ?? defaultSafetyPolicy();
   const executedSteps = [];
@@ -188,14 +195,14 @@ export async function executeRunPlanWithPlaywright({
     for (const step of runPlan.steps) {
       // ── Global fill ──────────────────────────────────────────────────────────
       if (step.type === 'fill_global') {
-        const sel   = globalFieldSelector(step.source);
+        const sel   = globalFieldSelector(step.source, fieldMap);
         const label = `fill_global[${step.source}]`;
         await fillField(page, sel, step.value, label);
         executedSteps.push({ type: step.type, source: step.source, value: step.value });
 
       // ── Global upload ────────────────────────────────────────────────────────
       } else if (step.type === 'upload_global') {
-        const sel      = globalFieldSelector(step.source);
+        const sel      = globalFieldSelector(step.source, fieldMap);
         const filePath = path.resolve(manifestBaseDir, step.value);
         const label    = `upload_global[${step.source}]`;
         await uploadField(page, sel, filePath, label);
@@ -247,7 +254,7 @@ export async function executeRunPlanWithPlaywright({
           // fill_item — fill a non-file field scoped to this item section
           } else if (sub.type === 'fill_item') {
             const section = page.locator(sectionSel).nth(itemIndex);
-            const sel     = itemFieldSelector(sub.fieldName);
+            const sel     = itemFieldSelector(sub.fieldName, fieldMap);
             const label   = `fill_item[${itemIndex}].${sub.fieldName}`;
             await fillField(section, sel, sub.value, label);
             executedSteps.push({
@@ -258,7 +265,7 @@ export async function executeRunPlanWithPlaywright({
           // upload_item — set a file on an upload field scoped to this item section
           } else if (sub.type === 'upload_item') {
             const section  = page.locator(sectionSel).nth(itemIndex);
-            const sel      = itemFieldSelector(sub.fieldName);
+            const sel      = itemFieldSelector(sub.fieldName, fieldMap);
             const filePath = path.resolve(manifestBaseDir, sub.value);
             const label    = `upload_item[${itemIndex}].${sub.fieldName}`;
             await uploadField(section, sel, filePath, label);
