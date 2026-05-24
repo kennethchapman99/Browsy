@@ -14,25 +14,43 @@
 // extractPackageFields — derive typed field list from a package JSON
 // ---------------------------------------------------------------------------
 
-// Returns [{ fieldName, inputType, scope, groupId? }]
+// Returns [{ fieldName, inputType, scope, groupId?, sourcePath, label }]
 export function extractPackageFields(pkg) {
   const fields = [];
 
   // Global text fields
-  for (const key of Object.keys(pkg.globals || {})) {
-    fields.push({ fieldName: key, inputType: 'text', scope: 'global' });
+  for (const [key, val] of Object.entries(pkg.globals || {})) {
+    fields.push({
+      fieldName: key,
+      inputType: 'text',
+      scope: 'global',
+      sourcePath: `globals.${key}`,
+      label: typeof val === 'object' && val?.label ? val.label : key,
+    });
   }
 
   // Global file uploads
-  for (const key of Object.keys(pkg.assets || {})) {
-    fields.push({ fieldName: key, inputType: 'file', scope: 'global' });
+  for (const [key, val] of Object.entries(pkg.assets || {})) {
+    fields.push({
+      fieldName: key,
+      inputType: 'file',
+      scope: 'asset',
+      sourcePath: `assets.${key}`,
+      label: typeof val === 'object' && val?.label ? val.label : key,
+    });
   }
 
   // Default values (applied as fallback to repeat items — still real form fields)
-  for (const key of Object.keys(pkg.defaults || {})) {
-    // Avoid duplicating a key already captured from globals
-    if (!fields.some(f => f.fieldName === key && f.scope === 'global')) {
-      fields.push({ fieldName: key, inputType: 'text', scope: 'global' });
+  for (const [key, val] of Object.entries(pkg.defaults || {})) {
+    // Avoid duplicating a key already captured from globals or assets
+    if (!fields.some(f => f.fieldName === key)) {
+      fields.push({
+        fieldName: key,
+        inputType: 'text',
+        scope: 'default',
+        sourcePath: `defaults.${key}`,
+        label: key,
+      });
     }
   }
 
@@ -40,12 +58,40 @@ export function extractPackageFields(pkg) {
   for (const group of pkg.repeatGroups || []) {
     const groupId = group.id || 'items';
     const sample = group.items?.[0] || {};
-    for (const key of Object.keys(sample.fields || {})) {
-      fields.push({ fieldName: key, inputType: 'text', scope: 'item', groupId });
+    for (const [key, val] of Object.entries(sample.fields || {})) {
+      fields.push({
+        fieldName: key,
+        inputType: 'text',
+        scope: 'item',
+        groupId,
+        sourcePath: `repeatGroups.${groupId}.items[].fields.${key}`,
+        label: typeof val === 'object' && val?.label ? val.label : key,
+      });
     }
-    for (const key of Object.keys(sample.assets || {})) {
-      fields.push({ fieldName: key, inputType: 'file', scope: 'item', groupId });
+    for (const [key, val] of Object.entries(sample.assets || {})) {
+      fields.push({
+        fieldName: key,
+        inputType: 'file',
+        scope: 'item_asset',
+        groupId,
+        sourcePath: `repeatGroups.${groupId}.items[].assets.${key}`,
+        label: typeof val === 'object' && val?.label ? val.label : key,
+      });
     }
+  }
+
+  // Captured outputs — informational, not fillable by the executor,
+  // but included so LLM mapping can flag external link targets.
+  for (const output of pkg.capturedOutputs || []) {
+    const id = output.id || output.name;
+    if (!id) continue;
+    fields.push({
+      fieldName: id,
+      inputType: 'captured',
+      scope: output.scope || 'captured',
+      sourcePath: `capturedOutputs.${id}`,
+      label: output.label || id,
+    });
   }
 
   return fields;

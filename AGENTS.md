@@ -2,7 +2,7 @@
 
 Browsy is an automation project intake and harness factory.
 
-Treat `AUTOMATION_REQUEST.md` plus `workflows/<workflow-id>/project.json` as the source of truth for the requested automation. Generate a safe, inspectable, deterministic automation harness. **Do not claim success when a step fails, a selector is unverified, or a live action has not been tested.**
+Treat `AUTOMATION_REQUEST.md` plus `workflows/<workflow-id>/project.json` as the source of truth for the requested automation. Generate a safe, inspectable, deterministic automation harness. **Do not claim success when a step fails, a selector is unverified, or a live action has not been tested — never claim success unless tests have run and passed.** Use human checkpoints for final actions and never automate past them without explicit approval.
 
 ---
 

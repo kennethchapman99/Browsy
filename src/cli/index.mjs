@@ -1082,24 +1082,29 @@ async function discoverMap() {
   }
   console.log(`Discovery: ${discoveryRunDir}`);
 
-  // 2. Load package JSON
+  // 2. Load package JSON — priority order per spec
   const pkgFlag = args.package;
   const pkgPaths = pkgFlag
     ? [resolve(pkgFlag)]
     : [
+        join(workflowDir(workflow), 'workflow-package.local.json'),
+        join(workflowDir(workflow), 'workflow-package.example.json'),
+        // Legacy fallback only — do not create these for new workflows
         join(workflowDir(workflow), 'sample-package.json'),
         join(workflowDir(workflow), 'package.json'),
       ];
   let pkg = null;
+  let pkgUsed = null;
   for (const p of pkgPaths) {
-    if (exists(p)) { pkg = readJson(p); break; }
+    if (exists(p)) { pkg = readJson(p); pkgUsed = p; break; }
   }
   if (!pkg) {
     throw new Error(
       `No package JSON found for workflow "${workflow}". ` +
-      `Create workflows/${workflow}/sample-package.json or pass --package <path>.`
+      `Create workflows/${workflow}/workflow-package.example.json or pass --package <path>.`
     );
   }
+  console.log(`Package: ${pkgUsed}`);
 
   // 3. Extract fields and generate candidates
   const packageFields = extractPackageFields(pkg);
