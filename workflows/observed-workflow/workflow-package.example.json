@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "browsy.workflow-package.v1",
+  "workflowId": "observed-workflow",
+  "globals": {
+    "numberOfSongs": "Example numberOfSongs"
+  },
+  "assets": {},
+  "defaults": {},
+  "repeatGroups": [
+    {
+      "id": "group1",
+      "label": "Add to Album",
+      "itemLabel": "item",
+      "items": [
+        {
+          "fields": {},
+          "assets": {}
+        }
+      ]
+    },
+    {
+      "id": "group2",
+      "label": "Add Tracks",
+      "itemLabel": "item",
+      "items": [
+        {
+          "fields": {},
+          "assets": {}
+        }
+      ]
+    }
+  ]
+}

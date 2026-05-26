@@ -1,0 +1,1616 @@
+{
+  "$note": "Sanitized golden event log captured from observation-realistic-upload fixture. Re-generate with: node scripts/capture-observation-realistic-upload.mjs",
+  "$source": {
+    "fixture": "fixtures/observation-realistic-upload/release.html",
+    "captureSource": "playwrightRecorder",
+    "sessionId": "session-realistic-upload",
+    "flow": "metadata → tracks (×2) → review. Submit & Publish Release intentionally NOT clicked."
+  },
+  "events": [
+    {
+      "id": "evt-001",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+0",
+      "type": "session_started",
+      "source": "playwrightRecorder"
+    },
+    {
+      "id": "evt-002",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+1",
+      "type": "capture_source_selected",
+      "source": "playwrightRecorder",
+      "captureSource": "playwrightRecorder"
+    },
+    {
+      "id": "evt-003",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+2",
+      "type": "page_seen",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "rawEvidence": {
+        "trigger": "framenavigated"
+      }
+    },
+    {
+      "id": "evt-004",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+3",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#cover-art",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "file",
+        "name": "cover_art",
+        "id": "cover-art",
+        "label": "Cover image (JPG / PNG, ≥ 3000×3000)*",
+        "isFileInput": true,
+        "required": true,
+        "accept": "image/png,image/jpeg",
+        "selectorCandidates": [
+          {
+            "selector": "#cover-art",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"cover_art\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Cover image (JPG / PNG, ≥ 3000×3000)*\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "initial_scan"
+      }
+    },
+    {
+      "id": "evt-005",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+4",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#track-audio-1",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "file",
+        "name": "track_audio_1",
+        "id": "track-audio-1",
+        "label": "Audio file",
+        "isFileInput": true,
+        "required": true,
+        "accept": "audio/*",
+        "selectorCandidates": [
+          {
+            "selector": "#track-audio-1",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"track_audio_1\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Audio file\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "initial_scan"
+      }
+    },
+    {
+      "id": "evt-006",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+5",
+      "type": "repeat_group_candidate_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#btn-to-tracks",
+      "confidence": 0.8,
+      "rawEvidence": {
+        "label": "Next: add tracks →",
+        "matchedKeyword": "add",
+        "selectorCandidates": [
+          {
+            "selector": "#btn-to-tracks",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "button:has-text(\"Next: add tracks →\")",
+            "kind": "text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "button:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "button",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "initial_scan"
+      }
+    },
+    {
+      "id": "evt-007",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+6",
+      "type": "repeat_group_candidate_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#btn-add-track",
+      "confidence": 0.8,
+      "rawEvidence": {
+        "label": "+ Add another track",
+        "matchedKeyword": "Add another",
+        "selectorCandidates": [
+          {
+            "selector": "#btn-add-track",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "button:has-text(\"+ Add another track\")",
+            "kind": "text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "button:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "button",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "initial_scan"
+      }
+    },
+    {
+      "id": "evt-008",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+7",
+      "type": "dangerous_action_candidate_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#btn-to-review",
+      "confidence": 0.85,
+      "rawEvidence": {
+        "label": "Review release →",
+        "matchedKeyword": "release",
+        "selectorCandidates": [
+          {
+            "selector": "#btn-to-review",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "button:has-text(\"Review release →\")",
+            "kind": "text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "button:nth-of-type(2)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "button",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "initial_scan"
+      }
+    },
+    {
+      "id": "evt-009",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+8",
+      "type": "dangerous_action_candidate_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#btn-publish-release",
+      "confidence": 0.85,
+      "rawEvidence": {
+        "label": "Submit & Publish Release",
+        "matchedKeyword": "Submit",
+        "selectorCandidates": [
+          {
+            "selector": "#btn-publish-release",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "button:has-text(\"Submit & Publish Release\")",
+            "kind": "text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "button:nth-of-type(2)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "button",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "initial_scan"
+      }
+    },
+    {
+      "id": "evt-010",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+9",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#release-title",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "text",
+        "name": "release_title",
+        "id": "release-title",
+        "label": "Release title*",
+        "value": "Tiny Robot Parade EP",
+        "required": true,
+        "selectorCandidates": [
+          {
+            "selector": "#release-title",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"release_title\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Release title*\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-011",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+10",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#release-title",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "text",
+        "name": "release_title",
+        "id": "release-title",
+        "label": "Release title*",
+        "value": "Tiny Robot Parade EP",
+        "required": true,
+        "selectorCandidates": [
+          {
+            "selector": "#release-title",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"release_title\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Release title*\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-012",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+11",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#primary-artist",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "text",
+        "name": "primary_artist",
+        "id": "primary-artist",
+        "label": "Primary artist*",
+        "value": "The Tiny Robots",
+        "required": true,
+        "selectorCandidates": [
+          {
+            "selector": "#primary-artist",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"primary_artist\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Primary artist*\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-013",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+12",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#primary-artist",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "text",
+        "name": "primary_artist",
+        "id": "primary-artist",
+        "label": "Primary artist*",
+        "value": "The Tiny Robots",
+        "required": true,
+        "selectorCandidates": [
+          {
+            "selector": "#primary-artist",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"primary_artist\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Primary artist*\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-014",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+13",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#release-date",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "text",
+        "name": "release_date",
+        "id": "release-date",
+        "label": "Release date*",
+        "value": "2026-06-01",
+        "required": true,
+        "selectorCandidates": [
+          {
+            "selector": "#release-date",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"release_date\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Release date*\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-015",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+14",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#genre",
+      "rawEvidence": {
+        "tag": "select",
+        "inputType": "select-one",
+        "name": "genre",
+        "id": "genre",
+        "label": "Genre",
+        "value": "electronic",
+        "required": false,
+        "selectorCandidates": [
+          {
+            "selector": "#genre",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "select[name=\"genre\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Genre\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "select:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "select",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-016",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+15",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#genre",
+      "rawEvidence": {
+        "tag": "select",
+        "inputType": "select-one",
+        "name": "genre",
+        "id": "genre",
+        "label": "Genre",
+        "value": "electronic",
+        "required": false,
+        "selectorCandidates": [
+          {
+            "selector": "#genre",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "select[name=\"genre\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Genre\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "select:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "select",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-017",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+16",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#release-date",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "text",
+        "name": "release_date",
+        "id": "release-date",
+        "label": "Release date*",
+        "value": "2026-06-01",
+        "required": true,
+        "selectorCandidates": [
+          {
+            "selector": "#release-date",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"release_date\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Release date*\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-018",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+17",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#label-email",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "email",
+        "name": "label_email",
+        "id": "label-email",
+        "label": "Label contact email",
+        "value": "ops@label.example",
+        "required": false,
+        "selectorCandidates": [
+          {
+            "selector": "#label-email",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"label_email\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Label contact email\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-019",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+18",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#cover-art",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "file",
+        "name": "cover_art",
+        "id": "cover-art",
+        "label": "Cover image (JPG / PNG, ≥ 3000×3000)*",
+        "value": "<file: cover.png>",
+        "required": true,
+        "selectorCandidates": [
+          {
+            "selector": "#cover-art",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"cover_art\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Cover image (JPG / PNG, ≥ 3000×3000)*\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-020",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+19",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#label-email",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "email",
+        "name": "label_email",
+        "id": "label-email",
+        "label": "Label contact email",
+        "value": "ops@label.example",
+        "required": false,
+        "selectorCandidates": [
+          {
+            "selector": "#label-email",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"label_email\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Label contact email\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-021",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+20",
+      "type": "action_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#btn-to-tracks",
+      "rawEvidence": {
+        "tag": "button",
+        "label": "Next: add tracks →",
+        "type": "button",
+        "href": null,
+        "selectorCandidates": [
+          {
+            "selector": "#btn-to-tracks",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "button:has-text(\"Next: add tracks →\")",
+            "kind": "text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "button:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "button",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high"
+      }
+    },
+    {
+      "id": "evt-022",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+21",
+      "type": "repeat_group_candidate_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#btn-to-tracks",
+      "confidence": 0.8,
+      "rawEvidence": {
+        "label": "Next: add tracks →",
+        "matchedKeyword": "add",
+        "selectorCandidates": [
+          {
+            "selector": "#btn-to-tracks",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "button:has-text(\"Next: add tracks →\")",
+            "kind": "text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "button:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "button",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high"
+      }
+    },
+    {
+      "id": "evt-023",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+22",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#track-title-1",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "text",
+        "name": "track_title_1",
+        "id": "track-title-1",
+        "label": "Track 1 title",
+        "value": "Spin Up Spin Down",
+        "required": true,
+        "selectorCandidates": [
+          {
+            "selector": "#track-title-1",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"track_title_1\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Track 1 title\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-024",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+23",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#track-title-1",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "text",
+        "name": "track_title_1",
+        "id": "track-title-1",
+        "label": "Track 1 title",
+        "value": "Spin Up Spin Down",
+        "required": true,
+        "selectorCandidates": [
+          {
+            "selector": "#track-title-1",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"track_title_1\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Track 1 title\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-025",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+24",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#track-isrc-1",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "text",
+        "name": "track_isrc_1",
+        "id": "track-isrc-1",
+        "label": "ISRC",
+        "value": "US-XYZ-26-00001",
+        "required": false,
+        "selectorCandidates": [
+          {
+            "selector": "#track-isrc-1",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"track_isrc_1\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"ISRC\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-026",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+25",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#track-audio-1",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "file",
+        "name": "track_audio_1",
+        "id": "track-audio-1",
+        "label": "Audio file",
+        "value": "<file: track.wav>",
+        "required": true,
+        "selectorCandidates": [
+          {
+            "selector": "#track-audio-1",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"track_audio_1\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Audio file\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-027",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+26",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#track-isrc-1",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "text",
+        "name": "track_isrc_1",
+        "id": "track-isrc-1",
+        "label": "ISRC",
+        "value": "US-XYZ-26-00001",
+        "required": false,
+        "selectorCandidates": [
+          {
+            "selector": "#track-isrc-1",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"track_isrc_1\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"ISRC\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-028",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+27",
+      "type": "action_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#btn-add-track",
+      "rawEvidence": {
+        "tag": "button",
+        "label": "+ Add another track",
+        "type": "button",
+        "href": null,
+        "selectorCandidates": [
+          {
+            "selector": "#btn-add-track",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "button:has-text(\"+ Add another track\")",
+            "kind": "text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "button:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "button",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high"
+      }
+    },
+    {
+      "id": "evt-029",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+28",
+      "type": "repeat_group_candidate_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#btn-add-track",
+      "confidence": 0.8,
+      "rawEvidence": {
+        "label": "+ Add another track",
+        "matchedKeyword": "Add another",
+        "selectorCandidates": [
+          {
+            "selector": "#btn-add-track",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "button:has-text(\"+ Add another track\")",
+            "kind": "text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "button:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "button",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high"
+      }
+    },
+    {
+      "id": "evt-030",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+29",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#track-title-2",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "text",
+        "name": "track_title_2",
+        "id": "track-title-2",
+        "label": "Track 2 title",
+        "value": "Bolts and Lullabies",
+        "required": false,
+        "selectorCandidates": [
+          {
+            "selector": "#track-title-2",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"track_title_2\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Track 2 title\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-031",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+30",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#track-title-2",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "text",
+        "name": "track_title_2",
+        "id": "track-title-2",
+        "label": "Track 2 title",
+        "value": "Bolts and Lullabies",
+        "required": false,
+        "selectorCandidates": [
+          {
+            "selector": "#track-title-2",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"track_title_2\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Track 2 title\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-032",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+31",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#track-isrc-2",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "text",
+        "name": "track_isrc_2",
+        "id": "track-isrc-2",
+        "label": "ISRC",
+        "value": "US-XYZ-26-00002",
+        "required": false,
+        "selectorCandidates": [
+          {
+            "selector": "#track-isrc-2",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"track_isrc_2\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"ISRC\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-033",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+32",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#track-audio-2",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "file",
+        "name": "track_audio_2",
+        "id": "track-audio-2",
+        "label": "Audio file",
+        "value": "<file: track.wav>",
+        "required": false,
+        "selectorCandidates": [
+          {
+            "selector": "#track-audio-2",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"track_audio_2\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"Audio file\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-034",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+33",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#track-isrc-2",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "text",
+        "name": "track_isrc_2",
+        "id": "track-isrc-2",
+        "label": "ISRC",
+        "value": "US-XYZ-26-00002",
+        "required": false,
+        "selectorCandidates": [
+          {
+            "selector": "#track-isrc-2",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"track_isrc_2\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "label:has-text(\"ISRC\")",
+            "kind": "label-text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-035",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+34",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#chk-rights",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "checkbox",
+        "name": "confirm_rights",
+        "id": "chk-rights",
+        "label": "confirm_rights",
+        "value": true,
+        "required": true,
+        "selectorCandidates": [
+          {
+            "selector": "#chk-rights",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"confirm_rights\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-036",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+35",
+      "type": "field_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#chk-terms",
+      "rawEvidence": {
+        "tag": "input",
+        "inputType": "checkbox",
+        "name": "confirm_terms",
+        "id": "chk-terms",
+        "label": "confirm_terms",
+        "value": true,
+        "required": true,
+        "selectorCandidates": [
+          {
+            "selector": "#chk-terms",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "input[name=\"confirm_terms\"]",
+            "kind": "name",
+            "confidence": "medium"
+          },
+          {
+            "selector": "input:nth-of-type(1)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "input",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high",
+        "eventTrigger": "user_interaction"
+      }
+    },
+    {
+      "id": "evt-037",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+36",
+      "type": "action_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#btn-to-review",
+      "rawEvidence": {
+        "tag": "button",
+        "label": "Review release →",
+        "type": "button",
+        "href": null,
+        "selectorCandidates": [
+          {
+            "selector": "#btn-to-review",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "button:has-text(\"Review release →\")",
+            "kind": "text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "button:nth-of-type(2)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "button",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high"
+      }
+    },
+    {
+      "id": "evt-038",
+      "sessionId": "session-realistic-upload",
+      "timestamp": "+37",
+      "type": "dangerous_action_candidate_detected",
+      "source": "playwrightRecorder",
+      "pageUrl": "/fixtures/observation-realistic-upload/release.html",
+      "pageTitle": "Release Upload — realistic fixture",
+      "selector": "#btn-to-review",
+      "confidence": 0.85,
+      "rawEvidence": {
+        "label": "Review release →",
+        "matchedKeyword": "release",
+        "selectorCandidates": [
+          {
+            "selector": "#btn-to-review",
+            "kind": "id",
+            "confidence": "high"
+          },
+          {
+            "selector": "button:has-text(\"Review release →\")",
+            "kind": "text",
+            "confidence": "medium"
+          },
+          {
+            "selector": "button:nth-of-type(2)",
+            "kind": "nth-of-type",
+            "confidence": "low"
+          },
+          {
+            "selector": "button",
+            "kind": "tag",
+            "confidence": "low"
+          }
+        ],
+        "selectorConfidence": "high"
+      }
+    }
+  ]
+}

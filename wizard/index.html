@@ -763,6 +763,201 @@ body {
 .stage-fb-area textarea:focus { outline: none; border-color: var(--accent); }
 .stage-fb-hint { font-size: .76rem; color: var(--muted); margin-bottom: 6px; line-height: 1.5; }
 .stage-fb-result { font-size: .8rem; font-weight: 700; color: var(--green); padding: 5px 0; display: none; }
+
+/* ── Mode selection landing ── */
+.mode-select-screen {
+  display: flex; flex-direction: column;
+  padding: 60px 48px 100px;
+  max-width: 680px;
+  animation: fadeIn .22s ease;
+}
+.mode-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 32px; }
+.mode-card {
+  background: var(--card); border: 2.5px solid var(--border); border-radius: 20px;
+  padding: 28px 24px; cursor: pointer; transition: all .22s;
+  display: flex; flex-direction: column; gap: 10px;
+  text-align: left; font-family: inherit;
+}
+.mode-card:hover { border-color: var(--teal); box-shadow: 0 6px 24px color-mix(in srgb, var(--teal) 18%, transparent); transform: translateY(-2px); }
+.mode-card.atlas:hover { border-color: var(--purple); box-shadow: 0 6px 24px color-mix(in srgb, var(--purple) 18%, transparent); }
+.mode-card-icon { font-size: 2rem; }
+.mode-card-title { font-size: 1.15rem; font-weight: 900; color: var(--dark); }
+.mode-card-desc  { font-size: .87rem; color: var(--muted); line-height: 1.6; }
+.mode-card-tag {
+  display: inline-block; margin-top: 6px; padding: 4px 12px; border-radius: 100px;
+  font-size: .73rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+  background: color-mix(in srgb, var(--teal) 12%, transparent); color: var(--teal); width: fit-content;
+}
+.mode-card.atlas .mode-card-tag { background: color-mix(in srgb, var(--purple) 12%, transparent); color: var(--purple); }
+
+/* ── Capture step tabs ── */
+.capture-tabs { display: flex; gap: 6px; margin-bottom: 28px; }
+.capture-tab {
+  padding: 9px 20px; border-radius: 100px; font-size: .87rem; font-weight: 800;
+  border: 2px solid var(--border); background: transparent; color: var(--muted);
+  cursor: pointer; transition: all .18s; font-family: inherit;
+}
+.capture-tab.active { border-color: var(--purple); background: color-mix(in srgb, var(--purple) 12%, transparent); color: var(--purple); }
+.capture-panel { display: none; }
+.capture-panel.active { display: block; }
+
+/* ── Atlas guide box ── */
+.atlas-guide {
+  background: color-mix(in srgb, var(--purple) 6%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--purple) 20%, transparent);
+  border-radius: 14px; padding: 18px 20px; margin-bottom: 22px;
+}
+.atlas-guide-title { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--purple); margin-bottom: 12px; }
+.atlas-guide-steps { display: flex; flex-direction: column; gap: 8px; }
+.atlas-guide-step { display: flex; gap: 10px; align-items: flex-start; font-size: .88rem; line-height: 1.5; color: var(--dark); }
+.atlas-guide-num {
+  width: 22px; height: 22px; border-radius: 50%; background: var(--purple); color: white;
+  font-size: .7rem; font-weight: 800; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 1px;
+}
+
+/* ── Capture checklist ── */
+.capture-checklist {
+  background: var(--card); border: 1.5px solid var(--border); border-radius: 14px;
+  padding: 16px 20px; margin-bottom: 20px;
+}
+.capture-checklist-title { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 10px; }
+.capture-checklist-items { display: flex; flex-direction: column; gap: 5px; }
+.capture-checklist-item { font-size: .85rem; color: var(--muted); display: flex; gap: 8px; line-height: 1.45; }
+.capture-checklist-item::before { content: '·'; color: var(--purple); font-weight: 900; flex-shrink: 0; }
+
+/* ── Observation session UI ── */
+.obs-session-card {
+  background: var(--card); border: 2px solid var(--border);
+  border-radius: 20px; padding: 28px; margin-bottom: 20px;
+}
+.session-hero { display: flex; align-items: flex-start; gap: 18px; margin-bottom: 24px; }
+.session-hero-icon {
+  width: 56px; height: 56px; border-radius: 16px;
+  background: color-mix(in srgb, var(--purple) 12%, transparent);
+  color: var(--purple); font-size: 1.8rem;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.session-hero-content strong { display: block; font-size: 1.05rem; font-weight: 800; margin-bottom: 5px; }
+.session-hero-content span { font-size: .88rem; color: var(--muted); line-height: 1.55; }
+.session-instructions {
+  background: color-mix(in srgb, var(--purple) 6%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--purple) 18%, transparent);
+  border-radius: 13px; padding: 14px 18px; margin-top: 20px;
+}
+.session-instructions-title { font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--purple); margin-bottom: 10px; }
+.session-instructions ul { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+.session-instructions li { font-size: .87rem; color: var(--dark); line-height: 1.5; display: flex; gap: 8px; }
+.session-instructions li::before { content: '→'; color: var(--purple); font-weight: 800; flex-shrink: 0; }
+.session-connecting { text-align: center; padding: 36px; font-size: 1rem; font-weight: 700; color: var(--purple); }
+.session-spinner { display: inline-block; animation: obs-spin 1s linear infinite; font-size: 1.4rem; margin-right: 8px; }
+@keyframes obs-spin { to { transform: rotate(360deg); } }
+.session-status-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.session-recording-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 14px; border-radius: 100px;
+  background: color-mix(in srgb, var(--coral) 12%, transparent);
+  color: var(--coral); font-size: .8rem; font-weight: 800; letter-spacing: .04em;
+  animation: rec-pulse 1.6s ease-in-out infinite;
+}
+.session-recording-badge.paused {
+  background: color-mix(in srgb, var(--yellow) 14%, transparent);
+  color: var(--orange); animation: none;
+}
+@keyframes rec-pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+.session-timer { font-size: .88rem; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; }
+.capture-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 22px; }
+.capture-stat {
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 12px; padding: 12px 14px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.capture-stat span { font-size: 1.6rem; font-weight: 900; color: var(--purple); line-height: 1; }
+.capture-stat label { font-size: .7rem; font-weight: 700; color: var(--muted); text-align: center; text-transform: uppercase; letter-spacing: .04em; }
+.capture-stat.danger span { color: var(--coral); }
+.capture-stat.warning span { color: var(--orange); }
+.session-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.btn-session-primary {
+  display: block; width: 100%;
+  padding: 18px; border-radius: 16px; border: none;
+  background: var(--purple); color: white;
+  font-size: 1.1rem; font-weight: 900;
+  cursor: pointer; transition: all .22s; font-family: inherit;
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--purple) 38%, transparent);
+}
+.btn-session-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 32px color-mix(in srgb, var(--purple) 48%, transparent); }
+.btn-session-secondary {
+  padding: 10px 16px; border-radius: 11px;
+  border: 2px solid var(--border); background: transparent;
+  color: var(--dark); font-size: .87rem; font-weight: 800;
+  cursor: pointer; transition: all .18s; font-family: inherit;
+}
+.btn-session-secondary:hover { border-color: var(--purple); color: var(--purple); }
+.btn-session-secondary.btn-danger:hover { border-color: var(--coral); color: var(--coral); }
+.btn-session-finish {
+  display: block; width: 100%;
+  padding: 16px; border-radius: 14px; border: none;
+  background: var(--green); color: white;
+  font-size: 1rem; font-weight: 900;
+  cursor: pointer; transition: all .18s; font-family: inherit;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--green) 32%, transparent); margin-top: 8px;
+}
+.btn-session-finish:hover { transform: translateY(-1px); }
+.obs-note-panel {
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 13px; padding: 14px 16px; margin-bottom: 16px;
+}
+.obs-note-panel textarea {
+  width: 100%; border: 1.5px solid var(--border); border-radius: 10px;
+  padding: 10px 13px; font-size: .9rem; font-family: inherit;
+  color: var(--dark); background: var(--card); resize: vertical; min-height: 80px; margin-bottom: 10px;
+}
+.obs-note-panel textarea:focus { outline: none; border-color: var(--purple); }
+.obs-note-panel-actions { display: flex; gap: 8px; }
+.obs-annotation-item {
+  background: color-mix(in srgb, var(--purple) 6%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--purple) 16%, transparent);
+  border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;
+  font-size: .85rem; color: var(--dark); line-height: 1.5;
+}
+.obs-annotation-item.danger { background: color-mix(in srgb,var(--coral) 6%,transparent); border-color: color-mix(in srgb,var(--coral) 18%,transparent); }
+.obs-annotation-item.repeat { background: color-mix(in srgb,var(--teal) 6%,transparent); border-color: color-mix(in srgb,var(--teal) 18%,transparent); }
+.obs-annotation-tag { font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--purple); margin-bottom: 3px; display: block; }
+.obs-annotation-item.danger .obs-annotation-tag { color: var(--coral); }
+.obs-annotation-item.repeat  .obs-annotation-tag { color: var(--teal); }
+.session-finished-summary { display: flex; align-items: flex-start; gap: 18px; margin-bottom: 24px; }
+.session-finished-icon {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: color-mix(in srgb, var(--green) 14%, transparent);
+  color: var(--green); font-size: 1.4rem;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.session-finished-summary strong { display: block; font-size: 1rem; font-weight: 800; margin-bottom: 4px; }
+.session-finished-summary span { font-size: .87rem; color: var(--muted); }
+.obs-advanced-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 100px;
+  border: 1.5px solid var(--border); background: transparent;
+  color: var(--muted); font-size: .82rem; font-weight: 700;
+  cursor: pointer; transition: all .18s; font-family: inherit; margin-top: 20px;
+}
+.obs-advanced-toggle:hover { border-color: var(--purple); color: var(--purple); }
+.obs-source-section { margin-bottom: 24px; }
+.obs-source-section-label { font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 12px; }
+.obs-source-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+.obs-source-card { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--border); background: transparent; cursor: pointer; font-family: inherit; text-align: left; transition: all .18s; }
+.obs-source-card:hover:not(:disabled) { border-color: var(--purple); }
+.obs-source-card.selected { border-color: var(--purple); background: color-mix(in srgb, var(--purple) 8%, transparent); }
+.obs-source-card:disabled { opacity: .5; cursor: not-allowed; }
+.obs-source-card-name { font-size: .88rem; font-weight: 800; color: var(--dark); }
+.obs-source-card-desc { font-size: .78rem; color: var(--muted); line-height: 1.4; }
+.obs-source-card-status { font-size: .7rem; font-weight: 700; margin-top: 2px; }
+.obs-source-card.selected .obs-source-card-status { color: var(--purple); }
+.obs-source-card-status.unavailable { color: var(--muted); }
+.obs-source-card-status.demo { color: var(--orange); }
+.obs-source-status-text { font-size: .82rem; color: var(--muted); margin-bottom: 16px; font-style: italic; }
+.obs-source-badge { font-size: .7rem; font-weight: 700; padding: 3px 9px; border-radius: 6px; background: color-mix(in srgb, var(--orange) 12%, transparent); color: var(--orange); }
+.obs-source-badge.real { background: color-mix(in srgb, var(--teal) 12%, transparent); color: var(--teal); }
 </style>
 </head>
 <body>
@@ -773,6 +968,9 @@ body {
     <img src="data:image/png;base64,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" alt="Browsy">
   </div>
   <div class="sidebar-steps" id="sidebar-steps"></div>
+  <button id="obs-import-nav-btn" onclick="jumpToAtlasCapture()" style="margin-top:12px;width:100%;padding:10px 14px;border-radius:12px;border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:white;font-size:.82rem;font-weight:800;cursor:pointer;font-family:inherit;transition:all .2s;text-align:left;display:flex;align-items:center;gap:8px">
+    <span style="font-size:1rem">◉</span> Browser Observation
+  </button>
   <div class="sidebar-brand">Browsy</div>
 </aside>
 
@@ -780,8 +978,29 @@ body {
 <div class="main">
 <div class="steps-wrap">
 
+  <!-- Mode selection landing -->
+  <div class="mode-select-screen" id="mode-select-screen">
+    <div class="step-badge" style="background:color-mix(in srgb,var(--teal) 14%,transparent);color:var(--teal)">Choose your path</div>
+    <h1 class="step-title">How do you want to build?</h1>
+    <p class="step-hint">Browsy has two ways to create a workflow. Pick the one that fits what you're doing today.</p>
+    <div class="mode-cards">
+      <button class="mode-card" onclick="setWizardMode('manual')">
+        <div class="mode-card-icon">📋</div>
+        <div class="mode-card-title">Manual wizard</div>
+        <div class="mode-card-desc">You already know the workflow structure. Fill out the step-by-step form to describe fields, variables, safety rules, and outputs.</div>
+        <div class="mode-card-tag">Form answers</div>
+      </button>
+      <button class="mode-card atlas" onclick="setWizardMode('atlas')">
+        <div class="mode-card-icon">◉</div>
+        <div class="mode-card-title">Browser Observation</div>
+        <div class="mode-card-desc">Walk through a real website while Browsy captures fields, actions, and structure. Choose your capture method — Chrome Extension, Playwright Recorder, or manual notes.</div>
+        <div class="mode-card-tag">Structured observation</div>
+      </button>
+    </div>
+  </div>
+
   <!-- Step 1: Mission -->
-  <div class="step active" data-step="1">
+  <div class="step" data-step="1">
     <div class="step-badge">Step 1 of 10 · Mission</div>
     <h1 class="step-title">What are you automating?</h1>
     <p class="step-hint">Give this workflow a short name and describe what it should accomplish in plain English.</p>
@@ -834,30 +1053,212 @@ body {
     <button class="btn-add" onclick="addDataSource()">+ Add data source</button>
   </div>
 
-  <!-- Step 4: Walkthrough -->
+  <!-- Step 4: Capture -->
   <div class="step" data-step="4">
-    <div class="step-badge">Step 4 of 10 · Walkthrough</div>
-    <h1 class="step-title">Walk me through it</h1>
-    <p class="step-hint">Hit record, switch to the site, and narrate as you go. Explain <em>why</em> you make each choice — not just what you click. Save each page as a step.</p>
+    <div class="step-badge">Step 4 of 10 · Capture</div>
+    <h1 class="step-title">Browser Observation</h1>
+    <p class="step-hint">Walk through a real website while Browsy records fields, actions, and structure. Choose a capture method, then navigate and annotate.</p>
 
-    <div id="no-speech-note" class="no-speech-note" style="display:none">⚠️ Voice not available here. Use Chrome for dictation, or type directly.</div>
-
-    <div class="recorder-card">
-      <div class="recorder-top">
-        <button class="btn-mic" id="btn-mic" onclick="toggleMic()">🎤</button>
-        <div class="recorder-status">
-          <strong id="mic-status">Ready to record</strong>
-          <span id="mic-hint">Click the mic and start talking</span>
-        </div>
-      </div>
-      <div class="transcript-box" id="live-transcript"><em>Your speech will appear here…</em></div>
-      <div class="recorder-actions">
-        <input type="text" class="step-title-input" id="step-title-input" placeholder="Step name (e.g. 'Fill upload form')">
-        <button class="btn-save-step" id="btn-save-step" onclick="saveStep()" disabled>Save step ↓</button>
-      </div>
+    <div class="capture-tabs">
+      <button class="capture-tab active" id="cap-tab-atlas" onclick="showCaptureTab('atlas')">◉ Browser Observation</button>
+      <button class="capture-tab" id="cap-tab-notes" onclick="showCaptureTab('notes')">📝 Atlas-assisted notes</button>
     </div>
 
-    <div class="steps-list" id="steps-list"></div>
+    <!-- Atlas observation panel (primary) -->
+    <div class="capture-panel active" id="cap-panel-atlas">
+
+      <!-- ── Observation session state machine ── -->
+      <div id="obs-session-ui">
+
+        <!-- State: not-started -->
+        <div id="obs-state-not-started" class="obs-session-card">
+          <div class="obs-source-section">
+            <div class="obs-source-section-label">Choose capture method</div>
+            <div class="obs-source-cards">
+              <button class="obs-source-card" id="obs-source-chrome-extension" onclick="selectObsSource('chromeExtension')" disabled>
+                <div class="obs-source-card-name">Chrome Extension</div>
+                <div class="obs-source-card-desc">Real-time browser capture — recommended</div>
+                <div class="obs-source-card-status unavailable">Not yet available</div>
+              </button>
+              <button class="obs-source-card selected" id="obs-source-playwright" onclick="selectObsSource('playwrightRecorder')">
+                <div class="obs-source-card-name">Playwright Recorder</div>
+                <div class="obs-source-card-desc">Local automation-grade capture — opens a real browser</div>
+                <div class="obs-source-card-status">Default · Real capture</div>
+              </button>
+              <button class="obs-source-card" id="obs-source-mock" onclick="selectObsSource('mock')">
+                <div class="obs-source-card-name">Demo / Mock</div>
+                <div class="obs-source-card-desc">Dev-only simulated session — not real capture</div>
+                <div class="obs-source-card-status demo">Demo mode — no real website is being observed</div>
+              </button>
+            </div>
+            <div id="obs-source-status-text" class="obs-source-status-text">Connected: Playwright Recorder — local automation-grade capture</div>
+          </div>
+          <div class="field" id="obs-start-url-field">
+            <label for="obs-start-url-input">Target URL <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.82rem">(the page you want to observe — required for Playwright)</span></label>
+            <input id="obs-start-url-input" type="text" placeholder="https://example.com/your-form  or  http://localhost:3333/fixtures/observation-test-form/index.html" style="padding:14px 18px;font-size:1rem">
+          </div>
+          <button id="obs-start-btn" class="btn-session-primary" onclick="startObsSession()">▶ Start Browser Observation</button>
+          <div class="session-instructions">
+            <div class="session-instructions-title">What happens during observation</div>
+            <ul>
+              <li>Choose a capture method — Chrome Extension, Playwright Recorder, or manual notes</li>
+              <li>Walk through the real website — Browsy captures pages, fields, and actions</li>
+              <li>Mark repeat sections, dangerous actions, and add semantic notes as you go</li>
+              <li>Finish — Browsy infers the full workflow structure from captured evidence</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- State: connecting -->
+        <div id="obs-state-connecting" class="obs-session-card" style="display:none">
+          <div class="session-connecting">
+            <span class="session-spinner">⟳</span> <span id="obs-connecting-label">Setting up observation session…</span>
+          </div>
+        </div>
+
+        <!-- State: recording / paused -->
+        <div id="obs-state-recording" class="obs-session-card" style="display:none">
+          <div class="session-status-bar">
+            <div id="obs-recording-badge" class="session-recording-badge">● Recording</div>
+            <div id="obs-source-badge" class="obs-source-badge">Demo mode</div>
+            <div id="obs-session-timer" class="session-timer">0:00</div>
+          </div>
+
+          <div class="capture-stats-grid">
+            <div class="capture-stat"><span id="stat-pages">0</span><label>Pages</label></div>
+            <div class="capture-stat"><span id="stat-fields">0</span><label>Fields</label></div>
+            <div class="capture-stat"><span id="stat-buttons">0</span><label>Actions</label></div>
+            <div class="capture-stat"><span id="stat-groups">0</span><label>Repeat groups</label></div>
+            <div class="capture-stat"><span id="stat-outputs">0</span><label>Outputs</label></div>
+            <div class="capture-stat danger"><span id="stat-dangerous">0</span><label>Dangerous</label></div>
+            <div class="capture-stat warning"><span id="stat-checkpoints">0</span><label>Checkpoints</label></div>
+          </div>
+
+          <div class="session-actions">
+            <button id="obs-pause-btn" class="btn-session-secondary" onclick="pauseObsSession()">⏸ Pause</button>
+            <button id="obs-resume-btn" class="btn-session-secondary" style="display:none" onclick="resumeObsSession()">▶ Resume</button>
+            <button id="obs-add-note-btn" class="btn-session-secondary" onclick="showObsNotePanel()">📝 Add note</button>
+            <button id="obs-mark-repeat-btn" class="btn-session-secondary" onclick="markRepeatGroup()">↻ Repeat group</button>
+            <button id="obs-mark-dangerous-btn" class="btn-session-secondary btn-danger" onclick="markDangerous()">⚠ Dangerous</button>
+          </div>
+
+          <div id="obs-note-panel" class="obs-note-panel" style="display:none">
+            <textarea id="obs-note-input" placeholder="Describe what you see — page purpose, why a field matters, edge cases…"></textarea>
+            <div class="obs-note-panel-actions">
+              <button class="btn-session-secondary" onclick="saveObsNote()" style="border-color:var(--purple);color:var(--purple)">Save note</button>
+              <button class="btn-session-secondary" onclick="hideObsNotePanel()">Cancel</button>
+            </div>
+          </div>
+
+          <div id="obs-annotations-list" style="margin-bottom:12px"></div>
+
+          <details id="obs-raw-events-panel" style="margin-bottom:14px;border:1.5px dashed var(--border);border-radius:12px;padding:0 14px">
+            <summary style="cursor:pointer;font-size:.78rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:12px 0;user-select:none">⚙ Debug: raw observation events <span id="obs-raw-events-count" style="color:var(--purple);font-weight:900">(0)</span></summary>
+            <div style="padding-bottom:14px">
+              <div style="display:flex;gap:8px;margin-bottom:10px">
+                <button type="button" id="obs-raw-events-copy" class="btn-session-secondary" onclick="copyObsRawEvents()" style="padding:6px 12px;font-size:.78rem">Copy JSON</button>
+                <button type="button" id="obs-raw-events-download" class="btn-session-secondary" onclick="downloadObsRawEvents()" style="padding:6px 12px;font-size:.78rem">Download JSON</button>
+                <span id="obs-raw-events-status" style="font-size:.78rem;color:var(--muted);align-self:center"></span>
+              </div>
+              <pre id="obs-raw-events-pre" style="margin:0;max-height:240px;overflow:auto;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-family:'SF Mono','Fira Code',monospace;font-size:.74rem;line-height:1.4;white-space:pre-wrap;word-break:break-word">(no events yet)</pre>
+            </div>
+          </details>
+
+          <button id="obs-finish-btn" class="btn-session-finish" onclick="finishObsSession()">✓ Finish Observation</button>
+        </div>
+
+        <!-- State: finished -->
+        <div id="obs-state-finished" class="obs-session-card" style="display:none">
+          <div class="session-finished-summary">
+            <div class="session-finished-icon">✓</div>
+            <div>
+              <strong>Observation complete</strong>
+              <span id="obs-finished-stats">Ready to infer workflow structure.</span>
+            </div>
+          </div>
+          <button id="obs-review-btn" class="btn-session-primary" onclick="reviewObsSession()">✦ Review inferred workflow</button>
+        </div>
+
+      </div><!-- /obs-session-ui -->
+
+      <!-- ── Advanced: import observation JSON ── -->
+      <div style="margin-top:4px">
+        <button class="obs-advanced-toggle" id="obs-advanced-toggle-btn" onclick="toggleObsImport()">⚙ Advanced: import observation JSON</button>
+      </div>
+
+      <div id="obs-import-section" style="display:none;margin-top:20px">
+
+        <div class="field">
+          <label style="display:flex;align-items:center;justify-content:space-between">
+            Observation JSON
+            <button onclick="loadSampleObservation()" id="obs-load-sample" style="font-size:.78rem;padding:5px 12px;border:1.5px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;font-family:inherit;font-weight:700;transition:all .2s" onmouseover="this.style.borderColor='var(--purple)';this.style.color='var(--purple)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">Load sample</button>
+          </label>
+          <textarea id="obs-json-input" rows="10" placeholder='Paste observation JSON here, or click "Load sample" to try the conference proposal example…' style="font-family:'SF Mono','Fira Code',monospace;font-size:.82rem;min-height:200px;resize:vertical"></textarea>
+        </div>
+
+        <div id="obs-error" style="display:none;background:color-mix(in srgb,var(--coral) 10%,transparent);border:1.5px solid var(--coral);border-radius:12px;padding:12px 16px;font-size:.87rem;color:var(--coral);font-weight:700;margin-bottom:16px"></div>
+
+        <div style="display:flex;gap:10px;margin-bottom:24px">
+          <button id="obs-preview-btn" onclick="previewObservation()" style="flex:1;padding:14px 20px;border-radius:14px;border:2px solid var(--purple);background:transparent;color:var(--purple);font-size:.95rem;font-weight:800;cursor:pointer;font-family:inherit;transition:all .2s" onmouseover="this.style.background='var(--purple)';this.style.color='white'" onmouseout="this.style.background='transparent';this.style.color='var(--purple)'">Preview observation</button>
+          <button id="obs-create-btn" onclick="importObservation()" disabled style="flex:2;padding:14px 20px;border-radius:14px;border:none;background:var(--purple);color:white;font-size:.95rem;font-weight:900;cursor:pointer;font-family:inherit;transition:all .2s;opacity:.4;box-shadow:0 6px 24px color-mix(in srgb,var(--purple) 38%,transparent)">✦ Create workflow</button>
+        </div>
+
+        <div id="obs-preview-result" style="display:none">
+          <div id="obs-summary-card" style="background:var(--card);border:2px solid var(--border);border-radius:16px;padding:22px 26px;margin-bottom:16px">
+            <div style="font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--purple);margin-bottom:14px">Inferred structure</div>
+            <div id="obs-summary-body" style="display:flex;flex-direction:column;gap:8px;font-size:.9rem;line-height:1.55"></div>
+          </div>
+          <details style="margin-bottom:8px">
+            <summary style="cursor:pointer;font-size:.82rem;font-weight:800;color:var(--muted);padding:10px 0;user-select:none">workflow.json</summary>
+            <div id="obs-art-workflow" class="preview-box" style="margin-top:8px;max-height:280px"></div>
+          </details>
+          <details style="margin-bottom:8px">
+            <summary style="cursor:pointer;font-size:.82rem;font-weight:800;color:var(--muted);padding:10px 0;user-select:none">workflow-package.example.json</summary>
+            <div id="obs-art-package" class="preview-box" style="margin-top:8px;max-height:280px"></div>
+          </details>
+          <details style="margin-bottom:16px">
+            <summary style="cursor:pointer;font-size:.82rem;font-weight:800;color:var(--muted);padding:10px 0;user-select:none">run-plan.md</summary>
+            <div id="obs-art-runplan" class="preview-box" style="margin-top:8px;max-height:280px"></div>
+          </details>
+        </div>
+
+        <div id="obs-status" style="display:none;border-radius:14px;padding:18px 22px;font-size:.88rem;line-height:1.6"></div>
+
+        <div style="margin-top:28px;border-top:1.5px solid var(--border);padding-top:24px">
+          <div class="field voice-field">
+            <label>Additional notes / narration <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.82rem">(optional — supplements the observation JSON)</span></label>
+            <textarea id="obs-notes" rows="4" placeholder="Any context not captured in the observation JSON — e.g. why certain fields matter, edge cases, non-obvious auth steps…"></textarea>
+            <button class="btn-voice" title="Dictate" onclick="toggleVoice('obs-notes',this)">🎤</button>
+          </div>
+        </div>
+
+      </div><!-- /obs-import-section -->
+
+    </div><!-- /cap-panel-atlas -->
+
+    <!-- Manual notes panel (fallback) -->
+    <div class="capture-panel" id="cap-panel-notes">
+      <p style="font-size:.9rem;color:var(--muted);margin-bottom:20px;line-height:1.6"><strong style="color:var(--orange)">Atlas-assisted notes only</strong> — use this when you're manually reviewing a site with Atlas/ChatGPT and want to annotate your findings. Browsy does not automatically receive Atlas tab data; these are manual notes. Type or dictate what you observe.</p>
+
+      <div id="no-speech-note" class="no-speech-note" style="display:none">⚠️ Voice not available here. Use Chrome for dictation, or type directly.</div>
+
+      <div class="recorder-card">
+        <div class="recorder-top">
+          <button class="btn-mic" id="btn-mic" onclick="toggleMic()">🎤</button>
+          <div class="recorder-status">
+            <strong id="mic-status">Ready to record</strong>
+            <span id="mic-hint">Click the mic and start talking</span>
+          </div>
+        </div>
+        <div class="transcript-box" id="live-transcript"><em>Your speech will appear here…</em></div>
+        <div class="recorder-actions">
+          <input type="text" class="step-title-input" id="step-title-input" placeholder="Step name (e.g. 'Fill upload form')">
+          <button class="btn-save-step" id="btn-save-step" onclick="saveStep()" disabled>Save step ↓</button>
+        </div>
+      </div>
+
+      <div class="steps-list" id="steps-list"></div>
+    </div>
   </div>
 
   <!-- Step 5: Parameters / Runtime Variables -->
@@ -1023,6 +1424,9 @@ body {
     </div>
   </div>
 
+  <!-- ── Observation Import Section ── -->
+  <!-- obs-import-section removed — functionality now lives in step 4 (Atlas observation tab) -->
+
   <!-- Artifact preview modal (outside lifecycle-wrap so it overlays everything) -->
   <div class="artmodal" id="artmodal" onclick="closeArtmodal(event)">
     <div class="artmodal-box" onclick="event.stopPropagation()">
@@ -1052,7 +1456,7 @@ const S = {
   step: 1, totalSteps: 10,
   workflowName: '', goal: '', startUrl: '',
   pages: [], authMode: 'manual-save-state',
-  walkthroughSteps: [], parameters: [],
+  walkthroughSteps: [], obsNotes: '', parameters: [],
   // Runtime variables: input (user-provided), captured (from page), derived (computed)
   runtimeVars: { input: [], captured: [], derived: [] },
   // Data Sources (Step 3)
@@ -1077,7 +1481,7 @@ const S = {
   checkpoints: ['Stop before final release / payment / legal certification'],
 };
 
-const STEP_NAMES  = ['','Mission','Target Pages','Data Sources','Walkthrough','Variables','Run Inputs','Repeat Groups','Data Wiring','Safety','Generate'];
+const STEP_NAMES  = ['','Mission','Target Pages','Data Sources','Capture','Variables','Run Inputs','Repeat Groups','Data Wiring','Safety','Generate'];
 const STEP_COLORS = ['','var(--teal)','var(--orange)','#5b9bd5','var(--purple)','var(--green)','#7b4fc8','var(--yellow)','var(--coral)','#c0392b','var(--navy)'];
 
 // ── Voice (field dictation) ─────────────────────────────────────────────────
@@ -2181,9 +2585,11 @@ function generateMarkdown() {
     checkpoints: S.checkpoints,
   }, null, 2);
 
-  const narration = S.walkthroughSteps.length
+  const walkthroughNarration = S.walkthroughSteps.length
     ? S.walkthroughSteps.map((s,i)=>`**Step ${i+1}: ${s.title}**\n\n> ${s.transcript}`).join('\n\n')
-    : '(No walkthrough recorded yet — run the wizard to add narration.)';
+    : '';
+  const narration = [walkthroughNarration, S.obsNotes].filter(Boolean).join('\n\n')
+    || '(No narration or notes captured.)';
 
   const completionNote = S.completionAction ? `\n**Completion action:** ${S.completionAction}` : '';
 
@@ -2199,7 +2605,7 @@ function generateMarkdown() {
     ? S.checkpoints.map(c=>`- ${c}`).join('\n')
     : '- Stop before final submit.\n- Leave browser open by default.';
 
-  return `# Browsy Automation Request\n\n## 1. Workflow name\n\n\`${id}\`\n\n## 2. Goal\n\n${S.goal||'Describe the goal here.'}\n\n## 3. Target websites / pages\n\n${pagesHeader}\n${pagesRows}\n\n## 4. Existing APIs, files, or local systems\n\n${dsTable}${dsJson}\n\n## 5. Input data contract\n\n\`\`\`json\n${JSON.stringify(contract, null, 2)}\n\`\`\`\n${runtimeVarsSection}${repeatGroupsSection}\n## 6. Desired workflow steps\n\n${steps}\n\n## 7. Fields to fill or upload\n\n| Field / action | Source in input | Website field/page | Scope / rule |\n| --- | --- | --- | --- |\n${fieldsRows}\n\n## 8. Actions that must stay manual\n\n${S.manualActions.map(a=>`- ${a}`).join('\n')}\n\n## 9. Human checkpoints\n\n${checkpointLines}\n\n## 10. Authentication plan\n\n- ${S.authMode}\n\n## 11. Discovery needs\n\n${discoveryUrls}\n\nThe generated harness should produce:\n\n- discovered-fields.json\n- discovered-fields.md\n- screenshots\n- HTML snapshot\n- page text snapshot\n\n## 12. Safety policy\n\n\`\`\`json\n${safetyJson}\n\`\`\`\n\n## 13. Output artifacts expected\n\nEvery run should save:\n\n- run-log.json\n- filled-fields.json\n- skipped-fields.json\n- errors.json\n- runtime-vars.json (when runtime variables are captured)\n- screenshot-start.png\n- screenshot-after-fill.png\n- screenshot-final-review.png if reached\n- page-text-snapshot.txt\n- html-snapshot.html${completionNote}\n\n## 14. Test commands expected\n\n\`\`\`bash\nnpm install\nnpm run smoke\nnpm run auth:save -- --workflow ${id}\nnpm run auth:check -- --workflow ${id} --url ${startUrl}\nnpm run discover -- --workflow ${id} --url ${startUrl}\nnpm run run -- --workflow ${id} --manifest workflows/${id}/manifest.example.json --dry-run\n\`\`\`\n\n## 15. Acceptance criteria\n\n- Auth works or failure path is clearly documented.\n- DOM discovery works.\n- Dry-run fills/uploads safe fields.\n- Dangerous actions are blocked.\n- Browser pauses before manual checkpoint.\n- Logs/screenshots are saved.\n- A coding agent can rerun tests and understand failures.${capturedAC}${repeatGroupAC}\n\n## 16. Narrated walkthrough\n\n${narration}\n`;
+  return `# Browsy Automation Request\n\n## 1. Workflow name\n\n\`${id}\`\n\n## 2. Goal\n\n${S.goal||'Describe the goal here.'}\n\n## 3. Target websites / pages\n\n${pagesHeader}\n${pagesRows}\n\n## 4. Existing APIs, files, or local systems\n\n${dsTable}${dsJson}\n\n## 5. Input data contract\n\n\`\`\`json\n${JSON.stringify(contract, null, 2)}\n\`\`\`\n${runtimeVarsSection}${repeatGroupsSection}\n## 6. Desired workflow steps\n\n${steps}\n\n## 7. Fields to fill or upload\n\n| Field / action | Source in input | Website field/page | Scope / rule |\n| --- | --- | --- | --- |\n${fieldsRows}\n\n## 8. Actions that must stay manual\n\n${S.manualActions.map(a=>`- ${a}`).join('\n')}\n\n## 9. Human checkpoints\n\n${checkpointLines}\n\n## 10. Authentication plan\n\n- ${S.authMode}\n\n## 11. Discovery needs\n\n${discoveryUrls}\n\nThe generated harness should produce:\n\n- discovered-fields.json\n- discovered-fields.md\n- screenshots\n- HTML snapshot\n- page text snapshot\n\n## 12. Safety policy\n\n\`\`\`json\n${safetyJson}\n\`\`\`\n\n## 13. Output artifacts expected\n\nEvery run should save:\n\n- run-log.json\n- filled-fields.json\n- skipped-fields.json\n- errors.json\n- runtime-vars.json (when runtime variables are captured)\n- screenshot-start.png\n- screenshot-after-fill.png\n- screenshot-final-review.png if reached\n- page-text-snapshot.txt\n- html-snapshot.html${completionNote}\n\n## 14. Test commands expected\n\n\`\`\`bash\nnpm install\nnpm run smoke\nnpm run auth:save -- --workflow ${id}\nnpm run auth:check -- --workflow ${id} --url ${startUrl}\nnpm run discover -- --workflow ${id} --url ${startUrl}\nnpm run run -- --workflow ${id} --manifest workflows/${id}/manifest.example.json --dry-run\n\`\`\`\n\n## 15. Acceptance criteria\n\n- Auth works or failure path is clearly documented.\n- DOM discovery works.\n- Dry-run fills/uploads safe fields.\n- Dangerous actions are blocked.\n- Browser pauses before manual checkpoint.\n- Logs/screenshots are saved.\n- A coding agent can rerun tests and understand failures.${capturedAC}${repeatGroupAC}\n\n## 16. Notes & narration\n\n${narration}\n`;
 }
 
 // ── Write ─────────────────────────────────────────────────────────────────────
@@ -2782,10 +3188,17 @@ function syncFromDOM() {
   S.startUrl        = document.getElementById('startUrl').value.trim();
   S.completionAction= document.getElementById('completionAction')?.value.trim() || '';
   S.callbackUrl     = document.getElementById('callbackUrl')?.value.trim() || '';
+  S.obsNotes        = document.getElementById('obs-notes')?.value.trim() || '';
 }
 
 function showStep(n) {
   syncFromDOM();
+  // Hide mode-select-screen, restore nav bar
+  const modeScreen = document.getElementById('mode-select-screen');
+  if (modeScreen) modeScreen.style.display = 'none';
+  const navBar = document.querySelector('.nav-bar');
+  if (navBar) navBar.style.display = '';
+
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   document.querySelector(`.step[data-step="${n}"]`).classList.add('active');
   S.step = n;
@@ -2794,7 +3207,6 @@ function showStep(n) {
   if (n === 6) { renderRunInputs(); updateManifestPreview(); }
   if (n === 10) {
     document.getElementById('preview-box').textContent = generateMarkdown();
-    // Reset to MD tab on entry
     switchPreviewTab('md');
   }
   window.scrollTo(0,0);
@@ -2831,9 +3243,696 @@ function slugify(el) {
   el.value = el.value.toLowerCase().replace(/[^a-z0-9-]/g,'-').replace(/^-+/,'');
 }
 
+// ── Mode selection & capture tabs ─────────────────────────────────────────────
+
+let wizardMode = null; // 'manual' | 'atlas'
+
+function setWizardMode(mode) {
+  wizardMode = mode;
+  const modeScreen = document.getElementById('mode-select-screen');
+  const navBar     = document.querySelector('.nav-bar');
+  if (modeScreen) modeScreen.style.display = 'none';
+
+  if (mode === 'atlas') {
+    // Show only step 4 with atlas tab active, hide nav bar (Create workflow is the exit)
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+    const step4 = document.querySelector('.step[data-step="4"]');
+    if (step4) step4.classList.add('active');
+    if (navBar) navBar.style.display = 'none';
+    showCaptureTab('atlas');
+    renderSidebarSteps();
+    document.getElementById('sidebar').style.setProperty('--accent', 'var(--purple)');
+  } else {
+    // Manual wizard — go to step 1
+    document.getElementById('sidebar').style.removeProperty('--accent');
+    if (navBar) navBar.style.display = '';
+    showStep(1);
+  }
+  window.scrollTo(0, 0);
+}
+
+function showCaptureTab(tab) {
+  document.querySelectorAll('.capture-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.capture-panel').forEach(p => p.classList.remove('active'));
+  const tabEl   = document.getElementById(`cap-tab-${tab}`);
+  const panelEl = document.getElementById(`cap-panel-${tab}`);
+  if (tabEl)   tabEl.classList.add('active');
+  if (panelEl) panelEl.classList.add('active');
+}
+
+function jumpToAtlasCapture() {
+  // Sidebar shortcut — jump to step 4 and open the import section directly
+  const modeScreen = document.getElementById('mode-select-screen');
+  if (modeScreen) modeScreen.style.display = 'none';
+  const navBar = document.querySelector('.nav-bar');
+  if (navBar) navBar.style.display = 'none';
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  const step4 = document.querySelector('.step[data-step="4"]');
+  if (step4) step4.classList.add('active');
+  showCaptureTab('atlas');
+  const importSection = document.getElementById('obs-import-section');
+  if (importSection) importSection.style.display = '';
+  const toggleBtn = document.getElementById('obs-advanced-toggle-btn');
+  if (toggleBtn) toggleBtn.textContent = '⚙ Hide import section';
+  S.step = 4;
+  renderSidebarSteps();
+  window.scrollTo(0, 0);
+}
+
+function showModeSelect() {
+  // Reset obs session
+  clearInterval(obsTimerInterval);
+  clearInterval(obsPollInterval);
+  obsSession = null;
+  obsSource = 'playwrightRecorder';
+  showObsState('not-started');
+  // Reset source selector to default (Playwright Recorder — real capture)
+  document.querySelectorAll('.obs-source-card').forEach(c => c.classList.remove('selected'));
+  const pwCard = document.getElementById('obs-source-playwright');
+  if (pwCard) pwCard.classList.add('selected');
+  const srcStatusEl = document.getElementById('obs-source-status-text');
+  if (srcStatusEl) srcStatusEl.textContent = 'Connected: Playwright Recorder — local automation-grade capture';
+  const importSection = document.getElementById('obs-import-section');
+  if (importSection) importSection.style.display = 'none';
+  const toggleBtn = document.getElementById('obs-advanced-toggle-btn');
+  if (toggleBtn) toggleBtn.textContent = '⚙ Advanced: import observation JSON';
+  const annotList = document.getElementById('obs-annotations-list');
+  if (annotList) annotList.innerHTML = '';
+
+  // Reset import UI
+  const ta = document.getElementById('obs-json-input');
+  if (ta) ta.value = '';
+  const errEl = document.getElementById('obs-error');
+  if (errEl) errEl.style.display = 'none';
+  const result = document.getElementById('obs-preview-result');
+  if (result) result.style.display = 'none';
+  const statusEl = document.getElementById('obs-status');
+  if (statusEl) statusEl.style.display = 'none';
+  const createBtn = document.getElementById('obs-create-btn');
+  if (createBtn) { createBtn.disabled = true; createBtn.textContent = '✦ Create workflow'; createBtn.style.opacity = '.4'; createBtn.style.background = 'var(--purple)'; }
+
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  const navBar = document.querySelector('.nav-bar');
+  if (navBar) navBar.style.display = 'none';
+  const modeScreen = document.getElementById('mode-select-screen');
+  if (modeScreen) modeScreen.style.display = '';
+  document.getElementById('sidebar').style.removeProperty('--accent');
+  document.documentElement.style.setProperty('--accent', 'var(--teal)');
+  document.getElementById('sidebar').style.background = 'var(--teal)';
+  renderSidebarSteps();
+  window.scrollTo(0, 0);
+}
+
+// ── Observation Session State Machine ────────────────────────────────────────
+//
+// Real capture only. Counters and stats are derived from server-side events
+// (Playwright DOM listeners) — no timers or random data ever populate them.
+// Demo / mock is a quarantined developer mode: it does not auto-generate any
+// activity. The user has to manually add annotations to see counts move.
+
+let obsSession = null;
+let obsSource = 'playwrightRecorder'; // default: real Playwright capture
+let obsTimerInterval = null;
+let obsPollInterval = null;
+
+const OBS_SOURCE_LABELS = {
+  chromeExtension: 'Chrome Extension — not yet available. Install the Browsy extension to use this.',
+  playwrightRecorder: 'Connected: Playwright Recorder — local automation-grade capture',
+  mock: 'Demo mode — no real website is being observed',
+  atlasAssistedNotes: 'Atlas-assisted notes — manual annotations only (no automated capture)',
+};
+
+const OBS_SOURCE_BADGES = {
+  chromeExtension: 'Chrome Extension',
+  playwrightRecorder: 'Playwright Recorder',
+  mock: 'Demo mode',
+  atlasAssistedNotes: 'Atlas notes',
+};
+
+function showObsState(state) {
+  for (const s of ['not-started', 'connecting', 'recording', 'finished']) {
+    const el = document.getElementById(`obs-state-${s}`);
+    if (el) el.style.display = (state && s === state) ? '' : 'none';
+  }
+}
+
+function selectObsSource(source) {
+  obsSource = source;
+  const cardIds = { chromeExtension: 'obs-source-chrome-extension', playwrightRecorder: 'obs-source-playwright', mock: 'obs-source-mock' };
+  document.querySelectorAll('.obs-source-card').forEach(c => c.classList.remove('selected'));
+  const card = document.getElementById(cardIds[source]);
+  if (card) card.classList.add('selected');
+  const statusEl = document.getElementById('obs-source-status-text');
+  if (statusEl) statusEl.textContent = OBS_SOURCE_LABELS[source] || source;
+
+  // Start URL is required for Playwright. Show / hide accordingly.
+  const urlField = document.getElementById('obs-start-url-field');
+  if (urlField) urlField.style.display = source === 'playwrightRecorder' ? '' : 'none';
+}
+
+async function startObsSession() {
+  const startUrlInput = document.getElementById('obs-start-url-input');
+  const startUrl = startUrlInput ? startUrlInput.value.trim() : '';
+
+  if (obsSource === 'playwrightRecorder' && !startUrl) {
+    alert('Enter a target URL — Playwright Recorder needs a real page to observe.');
+    if (startUrlInput) startUrlInput.focus();
+    return;
+  }
+
+  const connectingLabels = {
+    chromeExtension: 'Waiting for Chrome Extension…',
+    playwrightRecorder: 'Launching Playwright browser…',
+    mock: 'Starting demo session (no real capture)…',
+    atlasAssistedNotes: 'Setting up notes session…',
+  };
+  const connectingEl = document.getElementById('obs-connecting-label');
+  if (connectingEl) connectingEl.textContent = connectingLabels[obsSource] || 'Setting up observation session…';
+  showObsState('connecting');
+
+  let resp;
+  try {
+    const r = await fetch('/api/observation/session/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: obsSource, startUrl, workflowId: (S.id || '').trim() || null }),
+    });
+    resp = await r.json();
+    if (!r.ok || !resp.ok) throw new Error(resp.error || `Server returned ${r.status}`);
+  } catch (e) {
+    alert('Could not start observation session: ' + e.message);
+    showObsState('not-started');
+    return;
+  }
+
+  obsSession = {
+    id: resp.sessionId,
+    source: resp.source || obsSource,
+    state: resp.status || 'recording',
+    startUrl: resp.startUrl || startUrl,
+    startedAt: Date.now(),
+    finishedAt: null,
+    elapsedSeconds: 0,
+    annotations: [],
+    events: resp.session?.events || [],
+    stats: resp.session?.stats || { pages: 0, fields: 0, buttons: 0, repeatGroups: 0, outputs: 0, dangerous: 0, checkpoints: 0 },
+  };
+
+  showObsState('recording');
+  const pauseBtn = document.getElementById('obs-pause-btn');
+  const resumeBtn = document.getElementById('obs-resume-btn');
+  if (pauseBtn) pauseBtn.style.display = '';
+  if (resumeBtn) resumeBtn.style.display = 'none';
+
+  const sourceBadge = document.getElementById('obs-source-badge');
+  if (sourceBadge) {
+    sourceBadge.textContent = OBS_SOURCE_BADGES[obsSource] || obsSource;
+    sourceBadge.className = 'obs-source-badge' + (obsSource === 'mock' ? '' : ' real');
+  }
+
+  renderObsStatsFromEvents();
+  startObsTimer();
+
+  // Poll real server-captured events. Mock/notes sessions never accumulate
+  // automated events — their counts only move via the manual annotation
+  // buttons (markRepeatGroup, markDangerous, saveObsNote).
+  if (obsSource === 'playwrightRecorder' || obsSource === 'mock' || obsSource === 'atlasAssistedNotes') {
+    pollObsEvents();
+    clearInterval(obsPollInterval);
+    obsPollInterval = setInterval(pollObsEvents, 1500);
+  }
+}
+
+async function pollObsEvents() {
+  if (!obsSession) return;
+  try {
+    const r = await fetch(`/api/observation/session/${encodeURIComponent(obsSession.id)}/events`);
+    if (!r.ok) return;
+    const data = await r.json();
+    obsSession.events = data.events || [];
+    obsSession.stats  = data.stats  || obsSession.stats;
+    if (data.state) obsSession.state = data.state;
+    renderObsStatsFromEvents();
+    if (data.state === 'finished' && obsSession.state !== 'closing') {
+      clearInterval(obsPollInterval);
+    }
+  } catch {}
+}
+
+function startObsTimer() {
+  clearInterval(obsTimerInterval);
+  obsTimerInterval = setInterval(() => {
+    if (!obsSession || obsSession.state !== 'recording') return;
+    obsSession.elapsedSeconds++;
+    const m = Math.floor(obsSession.elapsedSeconds / 60);
+    const s = obsSession.elapsedSeconds % 60;
+    const el = document.getElementById('obs-session-timer');
+    if (el) el.textContent = `${m}:${String(s).padStart(2, '0')}`;
+  }, 1000);
+}
+
+// Mirror of deriveStatsFromEvents from src/core/observation-events.mjs, so the
+// UI can compute stats from any events list (server-pushed or session-local
+// annotations) without leaking timer / random data into counters.
+function deriveStatsFromObsEvents(events) {
+  const st = { pages: 0, fields: 0, buttons: 0, repeatGroups: 0, outputs: 0, dangerous: 0, checkpoints: 0 };
+  for (const ev of (events || [])) {
+    switch (ev.type) {
+      case 'page_snapshot_captured':
+      case 'page_seen': st.pages++; break;
+      case 'field_detected': st.fields++; break;
+      case 'action_detected': st.buttons++; break;
+      case 'repeat_group_candidate_detected':
+      case 'user_marked_repeat_group': st.repeatGroups++; break;
+      case 'output_candidate_detected': st.outputs++; break;
+      case 'dangerous_action_candidate_detected':
+      case 'user_marked_dangerous_action': st.dangerous++; break;
+    }
+  }
+  return st;
+}
+
+function renderObsStatsFromEvents() {
+  if (!obsSession) return;
+  const events = obsSession.events || [];
+  obsSession.stats = deriveStatsFromObsEvents(events);
+  const st = obsSession.stats;
+  const map = { pages: st.pages, fields: st.fields, buttons: st.buttons, groups: st.repeatGroups, outputs: st.outputs, dangerous: st.dangerous, checkpoints: st.checkpoints };
+  for (const [id, val] of Object.entries(map)) {
+    const el = document.getElementById(`stat-${id}`);
+    if (el) el.textContent = val;
+  }
+  renderObsRawEvents();
+}
+
+function renderObsRawEvents() {
+  if (!obsSession) return;
+  const events = obsSession.events || [];
+  const countEl = document.getElementById('obs-raw-events-count');
+  if (countEl) countEl.textContent = `(${events.length})`;
+  const pre = document.getElementById('obs-raw-events-pre');
+  if (!pre) return;
+  // Only repaint the panel if user has expanded it — keeps the DOM cheap.
+  const panel = document.getElementById('obs-raw-events-panel');
+  if (!panel || !panel.open) return;
+  pre.textContent = events.length ? JSON.stringify(events, null, 2) : '(no events yet)';
+}
+
+async function copyObsRawEvents() {
+  const status = document.getElementById('obs-raw-events-status');
+  if (!obsSession || !obsSession.events || !obsSession.events.length) {
+    if (status) status.textContent = 'no events to copy';
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(obsSession.events, null, 2));
+    if (status) { status.textContent = 'copied ✓'; setTimeout(() => { if (status.textContent === 'copied ✓') status.textContent = ''; }, 1800); }
+  } catch (e) {
+    if (status) status.textContent = 'copy failed: ' + e.message;
+  }
+}
+
+function downloadObsRawEvents() {
+  const status = document.getElementById('obs-raw-events-status');
+  if (!obsSession || !obsSession.events || !obsSession.events.length) {
+    if (status) status.textContent = 'no events to download';
+    return;
+  }
+  const blob = new Blob([JSON.stringify(obsSession.events, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `observation-events-${obsSession.id}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  if (status) { status.textContent = 'downloaded ✓'; setTimeout(() => { if (status.textContent === 'downloaded ✓') status.textContent = ''; }, 1800); }
+}
+
+// Kept as an alias so legacy call sites (annotation handlers) still work but
+// always re-derive from events rather than mutating counters directly.
+function updateObsStats() { renderObsStatsFromEvents(); }
+
+function pauseObsSession() {
+  if (!obsSession) return;
+  obsSession.state = 'paused';
+  const badge = document.getElementById('obs-recording-badge');
+  if (badge) { badge.textContent = '⏸ Paused'; badge.classList.add('paused'); }
+  document.getElementById('obs-pause-btn').style.display = 'none';
+  document.getElementById('obs-resume-btn').style.display = '';
+}
+
+function resumeObsSession() {
+  if (!obsSession) return;
+  obsSession.state = 'recording';
+  const badge = document.getElementById('obs-recording-badge');
+  if (badge) { badge.textContent = '● Recording'; badge.classList.remove('paused'); }
+  document.getElementById('obs-pause-btn').style.display = '';
+  document.getElementById('obs-resume-btn').style.display = 'none';
+}
+
+function showObsNotePanel() {
+  const panel = document.getElementById('obs-note-panel');
+  const input = document.getElementById('obs-note-input');
+  if (panel) panel.style.display = '';
+  if (input) { input.value = ''; input.focus(); }
+}
+
+function hideObsNotePanel() {
+  const panel = document.getElementById('obs-note-panel');
+  if (panel) panel.style.display = 'none';
+}
+
+function pushLocalObsEvent(type, userAnnotation) {
+  if (!obsSession) return;
+  const id = `${obsSession.id}-${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  obsSession.events.push({
+    id, sessionId: obsSession.id, timestamp: new Date().toISOString(),
+    type, source: obsSession.source, userAnnotation,
+  });
+  renderObsStatsFromEvents();
+}
+
+function saveObsNote() {
+  const input = document.getElementById('obs-note-input');
+  const text = (input ? input.value : '').trim();
+  if (!text) { hideObsNotePanel(); return; }
+  if (obsSession) obsSession.annotations.push({ type: 'note', text, ts: Date.now() });
+  pushLocalObsEvent('user_note_added', text);
+  renderObsAnnotation({ type: 'note', text });
+  hideObsNotePanel();
+}
+
+function markRepeatGroup() {
+  const text = prompt('Describe this repeat group (e.g. "Add speaker — one per speaker"):');
+  if (!text || !text.trim()) return;
+  if (obsSession) obsSession.annotations.push({ type: 'repeat', text: text.trim(), ts: Date.now() });
+  pushLocalObsEvent('user_marked_repeat_group', text.trim());
+  renderObsAnnotation({ type: 'repeat', text: text.trim() });
+}
+
+function markDangerous() {
+  const text = prompt('Describe this dangerous action (e.g. "Submit proposal — irreversible"):');
+  if (!text || !text.trim()) return;
+  if (obsSession) obsSession.annotations.push({ type: 'dangerous', text: text.trim(), ts: Date.now() });
+  pushLocalObsEvent('user_marked_dangerous_action', text.trim());
+  renderObsAnnotation({ type: 'dangerous', text: text.trim() });
+}
+
+function renderObsAnnotation(ann) {
+  const list = document.getElementById('obs-annotations-list');
+  if (!list) return;
+  const labels = { note: 'Note', repeat: 'Repeat group', dangerous: 'Dangerous action' };
+  const div = document.createElement('div');
+  div.className = `obs-annotation-item${ann.type === 'dangerous' ? ' danger' : ann.type === 'repeat' ? ' repeat' : ''}`;
+  div.innerHTML = `<span class="obs-annotation-tag">${esc(labels[ann.type] || ann.type)}</span>${esc(ann.text)}`;
+  list.appendChild(div);
+}
+
+async function finishObsSession() {
+  if (!obsSession) return;
+  clearInterval(obsTimerInterval);
+  clearInterval(obsPollInterval);
+  obsSession.state = 'closing';
+
+  // Ask the server to stop Playwright cleanly. For mock / notes sessions this
+  // just appends a session_finished event server-side.
+  try {
+    const r = await fetch(`/api/observation/session/${encodeURIComponent(obsSession.id)}/stop`, { method: 'POST' });
+    if (r.ok) {
+      const data = await r.json();
+      obsSession.events = data.events || obsSession.events;
+      obsSession.stats  = data.stats  || obsSession.stats;
+    }
+  } catch {}
+
+  obsSession.state = 'finished';
+  obsSession.finishedAt = Date.now();
+  renderObsStatsFromEvents();
+
+  const st = obsSession.stats;
+  const parts = [];
+  if (st.pages)       parts.push(`${st.pages} page${st.pages !== 1 ? 's' : ''}`);
+  if (st.fields)      parts.push(`${st.fields} field${st.fields !== 1 ? 's' : ''}`);
+  if (st.buttons)     parts.push(`${st.buttons} action${st.buttons !== 1 ? 's' : ''}`);
+  if (st.repeatGroups) parts.push(`${st.repeatGroups} repeat group${st.repeatGroups !== 1 ? 's' : ''}`);
+  if (st.outputs)     parts.push(`${st.outputs} output${st.outputs !== 1 ? 's' : ''}`);
+  if (st.dangerous)   parts.push(`${st.dangerous} dangerous action${st.dangerous !== 1 ? 's' : ''} flagged`);
+  const statsEl = document.getElementById('obs-finished-stats');
+  if (statsEl) statsEl.textContent = parts.length ? parts.join(', ') + ' captured.' : 'Session recorded — ready to infer workflow.';
+
+  showObsState('finished');
+}
+
+function reviewObsSession() {
+  const obs = buildObsFromSession();
+  showObsState(null);
+
+  const importSection = document.getElementById('obs-import-section');
+  const ta = document.getElementById('obs-json-input');
+  const toggleBtn = document.getElementById('obs-advanced-toggle-btn');
+  if (importSection) importSection.style.display = '';
+  if (toggleBtn) toggleBtn.textContent = '⚙ Hide import section';
+  if (ta) ta.value = JSON.stringify(obs, null, 2);
+  previewObservation();
+}
+
+function buildObsFromSession() {
+  const wfId = (S.id && S.id.trim()) ? S.id.trim() : 'observed-workflow';
+  const st   = obsSession ? obsSession.stats : {};
+  const ann  = obsSession ? obsSession.annotations : [];
+  const src  = obsSession ? (obsSession.source || 'mock') : 'mock';
+  const isDemo = src === 'mock';
+
+  const sourceLabels = {
+    mock: 'Demo mode — simulated session, not real capture',
+    chromeExtension: 'Chrome Extension',
+    playwrightRecorder: 'Playwright Recorder — local automation-grade capture',
+    manualImport: 'Manual import',
+    atlasAssistedNotes: 'Atlas-assisted notes — manual annotations only',
+  };
+
+  const events = obsSession ? (obsSession.events || []) : [];
+
+  // Pages — from real page_seen events (and demo placeholders if mock).
+  const pageEvents = events.filter(e => e.type === 'page_seen' || e.type === 'page_snapshot_captured');
+  const seenUrls = new Map();
+  pageEvents.forEach((ev, i) => {
+    const u = ev.pageUrl || `page_${i + 1}`;
+    if (!seenUrls.has(u)) seenUrls.set(u, { name: `page_${seenUrls.size + 1}`, url: u, title: ev.pageTitle || u, fields: [], assets: [], buttons: [] });
+  });
+  const pages = Array.from(seenUrls.values());
+
+  // Fields — dedup by selector/name/id.
+  const fieldEvents = events.filter(e => e.type === 'field_detected');
+  const seenFields = new Map();
+  for (const ev of fieldEvents) {
+    const raw = ev.rawEvidence || {};
+    const key = ev.selector || raw.name || raw.id || raw.label || `f_${seenFields.size + 1}`;
+    if (seenFields.has(key)) continue;
+    const inputType = raw.inputType || 'text';
+    seenFields.set(key, {
+      id: raw.name || raw.id || key.replace(/[^a-z0-9_]/gi, '_').slice(0, 40),
+      label: raw.label || raw.placeholder || raw.name || raw.id || '',
+      inputType,
+      required: !!raw.required,
+      scope: inputType === 'file' ? 'asset' : 'global',
+      selector: ev.selector || null,
+      exampleValue: raw.value || undefined,
+    });
+  }
+  const allFields  = Array.from(seenFields.values());
+  const globalFields = allFields.filter(f => f.scope !== 'asset');
+  const globalAssets = allFields.filter(f => f.scope === 'asset');
+
+  // Repeat groups — from heuristic + manual annotations.
+  const repeatEvents = events.filter(e => e.type === 'repeat_group_candidate_detected' || e.type === 'user_marked_repeat_group');
+  const seenRepeats = new Map();
+  repeatEvents.forEach(ev => {
+    const label = ev.userAnnotation || ev.rawEvidence?.label || 'Repeat group';
+    if (!seenRepeats.has(label)) seenRepeats.set(label, { id: `group_${seenRepeats.size + 1}`, label, itemLabel: 'item', fields: [], assets: [], detectedBy: ev.type });
+  });
+  const repeatGroups = Array.from(seenRepeats.values());
+
+  // Dangerous / manual-only actions.
+  const dangerousEvents = events.filter(e => e.type === 'dangerous_action_candidate_detected' || e.type === 'user_marked_dangerous_action');
+  const seenDangerous = new Map();
+  dangerousEvents.forEach(ev => {
+    const label = ev.userAnnotation || ev.rawEvidence?.label || 'Dangerous action';
+    if (!seenDangerous.has(label)) seenDangerous.set(label, { id: `manual_${seenDangerous.size + 1}`, label, reason: 'flagged as dangerous during observation', detectedBy: ev.type });
+  });
+  const manualOnlyActions = Array.from(seenDangerous.values());
+
+  const noteTexts = events.filter(e => e.type === 'user_note_added').map(e => e.userAnnotation).filter(Boolean);
+
+  return {
+    workflowId: wfId,
+    title: wfId,
+    captureSource: src,
+    captureSourceLabel: sourceLabels[src] || src,
+    sourceUrl: obsSession?.startUrl || (S.pages && S.pages[0] && S.pages[0].url) || '',
+    capturedAt: new Date(obsSession ? obsSession.startedAt : Date.now()).toISOString(),
+    mode: isDemo ? 'demo' : 'session',
+    pages,
+    globalFields,
+    globalAssets,
+    capturedOutputs: [],
+    repeatGroups,
+    humanCheckpoints: [],
+    manualOnlyActions,
+    annotations: noteTexts,
+    sessionStats: deriveStatsFromObsEvents(events),
+    sessionEvents: events,
+  };
+}
+
+function toggleObsImport() {
+  const importSection = document.getElementById('obs-import-section');
+  const btn = document.getElementById('obs-advanced-toggle-btn');
+  if (!importSection) return;
+  const opening = importSection.style.display === 'none';
+  importSection.style.display = opening ? '' : 'none';
+  if (btn) btn.textContent = opening ? '⚙ Hide import section' : '⚙ Advanced: import observation JSON';
+}
+
+// ── Observation Import ────────────────────────────────────────────────────────
+
+async function loadSampleObservation() {
+  const ta  = document.getElementById('obs-json-input');
+  const err = document.getElementById('obs-error');
+  if (err) err.style.display = 'none';
+  try {
+    const res = await fetch('/api/observation/sample');
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const text = await res.text();
+    if (ta) ta.value = JSON.stringify(JSON.parse(text), null, 2);
+  } catch (e) {
+    if (err) { err.style.display = ''; err.textContent = 'Could not load sample: ' + e.message + '. Make sure the wizard server is running (npm run wizard).'; }
+  }
+}
+
+async function previewObservation() {
+  const ta      = document.getElementById('obs-json-input');
+  const errEl   = document.getElementById('obs-error');
+  const result  = document.getElementById('obs-preview-result');
+  const createBtn = document.getElementById('obs-create-btn');
+  if (errEl) errEl.style.display = 'none';
+  if (result) result.style.display = 'none';
+  if (createBtn) { createBtn.disabled = true; createBtn.style.opacity = '.4'; }
+
+  const raw = ta ? ta.value.trim() : '';
+  if (!raw) { if (errEl) { errEl.style.display = ''; errEl.textContent = 'Please paste or load an observation JSON first.'; } return; }
+
+  let parsed;
+  try { parsed = JSON.parse(raw); }
+  catch (e) { if (errEl) { errEl.style.display = ''; errEl.textContent = 'Invalid JSON: ' + e.message; } return; }
+
+  try {
+    const res = await fetch('/api/observation/preview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ observation: parsed }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      if (errEl) { errEl.style.display = ''; errEl.textContent = data.error || 'Preview failed.'; }
+      return;
+    }
+    renderObsPreview(data);
+    if (result) result.style.display = '';
+    if (createBtn) { createBtn.disabled = false; createBtn.style.opacity = '1'; }
+  } catch (e) {
+    if (errEl) { errEl.style.display = ''; errEl.textContent = 'Preview request failed: ' + e.message; }
+  }
+}
+
+function renderObsPreview(data) {
+  const s = data.summary;
+  const body = document.getElementById('obs-summary-body');
+  if (!body) return;
+
+  const row = (label, value, color) => `<div style="display:flex;gap:8px;align-items:flex-start"><span style="font-weight:800;min-width:160px;color:${color||'var(--muted)'};font-size:.82rem;text-transform:uppercase;letter-spacing:.04em">${esc(label)}</span><span style="color:var(--dark)">${esc(String(value))}</span></div>`;
+
+  const lines = [
+    row('Workflow ID',      s.workflowId, 'var(--purple)'),
+    s.title !== s.workflowId ? row('Title', s.title) : '',
+    row('Global fields',   `${s.globalFieldCount}${s.globalFieldCount ? ': ' + s.globalFieldNames.join(', ') : ''}`),
+    row('Global assets',   `${s.globalAssetCount}${s.globalAssetCount ? ': ' + s.globalAssetNames.join(', ') : ''}`),
+    s.sharedDefaultCount ? row('Shared defaults', `${s.sharedDefaultCount}: ${s.sharedDefaultNames.join(', ')}`) : '',
+    row('Repeat groups',   s.repeatGroupCount ? s.repeatGroups.map(g => {
+      const fNames = g.itemFieldNames.length ? `fields: ${g.itemFieldNames.join(', ')}` : '';
+      const aNames = g.itemAssetNames.length ? `assets: ${g.itemAssetNames.join(', ')}` : '';
+      const detail = [fNames, aNames].filter(Boolean).join('; ');
+      return `${g.id} (${g.itemLabel})${detail ? ' — ' + detail : ''}`;
+    }).join('; ') : '0'),
+    row('Captured outputs',`${s.capturedOutputCount}${s.capturedOutputCount ? ': ' + s.capturedOutputNames.join(', ') : ''}`),
+    s.runtimeDerivedCount ? row('Derived vars', `${s.runtimeDerivedCount}: ${s.runtimeDerivedNames.join(', ')}`) : '',
+    row('Checkpoints',     `${s.humanCheckpointCount}${s.humanCheckpointCount ? ': ' + s.humanCheckpointLabels.join('; ') : ''}`),
+    s.manualOnlyCount ? row('Manual-only', `${s.manualOnlyCount}: ${s.manualOnlyLabels.join(', ')}`, 'var(--coral)') : '',
+  ];
+
+  body.innerHTML = lines.filter(Boolean).join('');
+
+  const wfEl  = document.getElementById('obs-art-workflow');
+  const pkgEl = document.getElementById('obs-art-package');
+  const rpEl  = document.getElementById('obs-art-runplan');
+  if (wfEl)  wfEl.textContent  = JSON.stringify(data.artifacts.workflowJson, null, 2);
+  if (pkgEl) pkgEl.textContent = JSON.stringify(data.artifacts.workflowPackageJson, null, 2);
+  if (rpEl)  rpEl.textContent  = data.artifacts.runPlanMd;
+}
+
+async function importObservation() {
+  const ta      = document.getElementById('obs-json-input');
+  const errEl   = document.getElementById('obs-error');
+  const statusEl = document.getElementById('obs-status');
+  const createBtn = document.getElementById('obs-create-btn');
+  if (errEl) errEl.style.display = 'none';
+  if (statusEl) statusEl.style.display = 'none';
+
+  const raw = ta ? ta.value.trim() : '';
+  if (!raw) { if (errEl) { errEl.style.display = ''; errEl.textContent = 'Nothing to import — paste an observation JSON first.'; } return; }
+
+  let parsed;
+  try { parsed = JSON.parse(raw); }
+  catch (e) { if (errEl) { errEl.style.display = ''; errEl.textContent = 'Invalid JSON: ' + e.message; } return; }
+
+  if (createBtn) { createBtn.disabled = true; createBtn.textContent = 'Creating…'; }
+
+  try {
+    const res = await fetch('/api/observation/import', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ observation: parsed }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      if (errEl) { errEl.style.display = ''; errEl.textContent = data.error || 'Import failed.'; }
+      if (createBtn) { createBtn.disabled = false; createBtn.textContent = '✦ Create workflow'; }
+      return;
+    }
+    if (statusEl) {
+      statusEl.style.display = '';
+      statusEl.style.background = 'color-mix(in srgb,var(--green) 12%,transparent)';
+      statusEl.style.border = '1.5px solid var(--green)';
+      statusEl.style.color = 'var(--dark)';
+      statusEl.innerHTML = `<strong style="color:var(--green)">✓ Workflow created: ${esc(data.workflowId)}</strong><br><br>` +
+        `<span style="font-size:.82rem;color:var(--muted)">Files written:</span><br>` +
+        data.files.map(f => `<code style="font-size:.8rem;display:block;padding:2px 0">${esc(f)}</code>`).join('') +
+        `<br><span style="font-size:.85rem;color:var(--muted)">Workflow package is ready. Use the lifecycle panel to run auth, discover fields, and execute your first dry run.</span>` +
+        `<br><br><button onclick="showModeSelect()" style="padding:10px 20px;border-radius:10px;border:2px solid var(--border);background:transparent;color:var(--muted);font-size:.85rem;font-weight:800;cursor:pointer;font-family:inherit">← Start another workflow</button>`;
+    }
+    if (createBtn) { createBtn.disabled = true; createBtn.textContent = '✓ Created'; createBtn.style.background = 'var(--green)'; }
+  } catch (e) {
+    if (errEl) { errEl.style.display = ''; errEl.textContent = 'Import request failed: ' + e.message; }
+    if (createBtn) { createBtn.disabled = false; createBtn.textContent = '✦ Create workflow'; }
+  }
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 function init() {
-  updateNav();
+  // Show mode-select-screen first; hide nav bar until mode chosen
+  const navBar = document.querySelector('.nav-bar');
+  if (navBar) navBar.style.display = 'none';
+
   addPage({ purpose: 'Start page', url: '', requiresLogin: true });
   addParam({ key: 'id', type: 'string', example: 'ITEM_123', description: 'Unique item identifier' });
   renderChips();
@@ -2842,12 +3941,21 @@ function init() {
   renderDataSources();
   renderRunInputs();
   renderRepeatGroups();
+  renderSidebarSteps();
   if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
-    document.getElementById('no-speech-note').style.display = '';
+    const note = document.getElementById('no-speech-note');
+    if (note) note.style.display = '';
   }
 }
 
 init();
+
+// Re-render the raw-events panel when the user expands it, so the JSON is
+// painted exactly when they ask for it (renderObsRawEvents() bails when the
+// panel is closed to keep tick-time cheap).
+document.addEventListener('toggle', e => {
+  if (e.target && e.target.id === 'obs-raw-events-panel') renderObsRawEvents();
+}, true);
 </script>
 </body>
 </html>

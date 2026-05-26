@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Observation Test Form — Page 2</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; }
+    button { padding: .5em 1.2em; font-size: 1em; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Review</h1>
+  <p>This page exists so Playwright can capture a navigation event when the user follows "Next →".</p>
+
+  <form id="confirm-form" action="javascript:void(0);">
+    <p>
+      <label>
+        <input type="checkbox" id="agree" name="agree">
+        I confirm the release details
+      </label>
+    </p>
+    <p>
+      <button type="button" id="btn-confirm">Confirm Release</button>
+    </p>
+  </form>
+
+  <script>
+    document.getElementById('btn-confirm').addEventListener('click', () => {
+      document.body.insertAdjacentHTML('beforeend', '<p id="confirm-status">Confirm clicked.</p>');
+    });
+  </script>
+</body>
+</html>

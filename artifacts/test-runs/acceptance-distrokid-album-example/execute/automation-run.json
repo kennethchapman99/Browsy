@@ -1,7 +1,7 @@
 {
   "ok": true,
   "dryRun": false,
-  "generatedAt": "2026-05-24T13:42:24.503Z",
+  "generatedAt": "2026-05-25T23:55:32.623Z",
   "package": {
     "path": "/Users/kchapman/browsy/examples/workflows/distrokid-album-upload/sample-package.json",
     "workflowId": "distrokid-album-upload",

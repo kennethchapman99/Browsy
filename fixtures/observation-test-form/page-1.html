@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Observation Test Form — Page 1</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #222; }
+    .form-group { margin: 1em 0; }
+    label { display: block; font-weight: 600; margin-bottom: .3em; }
+    input, select, textarea { width: 100%; padding: .5em; font-size: 1em; box-sizing: border-box; }
+    .track-row { padding: .8em; border: 1px solid #ddd; border-radius: 6px; margin-bottom: .6em; }
+    button { padding: .5em 1.2em; font-size: 1em; cursor: pointer; }
+    .btn-add { background: #28a; color: white; border: none; border-radius: 4px; }
+    .btn-submit { background: #c33; color: white; border: none; border-radius: 4px; margin-top: 1em; }
+    .btn-next { background: #2c7; color: white; border: none; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Observation Test Form</h1>
+  <p>Browsy observation acceptance fixture. This page exercises every event type Playwright capture must handle.</p>
+
+  <form id="release-form" action="javascript:void(0);">
+
+    <div class="form-group">
+      <label for="title">Release Title</label>
+      <input type="text" id="title" name="title" placeholder="Enter release title">
+    </div>
+
+    <div class="form-group">
+      <label for="category">Category</label>
+      <select id="category" name="category">
+        <option value="">-- select --</option>
+        <option value="music">Music</option>
+        <option value="podcast">Podcast</option>
+        <option value="audiobook">Audiobook</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>
+        <input type="checkbox" id="notify" name="notify_email">
+        Send me an email when processing is complete
+      </label>
+    </div>
+
+    <div class="form-group">
+      <label for="cover-art">Cover Art</label>
+      <input type="file" id="cover-art" name="cover_art" accept="image/*">
+    </div>
+
+    <h2>Tracks</h2>
+    <div id="tracks">
+      <div class="track-row">
+        <label>Track 1 title</label>
+        <input type="text" name="track_title_1" placeholder="Track title">
+      </div>
+    </div>
+    <button type="button" id="btn-add-track" class="btn-add">+ Add another track</button>
+
+    <div class="form-group" style="margin-top: 1.6em">
+      <a href="page-2.html" id="lnk-next" class="btn-next" style="display:inline-block;padding:.5em 1.2em;text-decoration:none">Next →</a>
+      <button type="submit" id="btn-submit-release" class="btn-submit">Submit Release</button>
+    </div>
+  </form>
+
+  <script>
+    let trackCount = 1;
+    document.getElementById('btn-add-track').addEventListener('click', () => {
+      trackCount += 1;
+      const row = document.createElement('div');
+      row.className = 'track-row';
+      row.innerHTML = '<label>Track ' + trackCount + ' title</label>' +
+        '<input type="text" name="track_title_' + trackCount + '" placeholder="Track title">';
+      document.getElementById('tracks').appendChild(row);
+    });
+
+    document.getElementById('release-form').addEventListener('submit', e => {
+      e.preventDefault();
+    });
+  </script>
+</body>
+</html>

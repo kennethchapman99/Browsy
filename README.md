@@ -153,6 +153,15 @@ npm run wizard
 
 The wizard writes `AUTOMATION_REQUEST.md` and can save a complete automation project draft under `workflows/<workflow-id>/`.
 
+It also hosts the real **browser workflow recorder** (step 4) — context-scoped
+observation that handles multi-tab/popup flows, same-origin iframes, file
+inputs, drag/drop uploads, clipboard paste, contenteditable / rich editors,
+and downloads. The recorder produces a replay-ready package describing
+required assets, produced artifacts, and explicit replay notes for steps
+that cannot be safely automated from observation alone. See
+[docs/workflow-recorder.md](docs/workflow-recorder.md) for details and the
+exact event schema.
+
 ### Validate the request file
 
 ```bash
@@ -212,6 +221,7 @@ npm run smoke
 npm run smoke:browser
 npm run test
 npm run acceptance:project-lifecycle
+npm run acceptance:workflow-recorder
 ```
 
 ---
