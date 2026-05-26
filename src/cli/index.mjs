@@ -22,9 +22,17 @@ const args = parseArgs(argv.slice(command === 'auth' ? 2 : 1));
 // ---------------------------------------------------------------------------
 
 function printHelp() {
-  console.log('Browsy v0.3 — automation harness factory');
+  console.log('Browsy v0.4 — automation registry and runtime');
   console.log('');
-  console.log('Commands:');
+  console.log('Registry commands:');
+  console.log('  browsy apps list                   List registered apps');
+  console.log('  browsy workflows list [--app <id>] List registered workflows');
+  console.log('  browsy workflow run <ref> --payload <path>');
+  console.log('                                     Run workflow (ref: appId.wfId@version)');
+  console.log('  browsy run status <runId>          Show run status');
+  console.log('  browsy run artifacts <runId>       Show run artifacts');
+  console.log('');
+  console.log('Authoring commands:');
   console.log('  browsy validate-request           Validate AUTOMATION_REQUEST.md');
   console.log('  browsy plan [--request FILE]       Generate build plan from request');
   console.log('  browsy init --id <id>              Create workflow scaffold');
@@ -1399,11 +1407,152 @@ async function listWorkflowScaffolds() {
 }
 
 // ---------------------------------------------------------------------------
+// apps list
+// ---------------------------------------------------------------------------
+
+async function appsList() {
+  const { listApps } = await import('../registry/app-registry.mjs');
+  const apps = listApps();
+  if (!apps.length) { console.log('No apps registered. Use POST /api/apps/register to add one.'); return; }
+  console.log(`Apps (${apps.length}):`);
+  for (const a of apps) {
+    console.log(`  ${a.appId}  —  ${a.name}${a.description ? '  ' + a.description : ''}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// workflows list
+// ---------------------------------------------------------------------------
+
+async function workflowsList() {
+  const { listWorkflows } = await import('../registry/workflow-registry.mjs');
+  const appId = args.app || null;
+  const wfs = listWorkflows(appId);
+  if (!wfs.length) { console.log('No workflows registered.'); return; }
+  console.log(`Workflows (${wfs.length}):`);
+  for (const w of wfs) {
+    const latest = w.latestVersion || '—';
+    const versionCount = Object.keys(w.versions || {}).length;
+    console.log(`  ${w.workflowObjectId}  @${latest}  (${versionCount} version${versionCount !== 1 ? 's' : ''})`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// workflow run <ref> --payload <path> [--mode preview|live] [--approval-token <token>]
+// ---------------------------------------------------------------------------
+
+async function registryWorkflowRun() {
+  const ref = argv[2]; // e.g. distrokid.album-upload@1.0.0
+  if (!ref) {
+    console.error('FAIL: workflow ref required, e.g. browsy workflow run appId.wfId@1.0.0 --payload payload.json');
+    process.exit(1);
+  }
+
+  const payloadPath = args.payload;
+  if (!payloadPath) {
+    console.error('FAIL: --payload <path> is required');
+    process.exit(1);
+  }
+  if (!exists(resolve(payloadPath))) {
+    console.error('FAIL: payload file not found: ' + payloadPath);
+    process.exit(1);
+  }
+  let payload;
+  try { payload = readJson(resolve(payloadPath)); } catch (e) {
+    console.error('FAIL: invalid JSON in payload: ' + e.message); process.exit(1);
+  }
+
+  const { parseWorkflowRef, getWorkflowVersion } = await import('../registry/workflow-registry.mjs');
+  const { createRun } = await import('../registry/run-registry.mjs');
+  const { executeRun } = await import('../registry/run-executor.mjs');
+
+  const { workflowObjectId, version } = parseWorkflowRef(ref);
+  const wv = getWorkflowVersion(workflowObjectId, version);
+  if (!wv) {
+    console.error(`FAIL: workflow "${workflowObjectId}" version "${version || 'latest'}" not found`);
+    process.exit(1);
+  }
+
+  const mode = args.mode || 'preview';
+  const approvalToken = args['approval-token'] || null;
+
+  const run = createRun({ workflowObjectId, version: wv.version, mode, payload });
+  console.log(`Run ID: ${run.runId}`);
+  console.log(`Mode:   ${mode}`);
+  console.log(`Ref:    ${workflowObjectId}@${wv.version}`);
+
+  const result = await executeRun({ runId: run.runId, workflowVersion: wv, payload, mode, approvalToken });
+
+  console.log(`processStatus:   ${result.processStatus}`);
+  console.log(`workflowOutcome: ${result.workflowOutcome}`);
+  if (result.validationErrors?.length) {
+    for (const e of result.validationErrors) console.error(`validation: ${e}`);
+  }
+  if (result.artifacts?.length) {
+    console.log(`Artifacts (${result.artifacts.length}):`);
+    for (const a of result.artifacts) console.log(`  ${a.name} → ${a.path}`);
+  }
+
+  const exitCode = result.workflowOutcome === 'success' ? 0
+    : result.processStatus === 'rejected' ? 4
+    : 2;
+  process.exit(exitCode);
+}
+
+// ---------------------------------------------------------------------------
+// run status <runId>
+// ---------------------------------------------------------------------------
+
+async function registryRunStatus() {
+  const runId = argv[2];
+  if (!runId) { console.error('FAIL: runId required'); process.exit(1); }
+  const { getRun } = await import('../registry/run-registry.mjs');
+  const run = getRun(runId);
+  if (!run) { console.error(`FAIL: run "${runId}" not found`); process.exit(1); }
+  console.log(`Run ID:          ${run.runId}`);
+  console.log(`Workflow:        ${run.workflowObjectId}@${run.version}`);
+  console.log(`Mode:            ${run.mode}`);
+  console.log(`processStatus:   ${run.processStatus}`);
+  console.log(`workflowOutcome: ${run.workflowOutcome ?? '—'}`);
+  console.log(`startedAt:       ${run.startedAt}`);
+  if (run.completedAt) console.log(`completedAt:     ${run.completedAt}`);
+  if (run.validationErrors?.length) {
+    console.log('Validation errors:');
+    for (const e of run.validationErrors) console.log(`  ${e}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// run artifacts <runId>
+// ---------------------------------------------------------------------------
+
+async function registryRunArtifacts() {
+  const runId = argv[2];
+  if (!runId) { console.error('FAIL: runId required'); process.exit(1); }
+  const { getRunArtifacts } = await import('../registry/run-registry.mjs');
+  const result = getRunArtifacts(runId);
+  if (!result) { console.error(`FAIL: run "${runId}" not found`); process.exit(1); }
+  if (!result.artifacts.length) { console.log('No artifacts.'); return; }
+  console.log(`Artifacts for ${runId}:`);
+  for (const a of result.artifacts) {
+    console.log(`  [${a.type}] ${a.name}`);
+    console.log(`         ${a.path}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Dispatch
 // ---------------------------------------------------------------------------
 
 try {
   if (!command || command === 'help' || command === '--help') printHelp();
+  // Registry commands
+  else if (command === 'apps' && subcommand === 'list') await appsList();
+  else if (command === 'workflows' && subcommand === 'list') await workflowsList();
+  else if (command === 'workflow' && subcommand === 'run') await registryWorkflowRun();
+  else if (command === 'run' && subcommand === 'status') await registryRunStatus();
+  else if (command === 'run' && subcommand === 'artifacts') await registryRunArtifacts();
+  // Authoring commands
   else if (command === 'validate-request') validateRequest();
   else if (command === 'plan') generatePlan();
   else if (command === 'init') initWorkflow();

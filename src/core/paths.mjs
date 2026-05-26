@@ -8,6 +8,7 @@ export const REPO_ROOT = resolve(__dirname, '../..');
 export const WORKFLOWS_DIR = join(REPO_ROOT, 'workflows');
 export const OUTPUT_DIR = join(REPO_ROOT, 'output');
 export const AUTH_DIR = join(REPO_ROOT, '.auth');
+export const REGISTRY_DIR = join(REPO_ROOT, 'registry');
 
 export function workflowDir(workflow) {
   return join(WORKFLOWS_DIR, workflow);
