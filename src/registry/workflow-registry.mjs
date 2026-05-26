@@ -52,6 +52,8 @@ export function registerWorkflow({
   artifactPolicy = {},
   successAssertions = [],
   failureAssertions = [],
+  packagePath = null,
+  packageWorkflowId = null,
 }) {
   if (!appId || typeof appId !== 'string') throw new Error('appId is required');
   if (!workflowId || typeof workflowId !== 'string') throw new Error('workflowId is required');
@@ -103,6 +105,8 @@ export function registerWorkflow({
     artifactPolicy,
     successAssertions,
     failureAssertions,
+    packagePath: packagePath || null,
+    packageWorkflowId: packageWorkflowId || null,
     registeredAt: record.versions[version]?.registeredAt || now,
     updatedAt: now,
     frozenAt: null,

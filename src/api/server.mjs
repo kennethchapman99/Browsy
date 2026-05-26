@@ -17,6 +17,7 @@
 import http from 'http';
 import { parseArgs } from '../core/args.mjs';
 import { registerApp, getApp, listApps } from '../registry/app-registry.mjs';
+import { importWorkflowPackage, validateWorkflowPackageDir } from '../registry/package-importer.mjs';
 import { registerWorkflow, getWorkflow, listWorkflows, getWorkflowVersion, parseWorkflowRef } from '../registry/workflow-registry.mjs';
 import { createRun, getRun, stopRun, getRunArtifacts, listRuns } from '../registry/run-registry.mjs';
 import { executeRun } from '../registry/run-executor.mjs';
@@ -87,6 +88,27 @@ async function handleRequest(req, res) {
     // GET /api/apps
     if (method === 'GET' && url.startsWith('/api/apps') && !url.includes('/api/apps/')) {
       return ok(res, { apps: listApps() });
+    }
+
+    // POST /api/apps/:appId/workflows/import
+    {
+      const params = matchRoute('/api/apps/:appId/workflows/import', url.split('?')[0]);
+      if (params && method === 'POST') {
+        const body = await parseBody(req);
+        const { packagePath, workflowId, version, autoRegisterApp, appName } = body;
+        if (!packagePath) return badRequest(res, 'packagePath is required');
+        if (!workflowId) return badRequest(res, 'workflowId is required');
+        const result = importWorkflowPackage({
+          packagePath,
+          appId: params.appId,
+          workflowId,
+          version: version || '1.0.0',
+          autoRegisterApp: autoRegisterApp || false,
+          appName: appName || params.appId,
+        });
+        if (!result.ok) return badRequest(res, result.errors.join('; '));
+        return created(res, { imported: result });
+      }
     }
 
     // POST /api/workflows/register
@@ -200,6 +222,7 @@ if (process.argv[1] && new URL(import.meta.url).pathname === new URL('file://' +
     console.log('Routes:');
     console.log('  POST /api/apps/register');
     console.log('  GET  /api/apps');
+    console.log('  POST /api/apps/:appId/workflows/import');
     console.log('  POST /api/workflows/register');
     console.log('  GET  /api/workflows');
     console.log('  GET  /api/workflows/:workflowObjectId');
