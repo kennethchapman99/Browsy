@@ -1,0 +1,179 @@
+{
+  "schemaVersion": "browsy.observation.v1",
+  "workflowId": "conference-proposal-submit",
+  "title": "Conference proposal submission",
+  "goal": "Submit a conference session proposal through an online submission portal with repeated speaker entries, captured proposal ID, public preview URL, and a manual final-submit checkpoint.",
+  "pages": [
+    {
+      "id": "proposalForm",
+      "purpose": "Create proposal",
+      "url": "https://example.invalid/proposals/new",
+      "notes": "Initial proposal form observed in browser."
+    },
+    {
+      "id": "proposalDetail",
+      "purpose": "Proposal detail page after draft saved",
+      "urlTemplate": "https://example.invalid/proposals/{{proposalId}}",
+      "exampleUrl": "https://example.invalid/proposals/PROP_ABC123",
+      "captureAfter": "save-draft",
+      "derivedVarName": "proposalDetailUrl",
+      "notes": "Proposal ID appears in URL after the save-draft action."
+    }
+  ],
+  "fields": [
+    {
+      "id": "eventTitle",
+      "label": "Event title",
+      "type": "text",
+      "scope": "global",
+      "exampleValue": "Example Tech Conference 2026"
+    },
+    {
+      "id": "track",
+      "label": "Track",
+      "type": "select",
+      "scope": "global",
+      "exampleValue": "Engineering"
+    },
+    {
+      "id": "sessionFormat",
+      "label": "Session format",
+      "type": "select",
+      "scope": "global",
+      "exampleValue": "Talk"
+    },
+    {
+      "id": "abstract",
+      "label": "Abstract",
+      "type": "textarea",
+      "scope": "global",
+      "exampleValue": "An example talk about example things."
+    },
+    {
+      "id": "proposalDeck",
+      "label": "Proposal deck",
+      "type": "file",
+      "scope": "asset",
+      "exampleValue": "./proposal-deck.pdf"
+    },
+    {
+      "id": "organization",
+      "label": "Organization",
+      "type": "text",
+      "scope": "default",
+      "exampleValue": "Example Org"
+    },
+    {
+      "id": "country",
+      "label": "Country",
+      "type": "text",
+      "scope": "default",
+      "exampleValue": "US"
+    }
+  ],
+  "repeatGroups": [
+    {
+      "id": "speakers",
+      "label": "Speakers",
+      "itemLabel": "speaker",
+      "source": "manual",
+      "addAction": {
+        "id": "addSpeaker",
+        "label": "Add another speaker",
+        "type": "click",
+        "scope": "repeat-add",
+        "targetRepeatGroup": "speakers",
+        "selectorHint": "[data-browsy-action='add-speaker']"
+      },
+      "itemFields": [
+        { "id": "speakerName",  "label": "Speaker name",  "type": "text",     "exampleValue": "Jane Example" },
+        { "id": "speakerTitle", "label": "Speaker title", "type": "text",     "exampleValue": "Principal Engineer" },
+        { "id": "email",        "label": "Email",         "type": "email",    "exampleValue": "jane@example.invalid" },
+        { "id": "bio",          "label": "Bio",           "type": "textarea", "exampleValue": "An example engineer who builds example things." }
+      ],
+      "itemAssets": [
+        { "id": "headshot", "label": "Headshot", "type": "file", "exampleValue": "./headshot.jpg" },
+        { "id": "bioPdf",   "label": "Bio PDF",  "type": "file", "exampleValue": "./bio.pdf" }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "saveDraft",
+      "label": "Save draft",
+      "type": "click",
+      "selectorHint": "[data-browsy-action='save-draft']",
+      "manualOnly": false
+    },
+    {
+      "id": "addSpeaker",
+      "label": "Add another speaker",
+      "type": "click",
+      "scope": "repeat-add",
+      "targetRepeatGroup": "speakers",
+      "selectorHint": "[data-browsy-action='add-speaker']",
+      "manualOnly": false
+    },
+    {
+      "id": "finalSubmit",
+      "label": "Submit proposal",
+      "type": "click",
+      "selectorHint": "[data-browsy-action='final-submit']",
+      "manualOnly": true,
+      "safetyCategory": "final submission"
+    }
+  ],
+  "capturedOutputs": [
+    {
+      "id": "proposalId",
+      "label": "Proposal ID",
+      "scope": "captured",
+      "source": "current_url",
+      "regex": "/proposals/(PROP_[A-Z0-9_]+)",
+      "required": true,
+      "captureAfter": "save-draft",
+      "example": "PROP_ABC123"
+    },
+    {
+      "id": "publicPreviewUrl",
+      "label": "Public preview URL",
+      "scope": "external_link",
+      "source": "selector_attribute",
+      "selector": "[data-browsy-output='public-preview-url']",
+      "attribute": "href",
+      "required": true,
+      "captureAfter": "draft-saved",
+      "example": "https://example.invalid/preview/proposal-abc"
+    },
+    {
+      "id": "proposalStatus",
+      "label": "Proposal status",
+      "scope": "captured",
+      "source": "selector_text",
+      "selector": "[data-browsy-output='proposal-status']",
+      "required": true,
+      "captureAfter": "draft-saved",
+      "example": "Draft"
+    }
+  ],
+  "runtimeVariables": {
+    "derived": [
+      {
+        "name": "proposalDetailUrl",
+        "template": "https://example.invalid/proposals/{{proposalId}}"
+      }
+    ]
+  },
+  "humanCheckpoints": [
+    {
+      "id": "reviewProposalBeforeFinalSubmit",
+      "label": "Review proposal details before final submit",
+      "beforeAction": "finalSubmit"
+    },
+    {
+      "id": "verifyPublicPreviewUrl",
+      "label": "Verify publicPreviewUrl before downstream sharing"
+    }
+  ],
+  "notes": "Generic conference proposal submission fixture. No vendor-specific site names or product paths."
+}

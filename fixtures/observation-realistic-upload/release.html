@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Release Upload — realistic fixture</title>
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 760px; margin: 32px auto; padding: 0 22px; color: #1a1a1a; background: #fafafa; }
+    h1 { margin: 0 0 6px; font-size: 1.6rem; }
+    p.lead { color: #555; margin: 0 0 28px; }
+    fieldset { border: 1px solid #ddd; border-radius: 10px; padding: 18px 22px; margin: 0 0 22px; background: #fff; }
+    legend { font-weight: 700; padding: 0 8px; }
+    .row { margin: 12px 0; }
+    label { display: block; font-weight: 600; margin-bottom: 4px; font-size: .9rem; }
+    label .req { color: #c33; margin-left: 4px; }
+    input[type=text], input[type=email], input[type=number], input[type=url], select, textarea {
+      width: 100%; padding: 8px 10px; font-size: .95rem; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;
+    }
+    textarea { min-height: 70px; resize: vertical; }
+    input[type=file] { font-size: .9rem; }
+    .help { font-size: .8rem; color: #666; margin-top: 3px; }
+    .track-row {
+      border: 1px solid #ddd; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px;
+      background: #fcfcfd; display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 8px; align-items: end;
+    }
+    .track-row label { margin-bottom: 3px; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #777; }
+    .track-row .delete-track {
+      background: #fff; color: #c33; border: 1px solid #c33; border-radius: 6px; cursor: pointer; padding: 6px 10px; font-size: .82rem;
+    }
+    button { padding: 9px 16px; font-size: .95rem; cursor: pointer; border-radius: 6px; font-family: inherit; }
+    button.add { background: #28a; color: #fff; border: none; }
+    button.next { background: #2c7; color: #fff; border: none; }
+    button.review { background: #f08c00; color: #fff; border: none; }
+    button.publish { background: #c33; color: #fff; border: none; font-weight: 700; }
+    button.secondary { background: #fff; color: #333; border: 1px solid #aaa; }
+    .actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+    .checklist { background: #fdf6e3; border: 1px solid #f0c060; border-radius: 8px; padding: 12px 16px; margin: 14px 0; }
+    .checklist label { font-weight: 500; display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; }
+    .checklist input { margin-top: 3px; }
+    .stage { display: none; }
+    .stage.active { display: block; }
+    .stage-tag { display: inline-block; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #28a; margin-bottom: 6px; }
+    #review-pane { background: #f6f8fa; border: 1px dashed #aac; border-radius: 8px; padding: 14px 18px; font-size: .88rem; line-height: 1.55; white-space: pre-wrap; }
+    .toast { padding: 10px 14px; background: #d4edda; border: 1px solid #b3d8b9; border-radius: 6px; color: #245d2d; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Release Upload — realistic fixture</h1>
+  <p class="lead">Multi-stage release upload mimicking a real distribution SaaS — used by Browsy's observation hardening tests. <strong>No network calls.</strong></p>
+
+  <!-- ─────────── STAGE 1: METADATA ─────────── -->
+  <section class="stage active" id="stage-metadata" data-stage="metadata">
+    <span class="stage-tag">Step 1 of 3 — Release details</span>
+    <fieldset>
+      <legend>Release</legend>
+      <div class="row">
+        <label for="release-title">Release title<span class="req">*</span></label>
+        <input type="text" id="release-title" name="release_title" required placeholder="e.g. Tiny Robot Parade EP">
+      </div>
+      <div class="row">
+        <label for="primary-artist">Primary artist<span class="req">*</span></label>
+        <input type="text" id="primary-artist" name="primary_artist" required placeholder="Artist name">
+      </div>
+      <div class="row">
+        <label for="release-date">Release date<span class="req">*</span></label>
+        <input type="text" id="release-date" name="release_date" placeholder="YYYY-MM-DD" required>
+      </div>
+      <div class="row">
+        <label for="genre">Genre</label>
+        <select id="genre" name="genre">
+          <option value="">-- select --</option>
+          <option value="electronic">Electronic</option>
+          <option value="rock">Rock</option>
+          <option value="ambient">Ambient</option>
+          <option value="pop">Pop</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="label-email">Label contact email</label>
+        <input type="email" id="label-email" name="label_email" placeholder="ops@label.example">
+        <div class="help">Used for processing notifications only.</div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Artwork</legend>
+      <div class="row">
+        <label for="cover-art">Cover image (JPG / PNG, ≥ 3000×3000)<span class="req">*</span></label>
+        <input type="file" id="cover-art" name="cover_art" accept="image/png,image/jpeg" required>
+      </div>
+    </fieldset>
+
+    <div class="actions">
+      <button type="button" class="next" id="btn-to-tracks">Next: add tracks →</button>
+    </div>
+  </section>
+
+  <!-- ─────────── STAGE 2: TRACKS ─────────── -->
+  <section class="stage" id="stage-tracks" data-stage="tracks">
+    <span class="stage-tag">Step 2 of 3 — Tracks</span>
+    <fieldset>
+      <legend>Tracks <span class="help" style="font-weight:400">(one or more — repeated group)</span></legend>
+      <div id="tracks">
+        <div class="track-row" data-index="1">
+          <div>
+            <label for="track-title-1">Track 1 title</label>
+            <input type="text" id="track-title-1" name="track_title_1" placeholder="Track title" required>
+          </div>
+          <div>
+            <label for="track-isrc-1">ISRC</label>
+            <input type="text" id="track-isrc-1" name="track_isrc_1" placeholder="e.g. US-XYZ-25-12345">
+          </div>
+          <div>
+            <label for="track-audio-1">Audio file</label>
+            <input type="file" id="track-audio-1" name="track_audio_1" accept="audio/*" required>
+          </div>
+          <button type="button" class="delete-track" disabled title="At least one track required">×</button>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="add" id="btn-add-track">+ Add another track</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Confirmations</legend>
+      <div class="checklist">
+        <label><input type="checkbox" id="chk-rights" name="confirm_rights" required> I confirm I own or control all rights to this release.</label>
+        <label><input type="checkbox" id="chk-explicit" name="confirm_explicit"> This release contains explicit content.</label>
+        <label><input type="checkbox" id="chk-terms" name="confirm_terms" required> I agree to the distribution terms.</label>
+      </div>
+    </fieldset>
+
+    <div class="actions">
+      <button type="button" class="secondary" id="btn-back-to-metadata">← Back</button>
+      <button type="button" class="review" id="btn-to-review">Review release →</button>
+    </div>
+  </section>
+
+  <!-- ─────────── STAGE 3: REVIEW + PUBLISH ─────────── -->
+  <section class="stage" id="stage-review" data-stage="review">
+    <span class="stage-tag">Step 3 of 3 — Review and publish</span>
+    <fieldset>
+      <legend>Review</legend>
+      <div id="review-pane">(no data yet)</div>
+    </fieldset>
+
+    <div class="actions">
+      <button type="button" class="secondary" id="btn-back-to-tracks">← Back to tracks</button>
+      <button type="button" class="publish" id="btn-publish-release">Submit &amp; Publish Release</button>
+    </div>
+
+    <div id="publish-toast" class="toast" style="display:none">Submit clicked — fixture intercepts the action (no network call).</div>
+  </section>
+
+  <script>
+    // ─── stage navigation ─────────────────────────────────────────────────────
+    function show(stage) {
+      document.querySelectorAll('.stage').forEach(s => s.classList.toggle('active', s.dataset.stage === stage));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    document.getElementById('btn-to-tracks').addEventListener('click', () => show('tracks'));
+    document.getElementById('btn-back-to-metadata').addEventListener('click', () => show('metadata'));
+    document.getElementById('btn-to-review').addEventListener('click', () => {
+      const pane = document.getElementById('review-pane');
+      const f = (id) => (document.getElementById(id) || {}).value || '';
+      const tracks = Array.from(document.querySelectorAll('#tracks .track-row')).map((row, i) => {
+        const t = row.querySelector('input[id^="track-title-"]');
+        const isrc = row.querySelector('input[id^="track-isrc-"]');
+        const audio = row.querySelector('input[id^="track-audio-"]');
+        return `  ${i + 1}. ${t?.value || '(untitled)'}  [ISRC: ${isrc?.value || '—'}]  [audio: ${audio?.files?.[0]?.name || '—'}]`;
+      });
+      pane.textContent =
+        `Title:        ${f('release-title')}\n` +
+        `Artist:       ${f('primary-artist')}\n` +
+        `Release date: ${f('release-date')}\n` +
+        `Genre:        ${f('genre')}\n` +
+        `Contact:      ${f('label-email')}\n` +
+        `Cover:        ${(document.getElementById('cover-art')?.files?.[0]?.name) || '—'}\n` +
+        `\nTracks:\n${tracks.join('\n') || '  (none)'}\n` +
+        `\nRights confirmed:   ${document.getElementById('chk-rights').checked ? 'yes' : 'no'}\n` +
+        `Explicit content:    ${document.getElementById('chk-explicit').checked ? 'yes' : 'no'}\n` +
+        `Distribution terms:  ${document.getElementById('chk-terms').checked ? 'yes' : 'no'}\n`;
+      show('review');
+    });
+    document.getElementById('btn-back-to-tracks').addEventListener('click', () => show('tracks'));
+
+    // ─── dynamic add-track group ──────────────────────────────────────────────
+    let trackCount = 1;
+    function reindexDeleteButtons() {
+      const rows = document.querySelectorAll('#tracks .track-row');
+      rows.forEach((row, i) => {
+        const btn = row.querySelector('.delete-track');
+        btn.disabled = rows.length === 1;
+      });
+    }
+    function addTrack() {
+      trackCount += 1;
+      const row = document.createElement('div');
+      row.className = 'track-row';
+      row.dataset.index = String(trackCount);
+      row.innerHTML =
+        '<div>' +
+          '<label for="track-title-' + trackCount + '">Track ' + trackCount + ' title</label>' +
+          '<input type="text" id="track-title-' + trackCount + '" name="track_title_' + trackCount + '" placeholder="Track title">' +
+        '</div>' +
+        '<div>' +
+          '<label for="track-isrc-' + trackCount + '">ISRC</label>' +
+          '<input type="text" id="track-isrc-' + trackCount + '" name="track_isrc_' + trackCount + '" placeholder="ISRC">' +
+        '</div>' +
+        '<div>' +
+          '<label for="track-audio-' + trackCount + '">Audio file</label>' +
+          '<input type="file" id="track-audio-' + trackCount + '" name="track_audio_' + trackCount + '" accept="audio/*">' +
+        '</div>' +
+        '<button type="button" class="delete-track" title="Remove this track">×</button>';
+      document.getElementById('tracks').appendChild(row);
+      reindexDeleteButtons();
+    }
+    document.getElementById('btn-add-track').addEventListener('click', addTrack);
+    document.getElementById('tracks').addEventListener('click', e => {
+      if (e.target.classList.contains('delete-track')) {
+        const row = e.target.closest('.track-row');
+        if (row && document.querySelectorAll('#tracks .track-row').length > 1) row.remove();
+        reindexDeleteButtons();
+      }
+    });
+
+    // ─── publish (intercepted) ────────────────────────────────────────────────
+    document.getElementById('btn-publish-release').addEventListener('click', () => {
+      const toast = document.getElementById('publish-toast');
+      toast.style.display = '';
+      toast.textContent = 'Submit clicked at ' + new Date().toLocaleTimeString() + ' — fixture intercepts (no network call).';
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Workflow Recorder Test Page</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 24px auto; padding: 0 20px; }
+    section { border: 1px solid #ccc; border-radius: 6px; padding: 12px 16px; margin-bottom: 14px; }
+    section h2 { margin-top: 0; font-size: 1.05em; }
+    label { display: block; font-weight: 600; margin: .5em 0 .2em; }
+    input[type=text], textarea, select { width: 100%; padding: .4em; box-sizing: border-box; font-size: 1em; }
+    button, a.button { padding: .4em 1em; font-size: 1em; cursor: pointer; }
+    .dropzone { border: 2px dashed #888; border-radius: 6px; padding: 16px; text-align: center; color: #555; }
+    .dropzone.over { background: #eef; }
+    .editor { border: 1px solid #ccc; border-radius: 4px; padding: .5em; min-height: 60px; }
+  </style>
+</head>
+<body>
+  <h1>Workflow Recorder Test Page</h1>
+  <p>Generic fixture used by the workflow-recorder acceptance suite. It exercises every recorder capability without depending on any external site or business workflow.</p>
+
+  <section>
+    <h2>1 — Basic form input</h2>
+    <label for="display-name">Display name</label>
+    <input type="text" id="display-name" name="display_name" placeholder="Type here">
+    <label for="category">Category</label>
+    <select id="category" name="category">
+      <option value="">-- select --</option>
+      <option value="alpha">Alpha</option>
+      <option value="beta">Beta</option>
+    </select>
+  </section>
+
+  <section>
+    <h2>2 — Multi-tab navigation</h2>
+    <a href="popup.html" id="lnk-blank" target="_blank" rel="noopener" class="button">Open companion tab (target=_blank)</a>
+    <button type="button" id="btn-window-open">Open popup via window.open</button>
+  </section>
+
+  <section>
+    <h2>3 — Embedded sub-page (iframe)</h2>
+    <iframe id="ifr-form" src="frame-form.html" width="100%" height="180" style="border:1px solid #ccc;"></iframe>
+  </section>
+
+  <section>
+    <h2>4 — File input upload</h2>
+    <label for="file-input">Choose a file (single)</label>
+    <input type="file" id="file-input" name="single_file" accept=".txt,.json,.png">
+    <label for="files-input">Choose files (multiple)</label>
+    <input type="file" id="files-input" name="multi_files" multiple accept="*/*">
+  </section>
+
+  <section>
+    <h2>5 — Drag-and-drop upload zone</h2>
+    <div id="dropzone" class="dropzone" aria-label="Drop files here">Drop files here</div>
+    <div id="dropzone-result" data-testid="dropzone-result"></div>
+  </section>
+
+  <section>
+    <h2>6 — Rich text / contenteditable editor</h2>
+    <div id="rich-editor" class="editor" contenteditable="true" role="textbox" aria-label="Description"></div>
+  </section>
+
+  <section>
+    <h2>7 — Paste target</h2>
+    <textarea id="paste-target" placeholder="Paste something here" rows="3"></textarea>
+  </section>
+
+  <section>
+    <h2>8 — Download trigger</h2>
+    <a id="lnk-download" href="data:application/octet-stream;base64,SGVsbG8gQnJvd3N5IHJlY29yZGVyIGRvd25sb2FkIGFydGlmYWN0Lg==" download="recorder-artifact.txt">Download artifact</a>
+  </section>
+
+  <section>
+    <h2>9 — Submit (dangerous)</h2>
+    <button type="button" id="btn-submit">Submit</button>
+  </section>
+
+  <script>
+    document.getElementById('btn-window-open').addEventListener('click', () => {
+      window.open('popup.html', 'recorder-popup-window', 'width=420,height=300');
+    });
+
+    const dropzone = document.getElementById('dropzone');
+    dropzone.addEventListener('dragenter', e => { e.preventDefault(); dropzone.classList.add('over'); });
+    dropzone.addEventListener('dragover',  e => { e.preventDefault(); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
+    dropzone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropzone.classList.remove('over');
+      const files = Array.from(e.dataTransfer.files || []);
+      document.getElementById('dropzone-result').textContent =
+        'Received ' + files.length + ' file(s): ' + files.map(f => f.name).join(', ');
+    });
+
+    document.getElementById('btn-submit').addEventListener('click', e => {
+      e.preventDefault();
+    });
+  </script>
+</body>
+</html>

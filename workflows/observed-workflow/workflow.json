@@ -1,0 +1,55 @@
+{
+  "id": "observed-workflow",
+  "workflowId": "observed-workflow",
+  "title": "observed-workflow",
+  "targets": {
+    "pages": [
+      {
+        "id": "page1",
+        "purpose": "page_1",
+        "url": "http://localhost:3737/songs"
+      },
+      {
+        "id": "page2",
+        "purpose": "page_2",
+        "url": "http://localhost:3737/album-batch"
+      }
+    ]
+  },
+  "variables": {
+    "input": [
+      {
+        "name": "numberOfSongs"
+      }
+    ]
+  },
+  "runtimeVariables": {
+    "input": [
+      {
+        "name": "numberOfSongs"
+      }
+    ]
+  },
+  "repeatGroups": [
+    {
+      "id": "group1",
+      "label": "Add to Album",
+      "itemLabel": "item",
+      "itemPlural": "items"
+    },
+    {
+      "id": "group2",
+      "label": "Add Tracks",
+      "itemLabel": "item",
+      "itemPlural": "items"
+    }
+  ],
+  "safetyPolicy": {
+    "manual_only_categories": [
+      "final submission",
+      "payment",
+      "legal certification",
+      "destructive action"
+    ]
+  }
+}

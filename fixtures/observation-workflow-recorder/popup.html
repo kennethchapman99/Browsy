@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Recorder Companion Tab</title>
+</head>
+<body>
+  <h1>Companion tab</h1>
+  <p>This page is opened by the recorder test fixture as a second tab/popup. The recorder must attach to it automatically.</p>
+  <label for="popup-input">Tab-scoped note</label>
+  <input type="text" id="popup-input" name="popup_note" placeholder="Type a note in the popup">
+  <button type="button" id="btn-popup-close">Close this tab</button>
+  <script>
+    document.getElementById('btn-popup-close').addEventListener('click', () => window.close());
+  </script>
+</body>
+</html>

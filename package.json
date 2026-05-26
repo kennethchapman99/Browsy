@@ -37,7 +37,15 @@
     "acceptance:runtime-vars": "node scripts/acceptance-runtime-vars.mjs",
     "acceptance:observation-ingestion": "node scripts/acceptance-observation-ingestion.mjs",
     "acceptance:field-map-llm": "node scripts/acceptance-field-map-llm.mjs",
-    "test": "node scripts/acceptance-song-flow.mjs && node scripts/acceptance-repeat-groups.mjs && node scripts/acceptance-run-plan.mjs && node scripts/acceptance-playwright-executor.mjs && node scripts/acceptance-automation-package.mjs && node scripts/acceptance-generic-repeat-package.mjs && node scripts/acceptance-distrokid-album-example.mjs && node scripts/acceptance-wizard-package-gen.mjs && node scripts/acceptance-friendly-wizard.mjs && node scripts/acceptance-distrokid-album-wizard.mjs && node scripts/acceptance-project-lifecycle.mjs && node scripts/acceptance-runtime-vars.mjs && node scripts/acceptance-observation-ingestion.mjs && node scripts/acceptance-field-map-llm.mjs"
+    "acceptance:observation-ui": "node scripts/acceptance-observation-ui.mjs",
+    "acceptance:observation-playwright": "node scripts/acceptance-observation-playwright.mjs",
+    "acceptance:observation-hardening": "node scripts/acceptance-observation-hardening.mjs",
+    "acceptance:observation-real-world": "node scripts/acceptance-observation-real-world.mjs",
+    "acceptance:observation-workflow-preview": "node scripts/acceptance-observation-workflow-preview.mjs",
+    "acceptance:observation-evidence-capture": "node scripts/acceptance-observation-evidence-capture.mjs",
+    "acceptance:workflow-recorder": "node scripts/acceptance-workflow-recorder.mjs",
+    "capture:observation-realistic-upload": "node scripts/capture-observation-realistic-upload.mjs",
+    "test": "node scripts/acceptance-song-flow.mjs && node scripts/acceptance-repeat-groups.mjs && node scripts/acceptance-run-plan.mjs && node scripts/acceptance-playwright-executor.mjs && node scripts/acceptance-automation-package.mjs && node scripts/acceptance-generic-repeat-package.mjs && node scripts/acceptance-distrokid-album-example.mjs && node scripts/acceptance-wizard-package-gen.mjs && node scripts/acceptance-friendly-wizard.mjs && node scripts/acceptance-distrokid-album-wizard.mjs && node scripts/acceptance-project-lifecycle.mjs && node scripts/acceptance-runtime-vars.mjs && node scripts/acceptance-observation-ingestion.mjs && node scripts/acceptance-field-map-llm.mjs && node scripts/acceptance-observation-ui.mjs && node scripts/acceptance-observation-playwright.mjs && node scripts/acceptance-observation-hardening.mjs && node scripts/acceptance-observation-real-world.mjs && node scripts/acceptance-observation-workflow-preview.mjs && node scripts/acceptance-observation-evidence-capture.mjs && node scripts/acceptance-workflow-recorder.mjs"
   },
   "engines": {
     "node": ">=22"
