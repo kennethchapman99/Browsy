@@ -1,0 +1,193 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Kitchen Sink Workflow — Browsy Fixture</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 980px; margin: 32px auto; padding: 0 20px; }
+    fieldset { margin: 18px 0; padding: 16px; border-radius: 12px; border: 1px solid #ccc; }
+    label { display: block; margin: 10px 0; font-weight: 600; }
+    input, textarea, select, button, a { font-size: 16px; padding: 8px; margin-top: 4px; }
+    .row { border: 1px dashed #aaa; padding: 12px; margin: 12px 0; border-radius: 10px; }
+    .danger { background: #ffe2e2; }
+    pre { background: #111827; color: #f9fafb; padding: 16px; border-radius: 10px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Kitchen Sink Workflow</h1>
+  <p>Tests fields, repeat groups, browser file upload, download link clicks, safe actions, and manual-only dangerous actions.</p>
+
+  <form id="releaseForm">
+    <fieldset>
+      <legend>Album Fields</legend>
+
+      <label>Album title
+        <input name="album_title" id="album_title" type="text" required />
+      </label>
+
+      <label>Album description
+        <textarea name="album_description" id="album_description"></textarea>
+      </label>
+
+      <label>Brand profile
+        <select name="brand_profile_id" id="brand_profile_id">
+          <option value="">Choose brand</option>
+          <option value="pancake-robot">Pancake Robot</option>
+          <option value="chochee-theatrical-alt-rap">CHOCHEE</option>
+          <option value="basement-cypher">Basement Cypher</option>
+        </select>
+      </label>
+
+      <label>Release date
+        <input name="release_date" id="release_date" type="date" />
+      </label>
+
+      <label>
+        <input name="include_in_release" id="include_in_release" type="checkbox" />
+        Include in release
+      </label>
+
+      <div>
+        Release mode:
+        <label><input type="radio" name="release_mode" value="single" /> Single</label>
+        <label><input type="radio" name="release_mode" value="ep" /> EP</label>
+        <label><input type="radio" name="release_mode" value="album" /> Album</label>
+      </div>
+
+      <label>Primary image upload
+        <input name="primary_image" id="primary_image" type="file" accept=".png,.jpg,.jpeg,.webp" />
+      </label>
+    </fieldset>
+
+    <fieldset data-repeat-group="tracks">
+      <legend>Tracks Repeat Group</legend>
+      <div id="tracks"></div>
+      <button type="button" id="addTrack">Add Track</button>
+    </fieldset>
+
+    <fieldset data-repeat-group="platforms">
+      <legend>Platforms Repeat Group</legend>
+      <div id="platforms"></div>
+      <button type="button" id="addPlatform">Add Platform</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Safe Actions</legend>
+      <button type="button" id="generateDraft">Generate Draft</button>
+      <a id="downloadDraft" href="#" download="browsy-kitchen-sink-draft.json">Download Draft JSON</a>
+    </fieldset>
+
+    <fieldset class="danger">
+      <legend>Manual-only / blocked actions</legend>
+      <button type="button" id="submitRelease">Submit</button>
+      <button type="button" id="publishRelease">Publish</button>
+      <button type="button" id="payNow">Pay</button>
+      <button type="button" id="deleteRelease">Delete</button>
+    </fieldset>
+  </form>
+
+  <h2>Captured Output</h2>
+  <pre id="output">No draft generated yet.</pre>
+
+<script>
+let trackCount = 0;
+let platformCount = 0;
+
+function addTrack() {
+  trackCount++;
+  const i = trackCount;
+  const div = document.createElement('div');
+  div.className = 'row track-row';
+  div.innerHTML = `
+    <h3>Track ${i}</h3>
+    <label>Track title <input name="tracks[${i}][title]" data-repeat-group="tracks" data-field="title" type="text" /></label>
+    <label>Artist name <input name="tracks[${i}][artist]" data-repeat-group="tracks" data-field="artist" type="text" /></label>
+    <label><input name="tracks[${i}][explicit]" data-repeat-group="tracks" data-field="explicit" type="checkbox" /> Explicit</label>
+    <label>Track audio file <input name="tracks[${i}][audio]" data-repeat-group="tracks" data-field="audio" type="file" accept=".mp3,.wav,.m4a,.txt" /></label>
+    <button type="button" class="removeTrack">Remove Track</button>
+  `;
+  div.querySelector('.removeTrack').onclick = () => div.remove();
+  document.getElementById('tracks').appendChild(div);
+}
+
+function addPlatform() {
+  platformCount++;
+  const i = platformCount;
+  const div = document.createElement('div');
+  div.className = 'row platform-row';
+  div.innerHTML = `
+    <h3>Platform ${i}</h3>
+    <label>Platform
+      <select name="platforms[${i}][name]" data-repeat-group="platforms" data-field="name">
+        <option value="spotify">Spotify</option>
+        <option value="youtube">YouTube</option>
+        <option value="instagram">Instagram</option>
+        <option value="tiktok">TikTok</option>
+      </select>
+    </label>
+    <label><input name="platforms[${i}][enabled]" data-repeat-group="platforms" data-field="enabled" type="checkbox" /> Enabled</label>
+    <label>Notes <input name="platforms[${i}][notes]" data-repeat-group="platforms" data-field="notes" type="text" /></label>
+    <button type="button" class="removePlatform">Remove Platform</button>
+  `;
+  div.querySelector('.removePlatform').onclick = () => div.remove();
+  document.getElementById('platforms').appendChild(div);
+}
+
+function fileName(el) {
+  return el && el.files && el.files[0] ? el.files[0].name : null;
+}
+
+function generateDraft() {
+  const tracks = [...document.querySelectorAll('.track-row')].map((row, idx) => ({
+    position: idx + 1,
+    title: row.querySelector('[data-field="title"]').value,
+    artist: row.querySelector('[data-field="artist"]').value,
+    explicit: row.querySelector('[data-field="explicit"]').checked,
+    audioFile: fileName(row.querySelector('[data-field="audio"]'))
+  }));
+
+  const platforms = [...document.querySelectorAll('.platform-row')].map((row, idx) => ({
+    position: idx + 1,
+    name: row.querySelector('[data-field="name"]').value,
+    enabled: row.querySelector('[data-field="enabled"]').checked,
+    notes: row.querySelector('[data-field="notes"]').value
+  }));
+
+  const output = {
+    status: "draft_generated",
+    albumTitle: document.getElementById('album_title').value,
+    albumDescription: document.getElementById('album_description').value,
+    brandProfileId: document.getElementById('brand_profile_id').value,
+    releaseDate: document.getElementById('release_date').value,
+    includeInRelease: document.getElementById('include_in_release').checked,
+    releaseMode: document.querySelector('input[name="release_mode"]:checked')?.value || null,
+    primaryImage: fileName(document.getElementById('primary_image')),
+    trackCount: tracks.length,
+    tracks,
+    platformCount: platforms.length,
+    platforms,
+    generatedAt: new Date().toISOString()
+  };
+
+  const json = JSON.stringify(output, null, 2);
+  document.getElementById('output').textContent = json;
+
+  const blob = new Blob([json], { type: 'application/json' });
+  document.getElementById('downloadDraft').href = URL.createObjectURL(blob);
+}
+
+document.getElementById('addTrack').onclick = addTrack;
+document.getElementById('addPlatform').onclick = addPlatform;
+document.getElementById('generateDraft').onclick = generateDraft;
+
+['submitRelease','publishRelease','payNow','deleteRelease'].forEach(id => {
+  document.getElementById(id).onclick = () => {
+    document.getElementById('output').textContent = `MANUAL_ONLY_ACTION_CLICKED: ${id}`;
+  };
+});
+
+addTrack();
+addPlatform();
+</script>
+</body>
+</html>
