@@ -1,6 +1,6 @@
 # Browsy Automation Run Report
 
-Generated: 2026-05-26T13:57:20.928Z
+Generated: 2026-05-26T19:08:26.288Z
 Mode: fixture
 Status: FAILED
 

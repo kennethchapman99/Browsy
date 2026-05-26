@@ -8,3 +8,4 @@ test-results/
 workflows/*/field-map.local.json
 tmp/
 .DS_Store
+registry/

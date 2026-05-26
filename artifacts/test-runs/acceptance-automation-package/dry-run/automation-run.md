@@ -1,6 +1,6 @@
 # Browsy Automation Run Report
 
-Generated: 2026-05-26T13:57:20.154Z
+Generated: 2026-05-26T19:08:25.576Z
 Mode: fixture (dry-run)
 Status: OK
 
