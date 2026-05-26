@@ -13,13 +13,21 @@ export function normalizeObservation(input = {}) {
   const actions = asArray(raw.actions).map(normalizeAction);
   const repeatGroups = normalizeRepeatGroups(raw.repeatGroups || raw.repeatables || raw.repeatedGroups || [], actions);
 
+  // Merge the recorder's separate `globalAssets` array into the field list
+  // so file-type album-level inputs (cover art, album folder, etc.) reach
+  // canonical_payload.assets instead of being silently dropped.
+  const fieldsInput = [
+    ...asArray(raw.fields || raw.globalFields || []),
+    ...asArray(raw.globalAssets || []),
+  ];
+
   return {
     schemaVersion: raw.schemaVersion || 'browsy.observation.v1',
     workflowId,
     title: raw.title || raw.name || workflowId,
     goal: raw.goal || raw.description || '',
     pages: asArray(raw.pages || raw.targetPages || raw.targets).map(normalizePage),
-    fields: normalizeFields(raw.fields || raw.globalFields || [], { defaultScope: 'global' }),
+    fields: normalizeFields(fieldsInput, { defaultScope: 'global' }),
     actions,
     repeatGroups,
     capturedOutputs: normalizeCapturedOutputList(raw.capturedOutputs || raw.outputs || raw.captures || []),
