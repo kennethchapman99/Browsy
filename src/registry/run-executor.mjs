@@ -8,7 +8,7 @@
 //   5. Update run record with results + artifacts
 
 import { join } from 'path';
-import { REGISTRY_DIR, ensureDir, writeJson } from '../core/paths.mjs';
+import { REGISTRY_DIR, ensureDir, exists, readJson, writeJson } from '../core/paths.mjs';
 import { validatePayload, evaluateAssertions } from './schema-validator.mjs';
 import { checkSafetyGates, toInternalMode } from './safety-gates.mjs';
 import { updateRun, addArtifact } from './run-registry.mjs';
@@ -57,35 +57,61 @@ export async function executeRun({ runId, workflowVersion, payload, mode, approv
     });
   }
 
-  // ── 3. Build a synthetic workflow package for the existing engine ──────────
+  // ── 3. Build (or load) a workflow package for the existing engine ──────────
   const internalMode = toInternalMode(mode);
   const stopBeforeSubmit = mode === 'preview';
 
-  // Construct a temporary package file for runWorkflowPackage.
-  // The engine resolves workflow_id against the filesystem. For registry runs
-  // without a backing filesystem workflow, we set mode=dry_run so the engine
-  // reports the plan without launching a browser.
-  const syntheticPkg = {
-    workflow_id: workflowVersion.workflowObjectId,
-    source_system: 'registry',
-    entity_type: workflowVersion.appId,
-    entity_id: runId,
-    mode: internalMode,
-    human_gate: stopBeforeSubmit || mode === 'live',
-    canonical_payload: payload,
-    assets: [],
-    capture_outputs: [],
-    return_contract_version: 'automation-result-v1',
-    on_failure: 'stop_and_return_blocked_result',
-  };
-
-  // Write synthetic package to the run's directory so runWorkflowPackage can load it.
   const registryRunDir = runRoot
     ? join(runRoot, 'runs', runId)
     : join(REGISTRY_DIR, 'runs', runId);
   ensureDir(registryRunDir);
   const pkgPath = join(registryRunDir, 'package.json');
-  writeJson(pkgPath, syntheticPkg);
+
+  // When the workflow version was imported from a real package directory, try to
+  // use the execution package file from that directory. This wires the registry
+  // run to the real Browsy workflow execution engine rather than a synthetic stub.
+  let pkgToWrite = null;
+
+  if (workflowVersion.packagePath) {
+    for (const f of ['workflow-package.local.json', 'workflow-package.example.json']) {
+      const candidate = join(workflowVersion.packagePath, f);
+      if (exists(candidate)) {
+        try {
+          const realPkg = readJson(candidate);
+          pkgToWrite = {
+            ...realPkg,
+            // Override payload and mode from the registry run so callers' input
+            // takes precedence over the example values baked into the package file.
+            canonical_payload: payload,
+            mode: internalMode,
+            human_gate: stopBeforeSubmit || mode === 'live',
+          };
+        } catch { /* fall through to synthetic */ }
+        break;
+      }
+    }
+  }
+
+  if (!pkgToWrite) {
+    // Synthetic package: use packageWorkflowId when set so runWorkflowPackage can
+    // resolve the workflow directory on disk. Falls back to workflowObjectId for
+    // workflows registered without an imported package (prior behaviour).
+    pkgToWrite = {
+      workflow_id: workflowVersion.packageWorkflowId || workflowVersion.workflowObjectId,
+      source_system: 'registry',
+      entity_type: workflowVersion.appId,
+      entity_id: runId,
+      mode: internalMode,
+      human_gate: stopBeforeSubmit || mode === 'live',
+      canonical_payload: payload,
+      assets: [],
+      capture_outputs: [],
+      return_contract_version: 'automation-result-v1',
+      on_failure: 'stop_and_return_blocked_result',
+    };
+  }
+
+  writeJson(pkgPath, pkgToWrite);
 
   let engineResult = null;
   let processStatus = 'failed';

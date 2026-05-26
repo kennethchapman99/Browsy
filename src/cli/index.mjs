@@ -22,13 +22,16 @@ const args = parseArgs(argv.slice(command === 'auth' ? 2 : 1));
 // ---------------------------------------------------------------------------
 
 function printHelp() {
-  console.log('Browsy v0.4 — automation registry and runtime');
+  console.log('Browsy v0.5 — automation registry and runtime');
   console.log('');
   console.log('Registry commands:');
   console.log('  browsy apps list                   List registered apps');
   console.log('  browsy workflows list [--app <id>] List registered workflows');
+  console.log('  browsy workflow import <pkgPath> --app <id> --workflow-id <id> [--version <semver>]');
+  console.log('                                     Import a workflow package into the registry');
   console.log('  browsy workflow run <ref> --payload <path>');
   console.log('                                     Run workflow (ref: appId.wfId@version)');
+  console.log('  browsy workflow contract <ref>     Show integration contract for a workflow');
   console.log('  browsy run status <runId>          Show run status');
   console.log('  browsy run artifacts <runId>       Show run artifacts');
   console.log('');
@@ -1407,6 +1410,157 @@ async function listWorkflowScaffolds() {
 }
 
 // ---------------------------------------------------------------------------
+// workflow import <packagePath> --app <appId> --workflow-id <id> [--version <semver>]
+//                               [--register-app --app-name <name>]
+// ---------------------------------------------------------------------------
+
+async function workflowImport() {
+  const packagePath = argv[2];
+  if (!packagePath) {
+    console.error('FAIL: package path required, e.g. browsy workflow import ./workflows/my-wf --app myapp --workflow-id my-wf');
+    process.exit(1);
+  }
+
+  const appId = args.app || args['app-id'];
+  if (!appId) { console.error('FAIL: --app <appId> is required'); process.exit(1); }
+
+  const workflowId = args['workflow-id'] || args.workflowId;
+  if (!workflowId) { console.error('FAIL: --workflow-id <id> is required'); process.exit(1); }
+
+  const version = args.version || '1.0.0';
+  const autoRegisterApp = args['register-app'] === true || args['register-app'] === 'true';
+  const appName = args['app-name'] || appId;
+
+  const { importWorkflowPackage } = await import('../registry/package-importer.mjs');
+  const result = importWorkflowPackage({ packagePath, appId, workflowId, version, autoRegisterApp, appName });
+
+  if (!result.ok) {
+    console.error('FAIL: workflow import failed:');
+    for (const e of result.errors) console.error('  ' + e);
+    process.exit(1);
+  }
+
+  const summary = {
+    appId: result.appId,
+    workflowId: result.workflowId,
+    version: result.version,
+    workflowRef: result.workflowRef,
+    packagePath: result.packagePath,
+    requiredInputs: result.requiredInputs,
+    requiredAssets: result.requiredAssets,
+    supportedModes: result.supportedModes,
+    hasRealExecutor: result.hasRealExecutor,
+  };
+  console.log(JSON.stringify(summary, null, 2));
+}
+
+// ---------------------------------------------------------------------------
+// workflow contract <workflowRef>
+// ---------------------------------------------------------------------------
+
+async function workflowContract() {
+  const ref = argv[2];
+  if (!ref) {
+    console.error('FAIL: workflowRef required, e.g. browsy workflow contract myapp.my-wf@1.0.0');
+    process.exit(1);
+  }
+
+  const { parseWorkflowRef, getWorkflowVersion } = await import('../registry/workflow-registry.mjs');
+  const { workflowObjectId, version } = parseWorkflowRef(ref);
+  const wv = getWorkflowVersion(workflowObjectId, version);
+  if (!wv) {
+    console.error(`FAIL: workflow "${workflowObjectId}" version "${version || 'latest'}" not found`);
+    process.exit(1);
+  }
+
+  const port = process.env.BROWSY_PORT || 3001;
+  const baseUrl = `http://localhost:${port}`;
+
+  const schema = wv.inputSchema || {};
+  const requiredPayloadFields = schema.required || [];
+  const allFields = Object.keys(schema.properties || {});
+  const optionalPayloadFields = allFields.filter(f => !requiredPayloadFields.includes(f));
+
+  const examplePayload = {};
+  for (const f of requiredPayloadFields) {
+    const prop = schema.properties?.[f] || {};
+    examplePayload[f] = prop.type === 'number' ? 0 : prop.type === 'boolean' ? false : `<${f}>`;
+  }
+
+  const approvalRequired = (wv.safetyPolicy?.requiresLiveApproval !== false)
+    ? 'live mode requires a non-empty approvalToken'
+    : 'none';
+
+  const contract = {
+    workflowRef: `${wv.workflowObjectId}@${wv.version}`,
+    appId: wv.appId,
+    workflowId: wv.workflowId,
+    version: wv.version,
+    requiredPayloadFields,
+    optionalPayloadFields,
+    requiredAssets: wv.requiredAssets || [],
+    supportedModes: wv.supportedModes,
+    approvalRequired,
+    exampleCLIRun: `browsy workflow run ${wv.workflowObjectId}@${wv.version} --payload payload.json --mode preview`,
+    exampleHTTPCall: `POST ${baseUrl}/api/workflows/${wv.workflowObjectId}@${wv.version}/runs`,
+    exampleHTTPBody: { payload: examplePayload, mode: 'preview' },
+    runStatusEndpoint: `GET ${baseUrl}/api/runs/:runId`,
+    artifactEndpoint: `GET ${baseUrl}/api/runs/:runId/artifacts`,
+  };
+
+  const format = args.format || 'json';
+  if (format === 'markdown' || format === 'md') {
+    const lines = [
+      `# Workflow Contract: ${contract.workflowRef}`,
+      '',
+      `**App:** \`${contract.appId}\`  **Workflow:** \`${contract.workflowId}\`  **Version:** \`${contract.version}\``,
+      '',
+      '## Required payload fields',
+      '',
+      contract.requiredPayloadFields.length ? contract.requiredPayloadFields.map(f => `- \`${f}\``).join('\n') : '_none_',
+      '',
+      '## Optional payload fields',
+      '',
+      contract.optionalPayloadFields.length ? contract.optionalPayloadFields.map(f => `- \`${f}\``).join('\n') : '_none_',
+      '',
+      '## Supported modes',
+      '',
+      contract.supportedModes.map(m => `- \`${m}\``).join('\n'),
+      '',
+      `## Approval`,
+      '',
+      contract.approvalRequired,
+      '',
+      '## CLI run',
+      '',
+      '```bash',
+      contract.exampleCLIRun,
+      '```',
+      '',
+      '## HTTP API call',
+      '',
+      '```bash',
+      `curl -X POST ${contract.exampleHTTPCall.replace('POST ', '')} \\`,
+      `  -H 'Content-Type: application/json' \\`,
+      `  -d '${JSON.stringify(contract.exampleHTTPBody)}'`,
+      '```',
+      '',
+      '## Status polling',
+      '',
+      `\`${contract.runStatusEndpoint}\``,
+      '',
+      '## Artifact retrieval',
+      '',
+      `\`${contract.artifactEndpoint}\``,
+      '',
+    ];
+    console.log(lines.join('\n'));
+  } else {
+    console.log(JSON.stringify(contract, null, 2));
+  }
+}
+
+// ---------------------------------------------------------------------------
 // apps list
 // ---------------------------------------------------------------------------
 
@@ -1549,7 +1703,9 @@ try {
   // Registry commands
   else if (command === 'apps' && subcommand === 'list') await appsList();
   else if (command === 'workflows' && subcommand === 'list') await workflowsList();
+  else if (command === 'workflow' && subcommand === 'import') await workflowImport();
   else if (command === 'workflow' && subcommand === 'run') await registryWorkflowRun();
+  else if (command === 'workflow' && subcommand === 'contract') await workflowContract();
   else if (command === 'run' && subcommand === 'status') await registryRunStatus();
   else if (command === 'run' && subcommand === 'artifacts') await registryRunArtifacts();
   // Authoring commands
