@@ -34,7 +34,7 @@
  * 23   Clicking Create workflow writes observation.json copy
  * 24   Success message shows workflowId: conference-proposal-submit
  * 25   workflow.json contains correct workflowId
- * 26   workflow-package.example.json contains correct schema version
+ * 26   workflow-package.example.json validates against the runtime package contract
  * 27   run-plan.md contains repeat group speakers
  * 28   run-plan.md contains captured vars proposalId, publicPreviewUrl
  * 29   run-plan.md contains derived var proposalDetailUrl
@@ -679,13 +679,23 @@ section(25, 'workflow.json has correct workflowId');
   } catch (e) { fail('Could not read workflow.json', e.message); }
 }
 
-section(26, 'workflow-package.example.json has browsy.workflow-package.v1 schema version');
+section(26, 'workflow-package.example.json validates against the runtime package contract');
 {
   try {
+    const { validateWorkflowPackage } = await import('../src/core/workflow-contract.mjs');
     const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'workflows', TEST_WORKFLOW_ID, 'workflow-package.example.json'), 'utf8'));
-    pkg.schemaVersion === 'browsy.workflow-package.v1'
-      ? pass(`schemaVersion = "${pkg.schemaVersion}"`)
-      : fail('schemaVersion mismatch', `got: "${pkg.schemaVersion}"`);
+    const requiredOk = ['workflow_id', 'source_system', 'entity_type', 'entity_id', 'mode']
+      .every(k => typeof pkg[k] === 'string' && pkg[k].length > 0);
+    requiredOk
+      ? pass('required envelope fields present (workflow_id, source_system, entity_type, entity_id, mode)')
+      : fail('missing required envelope fields', JSON.stringify(Object.keys(pkg)));
+    Array.isArray(pkg.assets)
+      ? pass('assets is an array (per contract)')
+      : fail('assets must be an array', `got: ${typeof pkg.assets}`);
+    const v = validateWorkflowPackage(pkg);
+    v.ok
+      ? pass('validateWorkflowPackage accepts the generated package')
+      : fail('validateWorkflowPackage rejected', JSON.stringify(v.errors));
   } catch (e) { fail('Could not read workflow-package.example.json', e.message); }
 }
 

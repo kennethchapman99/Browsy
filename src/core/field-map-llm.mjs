@@ -18,8 +18,26 @@
 export function extractPackageFields(pkg) {
   const fields = [];
 
+  // Source the field-bearing buckets from either the current contract shape
+  // (pkg.canonical_payload.{globals|defaults|repeatGroups|capturedOutputs} +
+  // assets-as-keyed-object kept in canonical_payload for mapping) or the legacy
+  // flat shape (pkg.globals/.assets/...). Top-level keys win when both are present.
+  const cp = (pkg.canonical_payload && typeof pkg.canonical_payload === 'object' && !Array.isArray(pkg.canonical_payload))
+    ? pkg.canonical_payload
+    : {};
+  const globals = (pkg.globals && typeof pkg.globals === 'object' && !Array.isArray(pkg.globals))
+    ? pkg.globals : (cp.globals || {});
+  // pkg.assets in the new contract is an array; only treat it as the legacy
+  // id→path object when it actually is one. Otherwise fall back to canonical_payload.
+  const assetsObj = (pkg.assets && typeof pkg.assets === 'object' && !Array.isArray(pkg.assets))
+    ? pkg.assets : (cp.assets || {});
+  const defaults = (pkg.defaults && typeof pkg.defaults === 'object' && !Array.isArray(pkg.defaults))
+    ? pkg.defaults : (cp.defaults || {});
+  const repeatGroups = Array.isArray(pkg.repeatGroups) ? pkg.repeatGroups : (cp.repeatGroups || []);
+  const capturedOutputs = Array.isArray(pkg.capturedOutputs) ? pkg.capturedOutputs : (cp.capturedOutputs || []);
+
   // Global text fields
-  for (const [key, val] of Object.entries(pkg.globals || {})) {
+  for (const [key, val] of Object.entries(globals)) {
     fields.push({
       fieldName: key,
       inputType: 'text',
@@ -30,7 +48,7 @@ export function extractPackageFields(pkg) {
   }
 
   // Global file uploads
-  for (const [key, val] of Object.entries(pkg.assets || {})) {
+  for (const [key, val] of Object.entries(assetsObj)) {
     fields.push({
       fieldName: key,
       inputType: 'file',
@@ -41,7 +59,7 @@ export function extractPackageFields(pkg) {
   }
 
   // Default values (applied as fallback to repeat items — still real form fields)
-  for (const [key, val] of Object.entries(pkg.defaults || {})) {
+  for (const [key, val] of Object.entries(defaults)) {
     // Avoid duplicating a key already captured from globals or assets
     if (!fields.some(f => f.fieldName === key)) {
       fields.push({
@@ -55,7 +73,7 @@ export function extractPackageFields(pkg) {
   }
 
   // Repeat group items
-  for (const group of pkg.repeatGroups || []) {
+  for (const group of repeatGroups) {
     const groupId = group.id || 'items';
     const sample = group.items?.[0] || {};
     for (const [key, val] of Object.entries(sample.fields || {})) {
@@ -82,7 +100,7 @@ export function extractPackageFields(pkg) {
 
   // Captured outputs — informational, not fillable by the executor,
   // but included so LLM mapping can flag external link targets.
-  for (const output of pkg.capturedOutputs || []) {
+  for (const output of capturedOutputs) {
     const id = output.id || output.name;
     if (!id) continue;
     fields.push({

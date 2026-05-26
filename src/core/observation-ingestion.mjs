@@ -1,6 +1,8 @@
 // Convert a narrated/browser-observed workflow into generic Browsy artifacts.
 // This module intentionally avoids vendor-specific assumptions.
 
+import { RETURN_CONTRACT_VERSION } from './workflow-contract.mjs';
+
 const FILE_INPUT_TYPES = new Set(['file', 'file path', 'upload', 'asset']);
 const DANGEROUS_WORDS = /submit|release|publish|pay|purchase|checkout|delete|remove|confirm|certify|agree/i;
 const FINAL_WORDS = /final|submit|release|publish|upload to stores|go live/i;
@@ -98,15 +100,27 @@ export function inferRuntimeVariables(observation) {
   };
 }
 
+// Build a workflow package conforming to the current Browsy contract
+// (see docs/workflow-package-contract.md + src/core/workflow-contract.mjs).
+//
+// Required envelope fields (workflow_id, source_system, entity_type,
+// entity_id, mode) are populated with generic, contract-valid defaults so the
+// emitted package validates and dry-runs immediately after materialization.
+// Observation-derived structure (globals, defaults, repeatGroups,
+// capturedOutputs, humanCheckpoints) lives inside `canonical_payload`, which
+// Browsy passes to the reusable workflow without inspection.
+//
+// `assets` is an ARRAY of { role, path?, repeat_group? } as the contract
+// requires — never an id→path object.
 export function buildWorkflowPackageFromObservation(observation) {
   const obs = normalizeObservation(observation);
-  const globals = {};
-  const assets = {};
-  const defaults = {};
 
+  const globals = {};
+  const assetsByRole = {};
+  const defaults = {};
   for (const field of obs.fields) {
     const value = field.exampleValue ?? field.value ?? placeholderValue(field);
-    if (field.scope === 'asset' || field.inputType === 'file') assets[field.id] = value;
+    if (field.scope === 'asset' || field.inputType === 'file') assetsByRole[field.id] = value;
     else if (field.scope === 'default') defaults[field.id] = value;
     else globals[field.id] = value;
   }
@@ -125,25 +139,61 @@ export function buildWorkflowPackageFromObservation(observation) {
     items: [buildSampleRepeatItem(group)],
   }));
 
-  return cleanObject({
-    schemaVersion: 'browsy.workflow-package.v1',
-    workflowId: obs.workflowId,
-    goal: obs.goal,
+  const capturedOutputs = inferCapturedOutputs(obs).map(output => cleanObject({
+    id: output.id,
+    label: output.label,
+    scope: output.scope || 'captured',
+    source: output.source || 'captured_from_page',
+    required: output.required !== false,
+    verify: output.verify || null,
+    storesTo: output.storesTo || `captured.${output.id}`,
+  }));
+
+  // Flatten observation-derived assets (global + per-repeat-item) into the
+  // contract's array form: each entry is { role, path?, repeat_group? }.
+  const assetEntries = [];
+  for (const [role, value] of Object.entries(assetsByRole)) {
+    assetEntries.push(cleanObject({
+      role,
+      path: typeof value === 'string' ? value : null,
+    }));
+  }
+  for (const group of repeatGroups) {
+    const itemAssets = (group.items && group.items[0] && group.items[0].assets) || {};
+    for (const [role, value] of Object.entries(itemAssets)) {
+      assetEntries.push(cleanObject({
+        role,
+        repeat_group: group.id,
+        path: typeof value === 'string' ? value : null,
+      }));
+    }
+  }
+
+  const captureOutputNames = capturedOutputs.map(o => o.id).filter(Boolean);
+
+  const canonicalPayload = stripEmpty({
+    goal: obs.goal || undefined,
     globals,
-    assets,
     defaults,
+    assets: assetsByRole,
     repeatGroups,
-    capturedOutputs: inferCapturedOutputs(obs).map(output => cleanObject({
-      id: output.id,
-      label: output.label,
-      scope: output.scope || 'captured',
-      source: output.source || 'captured_from_page',
-      required: output.required !== false,
-      verify: output.verify || null,
-      storesTo: output.storesTo || `captured.${output.id}`,
-    })),
-    humanCheckpoints: obs.humanCheckpoints,
+    capturedOutputs,
+    humanCheckpoints: obs.humanCheckpoints || [],
   });
+
+  return {
+    workflow_id: obs.workflowId,
+    source_system: 'external_client',
+    entity_type: 'workflow',
+    entity_id: 'EXTERNAL_ENTITY_ID',
+    mode: 'dry_run',
+    human_gate: true,
+    canonical_payload: canonicalPayload,
+    assets: assetEntries,
+    capture_outputs: captureOutputNames,
+    on_failure: 'stop_and_return_blocked_result',
+    return_contract_version: RETURN_CONTRACT_VERSION,
+  };
 }
 
 export function buildWorkflowConfigFromObservation(observation) {
@@ -177,6 +227,7 @@ export function buildWorkflowConfigFromObservation(observation) {
 export function buildRunPlanFromObservation(observation) {
   const obs = normalizeObservation(observation);
   const pkg = buildWorkflowPackageFromObservation(obs);
+  const payload = pkg.canonical_payload || {};
   const runtime = inferRuntimeVariables(obs);
   const manualOnly = inferManualOnlyActions(obs);
 
@@ -192,13 +243,13 @@ export function buildRunPlanFromObservation(observation) {
     '',
     '## Inputs and assets',
     '',
-    ...Object.keys(pkg.globals || {}).map(k => `- Global field: \`${k}\``),
-    ...Object.keys(pkg.assets || {}).map(k => `- Global asset: \`${k}\``),
-    ...Object.keys(pkg.defaults || {}).map(k => `- Shared default: \`${k}\``),
+    ...Object.keys(payload.globals || {}).map(k => `- Global field: \`${k}\``),
+    ...Object.keys(payload.assets || {}).map(k => `- Global asset: \`${k}\``),
+    ...Object.keys(payload.defaults || {}).map(k => `- Shared default: \`${k}\``),
     '',
     '## Repeat groups',
     '',
-    ...(pkg.repeatGroups || []).map(g => `- **${g.id}** (${g.itemLabel}) — fields: ${Object.keys(g.items?.[0]?.fields || {}).join(', ') || 'none'}; assets: ${Object.keys(g.items?.[0]?.assets || {}).join(', ') || 'none'}`),
+    ...(payload.repeatGroups || []).map(g => `- **${g.id}** (${g.itemLabel}) — fields: ${Object.keys(g.items?.[0]?.fields || {}).join(', ') || 'none'}; assets: ${Object.keys(g.items?.[0]?.assets || {}).join(', ') || 'none'}`),
     '',
     '## Runtime variables',
     '',
@@ -431,6 +482,20 @@ function cleanObject(obj) {
     if (value === undefined || value === null || value === '') continue;
     if (Array.isArray(value) && value.length === 0) continue;
     out[key] = cleanObject(value);
+  }
+  return out;
+}
+
+// Like cleanObject but only at the top level: drops keys whose values are
+// undefined, null, empty string, empty array, or empty plain object. Used to
+// keep canonical_payload tidy without recursively rewriting nested data.
+function stripEmpty(obj) {
+  const out = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined || value === null || value === '') continue;
+    if (Array.isArray(value) && value.length === 0) continue;
+    if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) continue;
+    out[key] = value;
   }
   return out;
 }

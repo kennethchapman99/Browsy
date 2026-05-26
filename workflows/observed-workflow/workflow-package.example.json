@@ -1,33 +1,34 @@
 {
-  "schemaVersion": "browsy.workflow-package.v1",
-  "workflowId": "observed-workflow",
-  "globals": {
-    "numberOfSongs": "Example numberOfSongs"
-  },
-  "assets": {},
-  "defaults": {},
-  "repeatGroups": [
-    {
-      "id": "group1",
-      "label": "Add to Album",
-      "itemLabel": "item",
-      "items": [
-        {
-          "fields": {},
-          "assets": {}
-        }
-      ]
+  "workflow_id": "observed-workflow",
+  "source_system": "external_client",
+  "entity_type": "workflow",
+  "entity_id": "EXTERNAL_ENTITY_ID",
+  "mode": "dry_run",
+  "human_gate": true,
+  "canonical_payload": {
+    "globals": {
+      "brand": "chochee-theatrical-alt-rap",
+      "inputNthOfType1": true,
+      "albumTitle": "C",
+      "brandProfileId": "chochee-theatrical-alt-rap"
     },
-    {
-      "id": "group2",
-      "label": "Add Tracks",
-      "itemLabel": "item",
-      "items": [
-        {
-          "fields": {},
-          "assets": {}
-        }
-      ]
-    }
-  ]
+    "repeatGroups": [
+      {
+        "id": "group1",
+        "label": "Add to Album",
+        "itemLabel": "item",
+        "items": [{ "fields": {}, "assets": {} }]
+      },
+      {
+        "id": "group2",
+        "label": "Add Tracks",
+        "itemLabel": "item",
+        "items": [{ "fields": {}, "assets": {} }]
+      }
+    ]
+  },
+  "assets": [],
+  "capture_outputs": [],
+  "on_failure": "stop_and_return_blocked_result",
+  "return_contract_version": "automation-result-v1"
 }

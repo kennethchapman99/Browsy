@@ -20,6 +20,10 @@ import {
   buildWorkflowConfigFromObservation,
   buildRunPlanFromObservation,
 } from '../src/core/observation-ingestion.mjs';
+import {
+  validateWorkflowPackage,
+  RETURN_CONTRACT_VERSION,
+} from '../src/core/workflow-contract.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -129,38 +133,52 @@ check('captures selector_attribute outputs', () => {
 
 section('workflow package');
 
-check('emits workflow-package-compatible shape', () => {
-  assert.equal(pkg.schemaVersion, 'browsy.workflow-package.v1');
-  assert.equal(pkg.workflowId, 'observed-album-upload');
-  assert.ok(pkg.globals);
-  assert.ok(pkg.assets);
-  assert.ok(Array.isArray(pkg.repeatGroups));
+check('emits envelope conforming to workflow package contract', () => {
+  assert.equal(pkg.workflow_id, 'observed-album-upload');
+  assert.equal(pkg.source_system, 'external_client');
+  assert.equal(pkg.entity_type, 'workflow');
+  assert.equal(typeof pkg.entity_id, 'string');
+  assert.ok(pkg.entity_id.length > 0);
+  assert.equal(pkg.mode, 'dry_run');
+  assert.equal(pkg.return_contract_version, RETURN_CONTRACT_VERSION);
+  assert.equal(pkg.on_failure, 'stop_and_return_blocked_result');
+  // Validate against the live runtime contract.
+  const v = validateWorkflowPackage(pkg);
+  assert.equal(v.ok, true, `validateWorkflowPackage rejected: ${JSON.stringify(v.errors)}`);
 });
 
-check('package globals are correct', () => {
-  assert.equal(pkg.globals.albumTitle, 'Sunrise Sessions');
-  assert.equal(pkg.globals.artistName, 'Example Artist');
-  assert.equal(pkg.globals.releaseDate, '2099-06-01');
+check('assets is an ARRAY (not an id→path object) per the contract', () => {
+  assert.ok(Array.isArray(pkg.assets), 'assets must be an array');
+  // Observed album fixture has a global cover asset + a per-track audio asset
+  const cover = pkg.assets.find(a => a.role === 'albumCover');
+  assert.ok(cover, `expected albumCover entry — got ${JSON.stringify(pkg.assets)}`);
+  assert.equal(cover.path, './album-cover.png');
+  const audio = pkg.assets.find(a => a.role === 'audioFile');
+  assert.ok(audio, `expected audioFile entry — got ${JSON.stringify(pkg.assets)}`);
+  assert.equal(audio.repeat_group, 'tracks');
 });
 
-check('package assets are correct', () => {
-  assert.equal(pkg.assets.albumCover, './album-cover.png');
+check('capture_outputs is an array of names per the contract', () => {
+  assert.ok(Array.isArray(pkg.capture_outputs));
+  assert.ok(pkg.capture_outputs.includes('releaseId'));
+  assert.ok(pkg.capture_outputs.includes('publicReleaseUrl'));
 });
 
-check('package defaults are correct', () => {
-  assert.equal(pkg.defaults.songwriter, 'Example Artist');
-});
-
-check('package repeat group sample item is correct', () => {
-  const item = pkg.repeatGroups[0].items[0];
+check('canonical_payload retains observation-derived structure', () => {
+  const cp = pkg.canonical_payload;
+  assert.ok(cp && typeof cp === 'object');
+  assert.equal(cp.globals.albumTitle, 'Sunrise Sessions');
+  assert.equal(cp.globals.artistName, 'Example Artist');
+  assert.equal(cp.globals.releaseDate, '2099-06-01');
+  assert.equal(cp.assets.albumCover, './album-cover.png');
+  assert.equal(cp.defaults.songwriter, 'Example Artist');
+  assert.ok(Array.isArray(cp.repeatGroups));
+  const item = cp.repeatGroups[0].items[0];
   assert.equal(item.fields.trackTitle, 'Morning Light');
   assert.equal(item.fields.trackNumber, 1);
   assert.equal(item.assets.audioFile, './tracks/01-morning-light.wav');
-});
-
-check('package captured outputs are correct', () => {
-  assert.ok(pkg.capturedOutputs.some(output => output.id === 'releaseId'));
-  assert.ok(pkg.capturedOutputs.some(output => output.id === 'publicReleaseUrl'));
+  assert.ok(cp.capturedOutputs.some(output => output.id === 'releaseId'));
+  assert.ok(cp.capturedOutputs.some(output => output.id === 'publicReleaseUrl'));
 });
 
 section('workflow config');
@@ -220,7 +238,13 @@ check('core outputs do not inject vendor-specific strings', () => {
 check('exports are callable independently', () => {
   const minimal = normalizeObservation({ title: 'Simple Upload', fields: [{ label: 'Title' }] });
   assert.equal(minimal.workflowId, 'simple-upload');
-  assert.equal(buildWorkflowPackageFromObservation(minimal).globals.title, 'Example Title');
+  const minimalPkg = buildWorkflowPackageFromObservation(minimal);
+  assert.equal(minimalPkg.workflow_id, 'simple-upload');
+  assert.equal(minimalPkg.canonical_payload.globals.title, 'Example Title');
+  assert.ok(Array.isArray(minimalPkg.assets));
+  // Even with no assets, validateWorkflowPackage must accept the package.
+  const v = validateWorkflowPackage(minimalPkg);
+  assert.equal(v.ok, true, `validateWorkflowPackage rejected minimal: ${JSON.stringify(v.errors)}`);
 });
 
 console.log('');
