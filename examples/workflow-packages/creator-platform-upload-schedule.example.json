@@ -1,0 +1,31 @@
+{
+  "workflow_id": "creator-platform-upload-schedule",
+  "source_system": "external_client",
+  "entity_type": "video_upload",
+  "entity_id": "EXTERNAL_VIDEO_ID",
+  "mode": "dry_run",
+  "human_gate": true,
+  "canonical_payload": {
+    "upload": {
+      "title": "Example Video Title",
+      "description": "Example description.",
+      "tags": ["example", "tag"],
+      "category": "Music",
+      "visibility": "private",
+      "scheduled_publish_at": "2026-08-01T17:00:00Z",
+      "audience": "not_for_kids"
+    }
+  },
+  "assets": [
+    { "role": "video_file", "path": "/absolute/path/to/video.mp4" },
+    { "role": "thumbnail_image", "path": "/absolute/path/to/thumbnail.png" }
+  ],
+  "capture_outputs": [
+    "external_video_url",
+    "video_id",
+    "scheduled_status",
+    "review_page_screenshot"
+  ],
+  "on_failure": "stop_and_return_blocked_result",
+  "return_contract_version": "automation-result-v1"
+}

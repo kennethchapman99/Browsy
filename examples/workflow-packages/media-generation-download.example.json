@@ -1,0 +1,32 @@
+{
+  "workflow_id": "media-generation-download",
+  "source_system": "external_client",
+  "entity_type": "media_asset",
+  "entity_id": "EXTERNAL_ENTITY_ID",
+  "mode": "dry_run",
+  "human_gate": false,
+  "canonical_payload": {
+    "job": {
+      "entity_id": "EXTERNAL_ENTITY_ID",
+      "item_id": "EXTERNAL_ITEM_ID",
+      "prompt": "Example generation prompt.",
+      "duration": 8,
+      "aspect_ratio": "9:16",
+      "style_guardrails": ["no_text", "no_logos"],
+      "variants_requested": 1,
+      "output_dir": "/absolute/path/to/output"
+    }
+  },
+  "assets": [
+    { "role": "reference_image", "path": "/absolute/path/to/reference.png" }
+  ],
+  "capture_outputs": [
+    "job_id",
+    "prompt",
+    "result_url",
+    "downloaded_file_path",
+    "variant_paths"
+  ],
+  "on_failure": "stop_and_return_blocked_result",
+  "return_contract_version": "automation-result-v1"
+}

@@ -1,0 +1,37 @@
+{
+  "workflow_id": "artist-profile-pitch-or-update",
+  "source_system": "external_client",
+  "entity_type": "artist_profile",
+  "entity_id": "EXTERNAL_ARTIST_ID",
+  "mode": "dry_run",
+  "human_gate": true,
+  "canonical_payload": {
+    "artist": {
+      "artist_id": "EXTERNAL_ARTIST_ID",
+      "name": "Example Artist",
+      "bio": "Example bio.",
+      "social_urls": {
+        "instagram": "https://instagram.com/example",
+        "twitter": "https://twitter.com/example"
+      }
+    },
+    "pitch": {
+      "track_id": "EXTERNAL_TRACK_ID",
+      "pitch_text": "Example pitch text.",
+      "genre": "Pop",
+      "mood": "Uplifting",
+      "release_date": "2026-08-01"
+    }
+  },
+  "assets": [
+    { "role": "profile_image", "path": "/absolute/path/to/profile.png" },
+    { "role": "banner_image", "path": "/absolute/path/to/banner.png" }
+  ],
+  "capture_outputs": [
+    "profile_url",
+    "pitch_status",
+    "review_page_screenshot"
+  ],
+  "on_failure": "stop_and_return_blocked_result",
+  "return_contract_version": "automation-result-v1"
+}

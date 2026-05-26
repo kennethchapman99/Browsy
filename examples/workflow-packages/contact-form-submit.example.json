@@ -1,0 +1,26 @@
+{
+  "workflow_id": "contact-form-submit",
+  "source_system": "external_client",
+  "entity_type": "outreach_message",
+  "entity_id": "EXTERNAL_MESSAGE_ID",
+  "mode": "dry_run",
+  "human_gate": true,
+  "canonical_payload": {
+    "message": {
+      "name": "Example Sender",
+      "email": "sender@example.com",
+      "subject": "Example subject",
+      "body": "Example message body."
+    }
+  },
+  "assets": [
+    { "role": "attachment", "path": "/absolute/path/to/attachment.pdf" }
+  ],
+  "capture_outputs": [
+    "submission_status",
+    "confirmation_url",
+    "review_page_screenshot"
+  ],
+  "on_failure": "stop_and_return_blocked_result",
+  "return_contract_version": "automation-result-v1"
+}

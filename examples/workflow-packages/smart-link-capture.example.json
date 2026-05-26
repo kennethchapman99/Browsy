@@ -1,0 +1,23 @@
+{
+  "workflow_id": "smart-link-capture",
+  "source_system": "external_client",
+  "entity_type": "smart_link",
+  "entity_id": "EXTERNAL_RELEASE_ID",
+  "mode": "dry_run",
+  "human_gate": false,
+  "canonical_payload": {
+    "lookup": {
+      "release_id": "EXTERNAL_RELEASE_ID",
+      "release_title": "Example Release",
+      "artistName": "Example Artist"
+    }
+  },
+  "assets": [],
+  "capture_outputs": [
+    "smart_link_url",
+    "smart_link_dashboard_url",
+    "capture_timestamp"
+  ],
+  "on_failure": "stop_and_return_blocked_result",
+  "return_contract_version": "automation-result-v1"
+}

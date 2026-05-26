@@ -1,0 +1,70 @@
+{
+  "workflow_id": "distributor-album-submit",
+  "source_system": "external_client",
+  "entity_type": "album",
+  "entity_id": "EXTERNAL_ALBUM_ID",
+  "mode": "dry_run",
+  "human_gate": true,
+  "manifest_path": null,
+  "canonical_payload": {
+    "album": {
+      "title": "Example Album",
+      "artistName": "Example Artist",
+      "releaseDate": "2026-08-01",
+      "language": "English",
+      "genrePrimary": "Pop",
+      "genreSecondary": "Indie Pop",
+      "recordLabel": "Example Label",
+      "upc": null,
+      "explicit": false,
+      "aiDisclosure": {
+        "aiGate": "false",
+        "aiLyrics": "false",
+        "aiMusic": "false"
+      }
+    },
+    "tracks": [
+      {
+        "trackNumber": 1,
+        "trackTitle": "Track One",
+        "songwriter": "Example Writer",
+        "producer": "Example Producer",
+        "performer": "Example Artist",
+        "explicit": false,
+        "instrumental": false,
+        "aiDisclosure": {
+          "aiGate": "false",
+          "aiLyrics": "false",
+          "aiMusic": "false"
+        }
+      },
+      {
+        "trackNumber": 2,
+        "trackTitle": "Track Two",
+        "songwriter": "Example Writer",
+        "producer": "Example Producer",
+        "performer": "Example Artist",
+        "explicit": false,
+        "instrumental": true,
+        "aiDisclosure": {
+          "aiGate": "false",
+          "aiLyrics": "false",
+          "aiMusic": "false"
+        }
+      }
+    ]
+  },
+  "assets": [
+    { "role": "album_artwork", "path": "/absolute/path/to/cover.png" },
+    { "role": "track_audio", "track_number": 1, "path": "/absolute/path/to/01.wav" },
+    { "role": "track_audio", "track_number": 2, "path": "/absolute/path/to/02.wav" }
+  ],
+  "capture_outputs": [
+    "external_release_url",
+    "smart_link_url",
+    "submission_status",
+    "review_page_screenshot"
+  ],
+  "on_failure": "stop_and_return_blocked_result",
+  "return_contract_version": "automation-result-v1"
+}

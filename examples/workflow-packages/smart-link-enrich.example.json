@@ -1,0 +1,38 @@
+{
+  "workflow_id": "smart-link-enrich",
+  "source_system": "external_client",
+  "entity_type": "smart_link",
+  "entity_id": "EXTERNAL_RELEASE_ID",
+  "mode": "dry_run",
+  "human_gate": true,
+  "canonical_payload": {
+    "page": {
+      "smart_link_url": "https://example.com/smart-link/EXTERNAL_RELEASE_ID",
+      "title": "Example Release",
+      "release_date": "2026-08-01",
+      "description": "Example landing page description.",
+      "social_urls": {
+        "instagram": "https://instagram.com/example",
+        "tiktok": "https://tiktok.com/@example"
+      },
+      "streaming_urls": {
+        "spotify": "https://open.spotify.com/album/example",
+        "apple_music": "https://music.apple.com/example"
+      },
+      "video_url": "https://www.youtube.com/watch?v=example"
+    }
+  },
+  "assets": [
+    { "role": "profile_image", "path": "/absolute/path/to/profile.png" },
+    { "role": "banner_image", "path": "/absolute/path/to/banner.png" },
+    { "role": "cover_art", "path": "/absolute/path/to/cover.png" }
+  ],
+  "capture_outputs": [
+    "updated_fields",
+    "skipped_fields",
+    "before_screenshot",
+    "after_screenshot"
+  ],
+  "on_failure": "stop_and_return_blocked_result",
+  "return_contract_version": "automation-result-v1"
+}

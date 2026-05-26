@@ -2,7 +2,11 @@
 
 This example documents the first Browsy use case: generating a safe browser harness for uploading a music release to DistroKid up to manual final review.
 
-## Pattern proven in Pancake Robot
+> **Example only.** Pancake Robot was the first external client to exercise this
+> pattern. Browsy does not import, depend on, or write back to Pancake Robot —
+> any client can produce a workflow package shaped like the one shown here.
+
+## Pattern observed with an early client (Pancake Robot)
 
 - Build a local manifest with audio, artwork, title, genre, language, lyrics, and callback data.
 - Save DistroKid auth through a browser session.

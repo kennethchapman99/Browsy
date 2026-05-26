@@ -22,7 +22,7 @@ const args = parseArgs(argv.slice(command === 'auth' ? 2 : 1));
 // ---------------------------------------------------------------------------
 
 function printHelp() {
-  console.log('Browsy v0.2 — automation harness factory');
+  console.log('Browsy v0.3 — automation harness factory');
   console.log('');
   console.log('Commands:');
   console.log('  browsy validate-request           Validate AUTOMATION_REQUEST.md');
@@ -35,6 +35,8 @@ function printHelp() {
   console.log('  browsy discover:map --workflow <id> [--package <path>] [--model <model>]');
   console.log('  browsy generate-prompt             Print coding agent prompt');
   console.log('  browsy run --workflow <id> --manifest <path> [--dry-run]');
+  console.log('  browsy workflow:run --workflow <id> --package <path> [--dry-run|--live]');
+  console.log('  browsy workflow:scaffolds          List reusable workflow scaffolds');
 }
 
 // ---------------------------------------------------------------------------
@@ -1313,6 +1315,90 @@ function promoteWorkflow() {
 }
 
 // ---------------------------------------------------------------------------
+// workflow:run — run a generic workflow package and write automation-result-v1
+// ---------------------------------------------------------------------------
+
+async function workflowRun() {
+  const { runWorkflowPackage } = await import('../core/workflow-run.mjs');
+
+  const packagePath = args.package;
+  if (!packagePath) {
+    console.error('FAIL: --package <path> is required');
+    process.exit(2);
+  }
+
+  // Mode precedence: --live wins over --dry-run; if neither, leave the package's mode untouched.
+  let modeOverride;
+  if (boolArg(args.live, false)) modeOverride = 'live';
+  else if (boolArg(args['dry-run'], false)) modeOverride = 'dry_run';
+
+  const workflowIdOverride = args.workflow || undefined;
+
+  const outcome = await runWorkflowPackage({
+    packagePath,
+    workflowId: workflowIdOverride,
+    modeOverride,
+  });
+
+  // Always print the result path so external clients can find it.
+  if (outcome.resultPath) {
+    console.log(outcome.resultPath);
+  }
+
+  // Surface key signals to stderr so CI logs are useful.
+  console.error(`status: ${outcome.status}`);
+  if (outcome.errors?.length) {
+    for (const e of outcome.errors) {
+      const msg = typeof e === 'string' ? e : (e?.message || JSON.stringify(e));
+      console.error(`error: ${msg}`);
+    }
+  }
+  if (outcome.result?.client_action_requests?.length) {
+    for (const r of outcome.result.client_action_requests) {
+      console.error(`client_action_request[${r.severity}] ${r.type}: ${r.reason}`);
+    }
+  }
+
+  // Exit code policy:
+  //   0 — dry_run_passed | live_run_completed
+  //   3 — live_run_gated (expected human gate, machine-readable status)
+  //   4 — blocked (safety / missing input / unverified selector)
+  //   2 — failed (unexpected error or validation failure)
+  switch (outcome.status) {
+    case 'dry_run_passed':
+    case 'live_run_completed':
+      process.exit(0);
+      break;
+    case 'live_run_gated':
+      process.exit(3);
+      break;
+    case 'blocked':
+      process.exit(4);
+      break;
+    default:
+      process.exit(2);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// workflow:scaffolds — list reusable workflow scaffolds
+// ---------------------------------------------------------------------------
+
+async function listWorkflowScaffolds() {
+  const { listScaffolds } = await import('../core/workflow-scaffolds.mjs');
+  const scaffolds = listScaffolds();
+  console.log(`Reusable workflow scaffolds (${scaffolds.length}):`);
+  console.log('');
+  for (const s of scaffolds) {
+    console.log(`  ${s.id}`);
+    console.log(`    category:    ${s.category}`);
+    console.log(`    entity_type: ${s.entity_type}`);
+    console.log(`    purpose:     ${s.description}`);
+    console.log('');
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Dispatch
 // ---------------------------------------------------------------------------
 
@@ -1328,6 +1414,8 @@ try {
   else if (command === 'discover:map') await discoverMap();
   else if (command === 'generate-prompt') generatePrompt();
   else if (command === 'run') await runWorkflow();
+  else if (command === 'workflow:run') await workflowRun();
+  else if (command === 'workflow:scaffolds') await listWorkflowScaffolds();
   else if (command === 'review') await reviewRun();
   else if (command === 'feedback') saveFeedback();
   else if (command === 'promote') promoteWorkflow();

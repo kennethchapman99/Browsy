@@ -1,0 +1,41 @@
+{
+  "workflow_id": "distributor-single-submit",
+  "source_system": "external_client",
+  "entity_type": "single",
+  "entity_id": "EXTERNAL_SINGLE_ID",
+  "mode": "dry_run",
+  "human_gate": true,
+  "canonical_payload": {
+    "release": {
+      "title": "Example Single",
+      "artistName": "Example Artist",
+      "releaseDate": "2026-08-01",
+      "language": "English",
+      "genrePrimary": "Pop",
+      "recordLabel": "Example Label",
+      "isrc": null,
+      "upc": null,
+      "explicit": false,
+      "aiDisclosure": { "aiGate": "false", "aiLyrics": "false", "aiMusic": "false" }
+    },
+    "track": {
+      "trackTitle": "Example Single",
+      "songwriter": "Example Writer",
+      "producer": "Example Producer",
+      "performer": "Example Artist",
+      "instrumental": false
+    }
+  },
+  "assets": [
+    { "role": "release_artwork", "path": "/absolute/path/to/cover.png" },
+    { "role": "track_audio", "path": "/absolute/path/to/track.wav" }
+  ],
+  "capture_outputs": [
+    "external_release_url",
+    "smart_link_url",
+    "submission_status",
+    "review_page_screenshot"
+  ],
+  "on_failure": "stop_and_return_blocked_result",
+  "return_contract_version": "automation-result-v1"
+}

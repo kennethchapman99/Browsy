@@ -1,0 +1,23 @@
+{
+  "workflow_id": "platform-link-harvest",
+  "source_system": "external_client",
+  "entity_type": "external_links",
+  "entity_id": "EXTERNAL_ENTITY_ID",
+  "mode": "dry_run",
+  "human_gate": false,
+  "canonical_payload": {
+    "lookup": {
+      "entity_id": "EXTERNAL_ENTITY_ID",
+      "entity_type": "release",
+      "lookup_query": "Example Artist — Example Release"
+    }
+  },
+  "assets": [],
+  "capture_outputs": [
+    "external_urls",
+    "platform_ids",
+    "capture_timestamp"
+  ],
+  "on_failure": "stop_and_return_blocked_result",
+  "return_contract_version": "automation-result-v1"
+}
