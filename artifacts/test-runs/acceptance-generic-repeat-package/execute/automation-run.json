@@ -1,7 +1,7 @@
 {
   "ok": true,
   "dryRun": false,
-  "generatedAt": "2026-05-25T23:55:31.892Z",
+  "generatedAt": "2026-05-26T13:57:18.826Z",
   "package": {
     "path": "/Users/kchapman/browsy/fixtures/generic-repeat-group/package.json",
     "workflowId": "project-budget-submission",

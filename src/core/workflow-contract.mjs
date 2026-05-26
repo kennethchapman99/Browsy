@@ -27,12 +27,14 @@ export const VALID_MODES = ['dry_run', 'live'];
 //   live_run_completed   — live execution finished and all human gates were satisfied
 //   blocked              — execution stopped because of a safety violation, missing input, or unverified selector
 //   failed               — execution hit an unexpected error
+//   stopped_by_user      — the operator pressed STOP from the UI before the run could finish
 export const VALID_STATUSES = [
   'dry_run_passed',
   'live_run_gated',
   'live_run_completed',
   'blocked',
   'failed',
+  'stopped_by_user',
 ];
 
 // What to do when a workflow can't make safe progress.
@@ -145,6 +147,7 @@ export function newResult({ pkg, runId }) {
     entity_id: pkg.entity_id,
     status: null,
     captured_outputs: {},
+    downloaded_files: [],
     filled_fields: [],
     skipped_fields: [],
     errors: [],

@@ -59,6 +59,10 @@ const STRONG_DANGEROUS_VERBS_RX = /\b(submit|publish|delete|pay|purchase|charge|
 const REPEAT_ADD_VERBS_RX = /\badd\s+(another|more|item|row|track|entry|line|field|speaker|guest|file|attachment|stop|leg)\b/i;
 const REPEAT_PLUS_MARKER_RX = /^\s*[+＋]\s*add\b/i;
 const REPEAT_APPEND_RX = /\bappend\s+(another|more|item|row|track)\b/i;
+// "Add Track" / "Add Platform" — capitalised noun as a simple bare verb-phrase.
+// Common on hand-built forms ("Add Track" rather than "Add another track"); we
+// still rule out navigation prefixes via NAV_PREFIX_RX upstream.
+const REPEAT_ADD_NOUN_RX = /^\s*add\s+[A-Z][a-z]+\s*$/i;
 
 /**
  * Returns true when the label is a *real* dangerous action — irreversible,
@@ -93,7 +97,7 @@ export function isLikelyAddInstanceAction(label) {
   if (REPEAT_PLUS_MARKER_RX.test(trimmed)) return true;
   // Navigation labels ("Next: add tracks →") never count, even if they say "add".
   if (NAV_PREFIX_RX.test(trimmed)) return false;
-  return REPEAT_ADD_VERBS_RX.test(trimmed) || REPEAT_APPEND_RX.test(trimmed);
+  return REPEAT_ADD_VERBS_RX.test(trimmed) || REPEAT_APPEND_RX.test(trimmed) || REPEAT_ADD_NOUN_RX.test(trimmed);
 }
 
 // ── Event normalization + dedupe ─────────────────────────────────────────────
@@ -164,9 +168,61 @@ export function normalizeAndDedupeEvents(events = []) {
 
 // ── Repeat-group instance modeling ───────────────────────────────────────────
 
+// Decompose a single field id into `{ stem, index, base }` if it looks like
+// it belongs to a repeat-group instance. Recognises three common conventions:
+//
+//   1. `track_title_1`             — trailing `_N` suffix (existing pattern).
+//   2. `tracks[1][title]`          — bracket form emitted by Rails / many
+//                                    form frameworks. Preserved as `raw.name`
+//                                    when the recorder sees an `<input name="…">`.
+//   3. `tracks1Title`              — camelCase collapse the wizard's `toCamel`
+//                                    normalizer produces from the bracket form.
+//
+// Returns null for anything that doesn't match. Cases 2 and 3 yield a stable
+// underscore-joined `base` (`tracks_title`) so the existing bucketing logic
+// keeps working without further changes.
+function decomposeRepeatId(id) {
+  const raw = String(id || '');
+  if (!raw) return null;
+
+  const bracket = raw.match(/^([A-Za-z_][A-Za-z0-9_]*)\[(\d+)\]\[([A-Za-z_][A-Za-z0-9_]*)\]$/);
+  if (bracket) {
+    const stemKey = bracket[1];
+    const idx = parseInt(bracket[2], 10);
+    if (Number.isFinite(idx)) {
+      return { stem: stemKey, index: idx, base: `${stemKey}_${bracket[3]}`.toLowerCase() };
+    }
+  }
+
+  const camel = raw.match(/^([A-Za-z_]+?)(\d+)([A-Z][A-Za-z0-9]*)$/);
+  if (camel) {
+    const stemKey = camel[1];
+    const idx = parseInt(camel[2], 10);
+    if (Number.isFinite(idx)) {
+      // Insert an underscore between the camelCase word boundary in the field
+      // portion so multi-word field names round-trip ("trackTitle" stays as
+      // `track_title`, not `tracktitle`).
+      const fieldPart = camel[3].replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+      return { stem: stemKey, index: idx, base: `${stemKey}_${fieldPart}` };
+    }
+  }
+
+  const suffix = raw.match(/^(.+?)_(\d+)$/);
+  if (suffix) {
+    const idx = parseInt(suffix[2], 10);
+    if (Number.isFinite(idx)) {
+      const base = suffix[1];
+      return { stem: base.split('_')[0] || base, index: idx, base };
+    }
+  }
+
+  return null;
+}
+
 /**
- * Cluster fields/assets whose ids look like `{stem}_{n}` into structured
- * repeat-group instances.
+ * Cluster fields/assets whose ids look like instances of the same group into
+ * structured repeat-group instances. See `decomposeRepeatId` for the patterns
+ * we recognise.
  *
  * Returns an array of `{ stem, fieldStems, instances: [{ index, fields, assets }], itemFieldCount }`.
  *
@@ -175,20 +231,19 @@ export function normalizeAndDedupeEvents(events = []) {
 export function inferRepeatGroupInstances({ globalFields = [], globalAssets = [] } = {}) {
   const tagged = [];
   for (const f of [...globalFields, ...globalAssets]) {
-    const idMatch = (f.id || '').match(/^(.+?)_(\d+)$/);
-    if (!idMatch) continue;
-    const base = idMatch[1];
-    const index = parseInt(idMatch[2], 10);
-    if (!Number.isFinite(index)) continue;
-    tagged.push({ base, index, field: f });
+    const decomp = decomposeRepeatId(f.id);
+    if (!decomp) continue;
+    tagged.push({ ...decomp, field: f });
   }
   if (tagged.length < 2) return [];
 
-  // Bucket by the first underscore-separated token. For `track_title_1` and
-  // `track_isrc_1`, that's `track` — these belong to the same group.
+  // Bucket by the first underscore-separated token of the base. For
+  // `track_title_1` and `track_isrc_1`, that's `track`; for `tracks[1][title]`
+  // (base = `tracks_title`) it's `tracks`. Both end up in their own bucket
+  // and don't collide.
   const stemBuckets = new Map();
   for (const item of tagged) {
-    const stem = item.base.split('_')[0] || item.base;
+    const stem = item.base.split('_')[0] || item.stem || item.base;
     if (!stemBuckets.has(stem)) stemBuckets.set(stem, []);
     stemBuckets.get(stem).push(item);
   }
@@ -205,11 +260,34 @@ export function inferRepeatGroupInstances({ globalFields = [], globalAssets = []
         assets: fieldsForIdx.filter(f => f.scope === 'asset').map(f => f.id),
       };
     });
+
+    // Build normalized item-level field/asset objects from instance[0].
+    // Strip the "stem_" prefix from each tagged item's base to get the canonical
+    // per-item field id (e.g. "tracks_title" → "title", "platforms_name" → "name").
+    const firstIdx = indices[0];
+    const firstItems = items.filter(i => i.index === firstIdx);
+    const seenItemIds = new Set();
+    const itemFields = [];
+    const itemAssets = [];
+    for (const tagged of firstItems) {
+      const itemId = tagged.base.slice(stem.length + 1) || tagged.base;
+      if (seenItemIds.has(itemId)) continue;
+      seenItemIds.add(itemId);
+      const entry = { ...tagged.field, id: itemId };
+      if (tagged.field.scope === 'asset') {
+        itemAssets.push(entry);
+      } else {
+        itemFields.push(entry);
+      }
+    }
+
     groups.push({
       stem,
       fieldStems: [...new Set(items.map(i => i.base))].sort(),
       instances,
       itemFieldCount: instances[0] ? instances[0].fields.length + instances[0].assets.length : 0,
+      itemFields,
+      itemAssets,
     });
   }
   return groups;
@@ -427,8 +505,8 @@ export function buildObservationFromEvents({
     });
   }
   const allFields  = Array.from(seenFields.values());
-  const globalFields = allFields.filter(f => f.scope !== 'asset');
-  const globalAssets = allFields.filter(f => f.scope === 'asset');
+  let globalFields = allFields.filter(f => f.scope !== 'asset');
+  let globalAssets = allFields.filter(f => f.scope === 'asset');
 
   // Repeat groups — keep only entries whose label survives the tightened
   // `isLikelyAddInstanceAction` heuristic. The raw event log still carries
@@ -461,8 +539,25 @@ export function buildObservationFromEvents({
   });
   const repeatGroups = Array.from(seenRepeats.values());
 
-  // Repeat-group instance modeling — cluster `track_*_<n>` fields.
+  // Repeat-group instance modeling — cluster per-instance fields by id pattern
+  // (see decomposeRepeatId for the conventions we recognise).
   const instanceGroups = inferRepeatGroupInstances({ globalFields, globalAssets });
+  // Any field/asset id the clusterer claimed is no longer a *global* — it
+  // belongs inside its repeat group. Removing it here prevents the same data
+  // from appearing twice in canonical_payload (once flattened in globals,
+  // once nested in repeatGroups[].items[].fields), which was the
+  // kitchen-sink-fixture regression.
+  const clusteredIds = new Set();
+  for (const ig of instanceGroups) {
+    for (const inst of ig.instances || []) {
+      for (const id of (inst.fields || [])) clusteredIds.add(id);
+      for (const id of (inst.assets || [])) clusteredIds.add(id);
+    }
+  }
+  if (clusteredIds.size) {
+    globalFields = globalFields.filter(f => !clusteredIds.has(f.id));
+    globalAssets = globalAssets.filter(f => !clusteredIds.has(f.id));
+  }
   // Attach instances to existing repeat groups when the stem looks related to
   // the group label; otherwise add as an inferred group so they aren't lost.
   for (const ig of instanceGroups) {
@@ -477,6 +572,8 @@ export function buildObservationFromEvents({
       match.instances = ig.instances;
       match.instanceCount = ig.instances.length;
       match.itemFieldCount = ig.itemFieldCount;
+      match.itemFields = ig.itemFields;
+      match.itemAssets = ig.itemAssets;
       match.inferredFromFieldNaming = true;
     } else {
       repeatGroups.push({
@@ -495,6 +592,8 @@ export function buildObservationFromEvents({
         instances: ig.instances,
         instanceCount: ig.instances.length,
         itemFieldCount: ig.itemFieldCount,
+        itemFields: ig.itemFields,
+        itemAssets: ig.itemAssets,
         inferredFromFieldNaming: true,
       });
     }
@@ -508,6 +607,28 @@ export function buildObservationFromEvents({
       g.instanceCount = 0;
       g.inferredFromFieldNaming = false;
     }
+  }
+
+  // Captured outputs — populated from output_captured events emitted by the
+  // MutationObserver in the Playwright init script when #output or
+  // [data-captured-output] elements change their text content.
+  const outputCaptureEvents = dedupedEvents.filter(e => e.type === 'output_captured');
+  const capturedOutputs = [];
+  for (const ev of outputCaptureEvents) {
+    const raw = ev.rawEvidence || {};
+    const id = raw.outputId || 'output';
+    if (capturedOutputs.some(o => o.id === id)) continue;
+    capturedOutputs.push({
+      id,
+      label: id,
+      selector: ev.selector || `#${id}`,
+      selectorCandidates: Array.isArray(raw.selectorCandidates) ? raw.selectorCandidates : [],
+      selectorConfidence: raw.selectorConfidence || 'low',
+      exampleValue: typeof raw.text === 'string' ? raw.text.slice(0, 500) : null,
+      captureAfter: raw.triggeredBySelector || null,
+      source: 'captured_from_page',
+      required: true,
+    });
   }
 
   // Dangerous / manual-only actions — keep only entries whose label survives
@@ -583,7 +704,7 @@ export function buildObservationFromEvents({
     pages,
     globalFields,
     globalAssets,
-    capturedOutputs: [],
+    capturedOutputs,
     repeatGroups,
     humanCheckpoints: [],
     manualOnlyActions,

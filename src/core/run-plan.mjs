@@ -283,6 +283,24 @@ export function buildRunPlanFromPackage(pkg) {
     }
   }
 
+  // Phase 2b: captured outputs — click the trigger action (if any), then read the element
+  for (const output of pkg.capturedOutputs || []) {
+    const selector = output.selector || (output.id ? `#${output.id}` : null);
+    if (!selector) continue;
+    if (output.captureAfter) {
+      steps.push({
+        type: 'click_safe_action',
+        selector: output.captureAfter,
+        label: output.captureAfter,
+      });
+    }
+    steps.push({
+      type: 'capture_output',
+      outputId: output.id,
+      selector,
+    });
+  }
+
   // Phase 3: human checkpoint
   const checkpoint = (pkg.humanCheckpoints || [])[0];
   steps.push({

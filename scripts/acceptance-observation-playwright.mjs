@@ -167,8 +167,12 @@ try {
   // ── Check 3: source default behaviour ──────────────────────────────────────
   section(3, 'When no source supplied, server defaults to playwrightRecorder');
   {
-    // We pass startUrl but no source — server should default to playwright.
-    const r = await httpJson('POST', '/api/observation/session/start', { startUrl: FIXTURE_URL });
+    // We pass startUrl + workflowId but no source — server should default to
+    // playwrightRecorder. The naming-before-observation slice (Part 2) made
+    // workflowId required for real-capture sessions, so we pass an explicit
+    // throwaway id here so the dup-check doesn't fire.
+    const tmpId = `obs-default-${Date.now()}`;
+    const r = await httpJson('POST', '/api/observation/session/start', { startUrl: FIXTURE_URL, workflowId: tmpId, overwrite: true });
     r.status === 200 && r.body.source === 'playwrightRecorder'
       ? pass(`default source = ${r.body.source}`)
       : fail('default source not playwrightRecorder', JSON.stringify(r.body));

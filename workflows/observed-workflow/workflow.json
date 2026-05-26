@@ -12,21 +12,49 @@
       {
         "id": "page2",
         "purpose": "page_2",
-        "url": "http://localhost:3737/album-batch"
+        "url": "http://localhost:3737/songs?q=&brand=chochee-theatrical-alt-rap&status=&activity=&sort="
+      },
+      {
+        "id": "page3",
+        "purpose": "page_3",
+        "url": "http://localhost:3737/albums/ALBUM_MPLZSN5J_J3JI"
+      },
+      {
+        "id": "page4",
+        "purpose": "page_4",
+        "url": "http://localhost:3737/api/albums/ALBUM_MPLZSN5J_J3JI/release-assets/build"
       }
     ]
   },
   "variables": {
     "input": [
       {
-        "name": "numberOfSongs"
+        "name": "brand"
+      },
+      {
+        "name": "inputNthOfType1"
+      },
+      {
+        "name": "albumTitle"
+      },
+      {
+        "name": "brandProfileId"
       }
     ]
   },
   "runtimeVariables": {
     "input": [
       {
-        "name": "numberOfSongs"
+        "name": "brand"
+      },
+      {
+        "name": "inputNthOfType1"
+      },
+      {
+        "name": "albumTitle"
+      },
+      {
+        "name": "brandProfileId"
       }
     ]
   },

@@ -154,6 +154,11 @@ try {
     await uiPage.waitForTimeout(150);
 
     // Confirm default is playwrightRecorder (no click needed) and URL is blank.
+    // The naming-before-observation slice (Part 2) requires title+workflowId
+    // before the Start URL guard fires — so we fill them first to isolate
+    // the URL-empty check this test is asserting.
+    await uiPage.fill('#obs-title-input', 'Hardening URL Guard');
+    await uiPage.fill('#obs-workflowid-input', `hardening-url-guard-${Date.now()}`);
     await uiPage.fill('#obs-start-url-input', '');
     await uiPage.click('#obs-start-btn');
     await uiPage.waitForTimeout(400);

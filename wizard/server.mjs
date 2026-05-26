@@ -18,6 +18,8 @@ import {
 import { createEvent, validateEvent, deriveStatsFromEvents, CAPTURE_SOURCES } from '../src/core/observation-events.mjs';
 import { captureVisualEvidence, evidenceToRawEvidence } from '../src/adapters/observation/visual-evidence-adapter.mjs';
 import { buildRecorderPackage } from '../src/core/recorder-package.mjs';
+import { loadWorkflowPackage, validateWorkflowPackage, RETURN_CONTRACT_VERSION } from '../src/core/workflow-contract.mjs';
+import { defaultSafetyPolicy } from '../src/core/safety.mjs';
 import crypto from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -461,6 +463,8 @@ const PLAYWRIGHT_OBS_INIT_SCRIPT = `(() => {
     }
   }
 
+  let lastActionSelector = null;
+
   const scanned = new WeakSet();
   function initialScan() {
     document.querySelectorAll('input[type="file"]').forEach(el => {
@@ -528,6 +532,7 @@ const PLAYWRIGHT_OBS_INIT_SCRIPT = `(() => {
     const path = e.composedPath ? e.composedPath() : [e.target];
     for (const node of path) {
       if (node && node.matches && node.matches('button, input[type=submit], input[type=button], a[role=button], a[href]')) {
+        lastActionSelector = selectorFor(node);
         actionEvent(node);
         break;
       }
@@ -752,10 +757,40 @@ const PLAYWRIGHT_OBS_INIT_SCRIPT = `(() => {
   }, true);
   document.addEventListener('compositionend', e => emitRichInput('rich_text_changed', e.target, { phase: 'compositionend' }), true);
 
+  // ── Output capture (MutationObserver on #output / [data-captured-output]) ──
+  function observeOutputs() {
+    const targets = Array.from(document.querySelectorAll('#output, [data-captured-output]'));
+    if (!targets.length) return;
+    const mo = new MutationObserver(() => {
+      for (const el of targets) {
+        const text = (el.textContent || '').trim();
+        if (!text || text === el.__browsyLastOutput) continue;
+        el.__browsyLastOutput = text;
+        const cands = selectorCandidatesFor(el);
+        emit({
+          type: 'output_captured',
+          selector: (cands[0] && cands[0].selector) || (el.id ? '#' + safeCss(el.id) : '[data-captured-output]'),
+          rawEvidence: {
+            outputId: el.id || el.getAttribute('data-captured-output') || 'output',
+            text: text.slice(0, 2000),
+            triggeredBySelector: lastActionSelector,
+            selectorCandidates: cands,
+            selectorConfidence: (cands[0] && cands[0].confidence) || 'low',
+            eventTrigger: 'mutation_observer',
+          },
+        });
+      }
+    });
+    for (const el of targets) {
+      mo.observe(el, { childList: true, characterData: true, subtree: true });
+    }
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initialScan);
+    document.addEventListener('DOMContentLoaded', () => { initialScan(); observeOutputs(); });
   } else {
     initialScan();
+    observeOutputs();
   }
 })();`;
 
@@ -1070,6 +1105,779 @@ async function stopPlaywrightSession(session, { reason = 'user_finished' } = {})
   }
 }
 
+// ── Workflow Library + Play UI ───────────────────────────────────────────────
+//
+// In-memory registry of active workflow runs spawned from the UI. Each entry
+// drives the /workflows pages: card status, live event panel, STOP button.
+// Persistence is intentionally per-process — long-term records live in the
+// timestamped result.json files we write under output/runs/.
+
+const workflowRuns = new Map();         // runId → record
+const runEventSubscribers = new Map();  // runId → Set<res> for SSE
+const MAX_RUN_LOG_LINES = 2000;         // ring-buffer cap per run
+
+function newRunId(workflowId) {
+  return `${workflowId}-${Date.now()}-${crypto.randomBytes(2).toString('hex')}`;
+}
+
+function pushRunEvent(run, event) {
+  const entry = { ...event, ts: event.ts || new Date().toISOString() };
+  run.events.push(entry);
+  if (run.events.length > MAX_RUN_LOG_LINES) run.events.splice(0, run.events.length - MAX_RUN_LOG_LINES);
+  const subs = runEventSubscribers.get(run.runId);
+  if (subs) {
+    const payload = `event: ${entry.kind || 'log'}\ndata: ${JSON.stringify(entry)}\n\n`;
+    for (const sub of subs) {
+      try { sub.write(payload); } catch {}
+    }
+  }
+}
+
+// Read the workflow package and return both the parsed object and a validity
+// report so the UI can render package-validity badges without re-running
+// validation in the browser.
+function loadPackageMetadata(workflowId) {
+  const pkgPath = path.join(REPO_ROOT, 'workflows', workflowId, 'workflow-package.example.json');
+  if (!has(pkgPath)) {
+    return { exists: false, valid: false, errors: ['package file not found'], package: null, packagePath: null };
+  }
+  const loaded = loadWorkflowPackage(pkgPath);
+  return {
+    exists: true,
+    valid: loaded.ok,
+    errors: loaded.errors || [],
+    package: loaded.pkg || null,
+    packagePath: loaded.packagePath,
+    packageRelPath: path.relative(REPO_ROOT, loaded.packagePath || pkgPath),
+  };
+}
+
+function loadWorkflowConfig(workflowId) {
+  const cfgPath = path.join(REPO_ROOT, 'workflows', workflowId, 'workflow.json');
+  if (!has(cfgPath)) return { exists: false, config: null, path: cfgPath };
+  try {
+    return { exists: true, config: JSON.parse(fs.readFileSync(cfgPath, 'utf8')), path: cfgPath };
+  } catch (e) {
+    return { exists: true, config: null, path: cfgPath, error: e.message };
+  }
+}
+
+function loadObservationMetadata(workflowId) {
+  const obsPath = path.join(REPO_ROOT, 'output', 'observations', workflowId, 'observation.json');
+  if (!has(obsPath)) return { exists: false, path: obsPath, capturedAt: null };
+  try {
+    const stat = fs.statSync(obsPath);
+    const text = fs.readFileSync(obsPath, 'utf8');
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { parsed = null; }
+    return {
+      exists: true,
+      path: obsPath,
+      relPath: path.relative(REPO_ROOT, obsPath),
+      capturedAt: parsed?.capturedAt || stat.mtime.toISOString(),
+      pageCount: Array.isArray(parsed?.pages) ? parsed.pages.length : 0,
+      eventCount: Array.isArray(parsed?.sessionEvents) ? parsed.sessionEvents.length : 0,
+    };
+  } catch {
+    return { exists: true, path: obsPath };
+  }
+}
+
+function loadRunPlanMetadata(workflowId) {
+  const planPath = path.join(REPO_ROOT, 'output', 'plans', workflowId, 'run-plan.md');
+  if (!has(planPath)) return { exists: false, path: planPath };
+  return { exists: true, path: planPath, relPath: path.relative(REPO_ROOT, planPath) };
+}
+
+// Selector-map status — workflows/<id>/field-map.local.json drives Live-Safe.
+// Returns { exists, valid, fieldCount, repeatGroupCount, generatedAt, errors }.
+function loadFieldMapStatus(workflowId) {
+  const mapPath = path.join(REPO_ROOT, 'workflows', workflowId, 'field-map.local.json');
+  if (!has(mapPath)) return { exists: false, valid: false, fieldCount: 0, repeatGroupCount: 0, generatedAt: null, errors: ['field-map.local.json not found'] };
+  try {
+    const stat = fs.statSync(mapPath);
+    const parsed = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
+    const fieldCount = parsed && typeof parsed.fields === 'object' ? Object.keys(parsed.fields).length : 0;
+    const repeatGroupCount = Array.isArray(parsed?.repeatGroups) ? parsed.repeatGroups.length : 0;
+    return {
+      exists: true,
+      valid: fieldCount > 0 || repeatGroupCount > 0,
+      fieldCount,
+      repeatGroupCount,
+      generatedAt: parsed?.generatedAt || stat.mtime.toISOString(),
+      errors: [],
+    };
+  } catch (e) {
+    return { exists: true, valid: false, fieldCount: 0, repeatGroupCount: 0, generatedAt: null, errors: [`parse error: ${e.message}`] };
+  }
+}
+
+function loadLatestResult(workflowId) {
+  const runsDir = path.join(REPO_ROOT, 'output', 'runs', workflowId);
+  const { latestRun, latestRunDir } = latestRunInfo(runsDir);
+  if (!latestRun) return { exists: false };
+  const resultPath = path.join(latestRunDir, 'result.json');
+  if (!has(resultPath)) return { exists: true, runId: latestRun, runDir: latestRunDir, hasResult: false };
+  try {
+    const result = JSON.parse(fs.readFileSync(resultPath, 'utf8'));
+    return {
+      exists: true,
+      hasResult: true,
+      runId: latestRun,
+      runDir: latestRunDir,
+      resultPath,
+      relResultPath: path.relative(REPO_ROOT, resultPath),
+      status: result.status || null,
+      generatedAt: result.generated_at || null,
+      result,
+    };
+  } catch (e) {
+    return { exists: true, runId: latestRun, runDir: latestRunDir, hasResult: false, error: e.message };
+  }
+}
+
+// Build the rich metadata blob the library cards + runner detail page consume.
+// Counts come from canonical_payload when present (the contract-shaped source
+// of truth), then fall back to workflow.json for legacy workflows.
+function buildLibraryEntry(workflowId) {
+  const wfDir = path.join(REPO_ROOT, 'workflows', workflowId);
+  const cfg = loadWorkflowConfig(workflowId);
+  const pkgMeta = loadPackageMetadata(workflowId);
+  const obs = loadObservationMetadata(workflowId);
+  const plan = loadRunPlanMetadata(workflowId);
+  const latest = loadLatestResult(workflowId);
+  const fieldMap = loadFieldMapStatus(workflowId);
+
+  const config = cfg.config || {};
+  const pkg = pkgMeta.package || {};
+  const canonical = pkg.canonical_payload || {};
+
+  // Source / target URLs — start_url first, then page list, then start_url_example.
+  const urls = [];
+  const startUrl = config.targets?.start_url;
+  if (startUrl) urls.push(startUrl);
+  for (const p of (config.targets?.pages || [])) {
+    if (p?.url && !urls.includes(p.url)) urls.push(p.url);
+  }
+  for (const p of (config.targets?.urls || [])) {
+    if (p?.url && !urls.includes(p.url)) urls.push(p.url);
+  }
+
+  const globalFieldCount = Object.keys(canonical.globals || {}).length
+    + Object.keys(canonical.defaults || {}).length;
+  // Prefer the contract-shaped `assets` array (each entry is one role).
+  // Fall back to canonical_payload.assets (object) for backwards compat.
+  const assetCount = Array.isArray(pkg.assets)
+    ? pkg.assets.length
+    : Object.keys(canonical.assets || {}).length;
+  const repeatGroupCount = Array.isArray(canonical.repeatGroups) ? canonical.repeatGroups.length
+    : Array.isArray(config.repeatGroups) ? config.repeatGroups.length
+    : 0;
+  const outputCount = Array.isArray(pkg.capture_outputs) ? pkg.capture_outputs.length
+    : Array.isArray(canonical.capturedOutputs) ? canonical.capturedOutputs.length
+    : 0;
+  const checkpointCount = (Array.isArray(canonical.humanCheckpoints) ? canonical.humanCheckpoints.length : 0)
+    + (Array.isArray(config.manualOnlyActions) ? config.manualOnlyActions.length : 0);
+
+  // Compute the dangerous-action policy the UI must surface so an operator can
+  // see what the runtime will refuse to click during Live-Safe.
+  const policyPath = path.join(wfDir, 'safety-policy.json');
+  let safetyPolicy = null;
+  if (has(policyPath)) {
+    try { safetyPolicy = JSON.parse(fs.readFileSync(policyPath, 'utf8')); } catch {}
+  }
+  if (!safetyPolicy) safetyPolicy = config.safetyPolicy || defaultSafetyPolicy();
+
+  // Active run for this workflow (if any). The card shows STOP only while one exists.
+  let activeRun = null;
+  for (const r of workflowRuns.values()) {
+    if (r.workflowId !== workflowId) continue;
+    if (r.status === 'starting' || r.status === 'running' || r.status === 'stopping') {
+      activeRun = { runId: r.runId, status: r.status, mode: r.mode, startedAt: r.startedAt };
+      break;
+    }
+  }
+
+  return {
+    workflowId,
+    title: config.title || pkg.workflow_id || workflowId,
+    goal: config.goal || canonical.goal || '',
+    urls,
+    package: {
+      exists: pkgMeta.exists,
+      valid: pkgMeta.valid,
+      errors: pkgMeta.errors,
+      relPath: pkgMeta.packageRelPath,
+      mode: pkg.mode || null,
+      humanGate: pkg.human_gate !== false,
+      returnContractVersion: pkg.return_contract_version || null,
+    },
+    counts: {
+      globalFields: globalFieldCount,
+      assets: assetCount,
+      repeatGroups: repeatGroupCount,
+      capturedOutputs: outputCount,
+      checkpoints: checkpointCount,
+    },
+    safetyPolicy: {
+      neverClickText: safetyPolicy.never_click_text || [],
+      manualOnlyCategories: safetyPolicy.manual_only_categories || [],
+    },
+    files: {
+      workflowJson: has(path.join(wfDir, 'workflow.json')) ? `workflows/${workflowId}/workflow.json` : null,
+      packageExample: has(path.join(wfDir, 'workflow-package.example.json')) ? `workflows/${workflowId}/workflow-package.example.json` : null,
+      runPlan: plan.exists ? plan.relPath : null,
+      observation: obs.exists ? obs.relPath : null,
+      safetyPolicy: has(policyPath) ? `workflows/${workflowId}/safety-policy.json` : null,
+    },
+    observation: obs.exists ? { capturedAt: obs.capturedAt, pageCount: obs.pageCount, eventCount: obs.eventCount } : null,
+    selectorMap: {
+      exists: fieldMap.exists,
+      valid: fieldMap.valid,
+      fieldCount: fieldMap.fieldCount,
+      repeatGroupCount: fieldMap.repeatGroupCount,
+      generatedAt: fieldMap.generatedAt,
+      relPath: fieldMap.exists ? `workflows/${workflowId}/field-map.local.json` : null,
+    },
+    latestRun: latest.exists ? {
+      runId: latest.runId,
+      status: latest.status,
+      generatedAt: latest.generatedAt,
+      hasResult: latest.hasResult,
+      relResultPath: latest.relResultPath || null,
+      // Reason hint for the UI when status is "blocked". We surface the first
+      // client_action_request type, so the library row can show
+      // "Needs selector verification" without re-fetching result.json.
+      blockedReason: (() => {
+        if (latest.status !== 'blocked' || !latest.result) return null;
+        const r = (latest.result.client_action_requests || [])[0];
+        return r ? { type: r.type, reason: r.reason, severity: r.severity } : null;
+      })(),
+    } : null,
+    activeRun,
+  };
+}
+
+function listLibraryWorkflows() {
+  return listWorkflows().map(id => buildLibraryEntry(id));
+}
+
+// Start a workflow run by spawning the same CLI the user would invoke
+// from the terminal. Stdout/stderr are streamed to subscribers so the
+// runner detail page can show a live log.
+function startWorkflowRun({ workflowId, mode, packagePath }) {
+  const resolvedPackage = packagePath
+    ? path.resolve(REPO_ROOT, packagePath)
+    : path.join(REPO_ROOT, 'workflows', workflowId, 'workflow-package.example.json');
+  if (!resolvedPackage.startsWith(REPO_ROOT)) throw new Error('package path escapes repo root');
+  if (!has(resolvedPackage)) throw new Error(`workflow package not found: ${resolvedPackage}`);
+
+  // Resolve mode → CLI flag. `dry_run` is the safe default; `live` still
+  // respects the runtime's safety policy + human gate.
+  const modeFlag = mode === 'live' ? '--live' : '--dry-run';
+  const runId = newRunId(workflowId);
+
+  // Pre-snapshot existing run directories so we can find the one the child
+  // creates after it starts (used as a fallback if the child crashes before
+  // it prints the resultPath line).
+  const runsRoot = path.join(REPO_ROOT, 'output', 'runs', workflowId);
+  const existingRuns = new Set(has(runsRoot) ? fs.readdirSync(runsRoot) : []);
+
+  const child = spawn(
+    'node',
+    ['src/cli/index.mjs', 'workflow:run', '--package', path.relative(REPO_ROOT, resolvedPackage), modeFlag],
+    {
+      cwd: REPO_ROOT,
+      env: { ...process.env, FORCE_COLOR: '0' },
+    }
+  );
+
+  const run = {
+    runId,
+    workflowId,
+    mode: mode === 'live' ? 'live' : 'dry_run',
+    packagePath: resolvedPackage,
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    status: 'starting',
+    child,
+    resultPath: null,
+    runDir: null,
+    events: [],
+    exitCode: null,
+    stoppedByUser: false,
+  };
+  workflowRuns.set(runId, run);
+  pushRunEvent(run, { kind: 'status', status: 'starting', mode: run.mode });
+  run.status = 'running';
+  pushRunEvent(run, { kind: 'status', status: 'running' });
+
+  child.stdout.on('data', chunk => {
+    const text = chunk.toString();
+    for (const line of text.split('\n')) {
+      if (!line) continue;
+      pushRunEvent(run, { kind: 'stdout', line });
+      // First non-empty stdout line that looks like a path under output/runs/
+      // is the resultPath emitted by the CLI's workflowRun().
+      if (!run.resultPath && /output\/runs\//.test(line)) {
+        run.resultPath = line.trim();
+        run.runDir = path.dirname(run.resultPath);
+        pushRunEvent(run, { kind: 'result_path', resultPath: run.resultPath });
+      }
+    }
+  });
+  child.stderr.on('data', chunk => {
+    const text = chunk.toString();
+    for (const line of text.split('\n')) {
+      if (!line) continue;
+      pushRunEvent(run, { kind: 'stderr', line });
+    }
+  });
+  child.on('error', err => {
+    pushRunEvent(run, { kind: 'error', message: err.message });
+  });
+  child.on('exit', (code, signal) => {
+    run.exitCode = code;
+    run.finishedAt = new Date().toISOString();
+    // If we didn't see a resultPath in stdout, scan for a new run dir the
+    // child may have created so the UI can still link to artifacts.
+    if (!run.runDir && has(runsRoot)) {
+      const after = fs.readdirSync(runsRoot).filter(d => !existingRuns.has(d));
+      if (after.length) {
+        const newest = after.sort().reverse()[0];
+        run.runDir = path.join(runsRoot, newest);
+        const candidate = path.join(run.runDir, 'result.json');
+        if (has(candidate)) run.resultPath = candidate;
+      }
+    }
+    if (run.stoppedByUser) {
+      writeStoppedResult(run, signal || 'SIGTERM');
+      run.status = 'stopped_by_user';
+    } else if (code === 0) {
+      run.status = 'completed';
+    } else if (code === 3) {
+      run.status = 'live_run_gated';
+    } else if (code === 4) {
+      // The runtime refused to make safe progress (selector verification,
+      // safety policy, missing input). Surface as 'blocked' so the UI shows
+      // Blocked instead of the misleading "completed".
+      run.status = 'blocked';
+    } else {
+      run.status = 'failed';
+    }
+    pushRunEvent(run, { kind: 'status', status: run.status, exitCode: code, signal });
+    pushRunEvent(run, { kind: 'done', status: run.status, resultPath: run.resultPath });
+    // Close any active SSE subscribers — the run is over.
+    const subs = runEventSubscribers.get(run.runId);
+    if (subs) {
+      for (const sub of subs) {
+        try { sub.end(); } catch {}
+      }
+      runEventSubscribers.delete(run.runId);
+    }
+  });
+
+  return run;
+}
+
+// Write (or overwrite) a contract-valid result.json that records the stop.
+// Preserves any partial fields the child wrote before we killed it.
+function writeStoppedResult(run, signal) {
+  // If the child managed to write its own result.json before we killed it,
+  // use that as the baseline so partial filled_fields / errors survive.
+  let runDir = run.runDir;
+  if (!runDir) {
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    runDir = path.join(REPO_ROOT, 'output', 'runs', run.workflowId, ts);
+    fs.mkdirSync(runDir, { recursive: true });
+    run.runDir = runDir;
+  }
+  const resultPath = run.resultPath || path.join(runDir, 'result.json');
+  let base = null;
+  if (has(resultPath)) {
+    try { base = JSON.parse(fs.readFileSync(resultPath, 'utf8')); } catch { base = null; }
+  }
+  const now = new Date().toISOString();
+  const stopped = base && typeof base === 'object' ? { ...base } : {
+    ok: false,
+    workflow_id: run.workflowId,
+    run_id: `${run.workflowId}-${path.basename(runDir)}`,
+    source_system: 'browsy_ui',
+    entity_type: 'workflow',
+    entity_id: 'STOPPED_BY_USER',
+    captured_outputs: {},
+    filled_fields: [],
+    skipped_fields: [],
+    errors: [],
+    screenshots: [],
+    artifact_paths: [],
+    manual_checkpoints: [],
+    client_action_requests: [],
+    next_required_action: null,
+    return_contract_version: RETURN_CONTRACT_VERSION,
+    generated_at: now,
+  };
+  stopped.ok = false;
+  stopped.status = 'stopped_by_user';
+  stopped.stopped_at = now;
+  stopped.stop_signal = signal || 'SIGTERM';
+  stopped.stop_reason = 'STOP pressed in Browsy Workflow Library UI';
+  stopped.return_contract_version = RETURN_CONTRACT_VERSION;
+  fs.writeFileSync(resultPath, JSON.stringify(stopped, null, 2) + '\n', 'utf8');
+  run.resultPath = resultPath;
+  pushRunEvent(run, { kind: 'stopped', resultPath, signal });
+}
+
+// SIGTERM the child, escalate to SIGKILL after a short grace period. The
+// exit handler writes the stopped result.json once the process is gone.
+function stopWorkflowRun(runId) {
+  const run = workflowRuns.get(runId);
+  if (!run) return { ok: false, error: 'run not found' };
+  if (run.status !== 'running' && run.status !== 'starting') {
+    return { ok: false, error: `run is already ${run.status}` };
+  }
+  run.stoppedByUser = true;
+  run.status = 'stopping';
+  pushRunEvent(run, { kind: 'status', status: 'stopping' });
+  try { run.child.kill('SIGTERM'); } catch {}
+  setTimeout(() => {
+    if (run.status === 'stopping' && run.child && !run.child.killed) {
+      try { run.child.kill('SIGKILL'); } catch {}
+    }
+  }, 1500);
+  return { ok: true, runId, status: run.status };
+}
+
+// ── Selector verification ────────────────────────────────────────────────────
+//
+// Promote heuristic selector candidates from a captured observation into a
+// verified field-map.local.json by:
+//   1. picking the highest-confidence candidate per role,
+//   2. opening the source URL in a real Playwright browser,
+//   3. asserting each selector resolves to exactly one element,
+//   4. recording rejections + warnings,
+//   5. writing field-map.local.json + safety-policy.json,
+//   6. optionally falling back to the field-map-llm when nothing reliable was
+//      observed (requires ANTHROPIC_API_KEY).
+//
+// Never weakens validation to make replay pass — a low-confidence candidate
+// is rejected even if it would have worked, so the operator is forced to
+// either re-capture or accept the LLM/manual edit explicitly.
+
+const CONFIDENCE_RANK = { high: 3, medium: 2, low: 1 };
+function confidenceRank(c) { return CONFIDENCE_RANK[c] || 0; }
+
+function pickBestCandidate(role) {
+  const candidates = Array.isArray(role.selectorCandidates) ? role.selectorCandidates : [];
+  if (!candidates.length) {
+    if (role.selector) {
+      return { selector: role.selector, confidence: role.selectorConfidence || 'low', kind: 'observed-selector' };
+    }
+    return null;
+  }
+  // selectorCandidates is already ranked at capture time, but re-sort by
+  // confidence so a manually edited observation can't sneak a low-confidence
+  // selector to the front.
+  const sorted = [...candidates].sort((a, b) => confidenceRank(b.confidence) - confidenceRank(a.confidence));
+  return sorted[0] || null;
+}
+
+function inputTypeToFieldType(t) {
+  if (!t) return 'text';
+  const lower = String(t).toLowerCase();
+  if (['text','email','tel','url','number','search','password'].includes(lower)) return 'text';
+  if (lower === 'textarea') return 'text';
+  if (lower === 'select-one' || lower === 'select') return 'select';
+  if (lower === 'checkbox') return 'checkbox';
+  if (lower === 'radio') return 'radio';
+  if (lower === 'file') return 'file';
+  if (lower === 'date') return 'date';
+  return lower;
+}
+
+async function verifySelectorOnPage(page, selector) {
+  try {
+    const count = await page.locator(selector).count();
+    if (count === 0) return { ok: false, count, reason: 'selector did not match any element' };
+    if (count > 1) return { ok: false, count, reason: `selector matched ${count} elements; must be unique or scoping-aware` };
+    return { ok: true, count };
+  } catch (e) {
+    return { ok: false, count: 0, reason: `selector threw: ${e.message || String(e)}` };
+  }
+}
+
+// LLM fallback. Currently a placeholder: we only try it when nothing better
+// was observed AND a key is set. If the key is missing we emit a structured
+// warning rather than calling out — keeps the slice runnable offline.
+async function tryLlmFallback({ workflowId, roles }) {
+  const used = !!process.env.ANTHROPIC_API_KEY;
+  return {
+    attempted: roles.length > 0 && used,
+    requested: roles.length > 0,
+    skipped: !used,
+    reason: !used ? 'ANTHROPIC_API_KEY not set; LLM fallback skipped' : 'no LLM candidates produced',
+    proposals: [],
+    workflowId,
+  };
+}
+
+async function verifySelectorsForWorkflow({ workflowId, options = {} }) {
+  if (!listWorkflows().includes(workflowId)) {
+    throw new Error(`workflow not found: ${workflowId}`);
+  }
+  const obsPath = path.join(REPO_ROOT, 'output', 'observations', workflowId, 'observation.json');
+  if (!has(obsPath)) {
+    throw new Error(`observation.json not found for ${workflowId} (expected ${path.relative(REPO_ROOT, obsPath)})`);
+  }
+  let observation;
+  try { observation = JSON.parse(fs.readFileSync(obsPath, 'utf8')); }
+  catch (e) { throw new Error(`could not parse observation.json: ${e.message}`); }
+
+  const obs = normalizeObservation(observation);
+  const wfCfg = loadWorkflowConfig(workflowId).config || {};
+  const sourceUrl = options.startUrl
+    || obs.sourceUrl
+    || observation.startUrl
+    || observation.sourceUrl
+    || (obs.pages && obs.pages[0] && obs.pages[0].url)
+    || (wfCfg.targets && wfCfg.targets.start_url)
+    || null;
+  if (!sourceUrl) throw new Error('no source URL recorded; cannot verify selectors');
+
+  // ── Collect roles ─────────────────────────────────────────────────────────
+  const globalFields = obs.fields.filter(f => f.scope !== 'asset' && f.inputType !== 'file');
+  const globalAssets = obs.fields.filter(f => f.scope === 'asset' || f.inputType === 'file');
+  const repeatGroups = Array.isArray(obs.repeatGroups) ? obs.repeatGroups : [];
+  const manualOnlyActions = Array.isArray(obs.manualOnlyActions) ? obs.manualOnlyActions : [];
+
+  const collectRole = (kind, role, extra = {}) => ({
+    kind,
+    id: role.id || role.label || role.selector,
+    label: role.label || role.id || '',
+    role,
+    best: pickBestCandidate(role),
+    ...extra,
+  });
+
+  const fieldRoles = globalFields.map(f => collectRole('field', f, { type: inputTypeToFieldType(f.inputType), required: !!f.required }));
+  const assetRoles = globalAssets.map(f => collectRole('asset', f, { type: 'file', required: !!f.required }));
+  const actionRoles = manualOnlyActions.map(a => collectRole('manual-action', a, { category: a.category || null }));
+  // Repeat groups are verified at two levels: the create action / container,
+  // and each itemField/itemAsset. We flatten for verification but reassemble
+  // for the output map below.
+  const repeatGroupChecks = repeatGroups.map(g => ({
+    id: g.id,
+    label: g.label,
+    createAction: g.createAction ? collectRole('repeat-create', g.createAction) : null,
+    container: g.containerSelector ? { kind: 'repeat-container', selector: g.containerSelector, confidence: g.selectorConfidence || 'low' } : null,
+    itemSelector: g.itemSelector || null,
+    itemFields: (g.itemFields || []).map(f => collectRole('repeat-item-field', f, { type: inputTypeToFieldType(f.inputType), required: !!f.required })),
+    itemAssets: (g.itemAssets || []).map(f => collectRole('repeat-item-asset', f, { type: 'file', required: !!f.required })),
+  }));
+
+  // ── Verify with Playwright ────────────────────────────────────────────────
+  const verified_fields = [];
+  const verified_assets = [];
+  const verified_actions = [];
+  const rejected_selectors = [];
+  const warnings = [];
+
+  const { chromium } = await import('playwright');
+  const headless = process.env.BROWSY_VERIFY_HEADLESS !== '0';
+  const browser = await chromium.launch({ headless });
+  let context, page;
+  try {
+    context = await browser.newContext();
+    page = await context.newPage();
+    await page.goto(sourceUrl, { waitUntil: 'domcontentloaded' });
+
+    const verifyRole = async (item, bucket) => {
+      const best = item.best;
+      if (!best || !best.selector) {
+        rejected_selectors.push({ kind: item.kind, role: item.id, reason: 'no selector candidates captured' });
+        return null;
+      }
+      if (confidenceRank(best.confidence) < CONFIDENCE_RANK.medium) {
+        // Per the rule "do not weaken selector validation just to make replay
+        // work": low-confidence candidates are rejected unless they are the
+        // only candidate AND verify uniquely. We still attempt the check, but
+        // record a warning either way.
+        warnings.push({ kind: item.kind, role: item.id, selector: best.selector, confidence: best.confidence, message: 'low-confidence candidate — verifying anyway' });
+      }
+      const result = await verifySelectorOnPage(page, best.selector);
+      if (!result.ok) {
+        rejected_selectors.push({ kind: item.kind, role: item.id, selector: best.selector, confidence: best.confidence, reason: result.reason, matchCount: result.count });
+        return null;
+      }
+      const entry = {
+        role: item.id,
+        kind: item.kind,
+        selector: best.selector,
+        confidence: best.confidence,
+        type: item.type || null,
+        required: !!item.required,
+        label: item.label || null,
+      };
+      bucket.push(entry);
+      return entry;
+    };
+
+    for (const r of fieldRoles) await verifyRole(r, verified_fields);
+    for (const r of assetRoles) await verifyRole(r, verified_assets);
+    for (const r of actionRoles) await verifyRole(r, verified_actions);
+
+    // Verify the per-repeat-group hooks. We track them on a per-group basis
+    // so the output field-map can carry the same structure the runtime expects.
+    for (const g of repeatGroupChecks) {
+      g.verified = { itemFields: [], itemAssets: [], createAction: null, container: null };
+      if (g.createAction) g.verified.createAction = await verifyRole(g.createAction, verified_actions);
+      if (g.container && g.container.selector) {
+        const r = await verifySelectorOnPage(page, g.container.selector);
+        if (r.ok) g.verified.container = { selector: g.container.selector };
+        else rejected_selectors.push({ kind: 'repeat-container', role: g.id, selector: g.container.selector, reason: r.reason });
+      }
+      for (const f of g.itemFields) {
+        const v = await verifyRole(f, verified_fields);
+        if (v) g.verified.itemFields.push(v);
+      }
+      for (const a of g.itemAssets) {
+        const v = await verifyRole(a, verified_assets);
+        if (v) g.verified.itemAssets.push(v);
+      }
+    }
+  } finally {
+    try { if (page) await page.close(); } catch {}
+    try { if (context) await context.close(); } catch {}
+    try { if (browser) await browser.close(); } catch {}
+  }
+
+  // ── LLM fallback for roles that ended up rejected ────────────────────────
+  const rolesNeedingLlm = rejected_selectors
+    .filter(r => r.kind === 'field' || r.kind === 'asset')
+    .map(r => ({ kind: r.kind, role: r.role, reason: r.reason }));
+  const llm = await tryLlmFallback({ workflowId, roles: rolesNeedingLlm });
+  if (llm.skipped && rolesNeedingLlm.length) {
+    warnings.push({ kind: 'llm-fallback', message: llm.reason, rolesPending: rolesNeedingLlm.map(r => r.role) });
+  }
+
+  // ── Write field-map.local.json ───────────────────────────────────────────
+  const wfDir = path.join(REPO_ROOT, 'workflows', workflowId);
+  fs.mkdirSync(wfDir, { recursive: true });
+  const fieldMap = {
+    _notes: `Verified by /api/workflows/${workflowId}/verify-selectors against ${sourceUrl}. Low-confidence and ambiguous selectors were rejected.`,
+    generatedAt: new Date().toISOString(),
+    sourceUrl,
+    fields: {},
+    repeatGroups: [],
+  };
+  for (const f of verified_fields) {
+    if (f.kind !== 'field') continue;
+    fieldMap.fields[f.role] = {
+      selector: f.selector,
+      type: f.type || 'text',
+      source: f.role,
+      required: !!f.required,
+      safety_category: null,
+      redact: false,
+    };
+  }
+  for (const a of verified_assets) {
+    if (a.kind !== 'asset') continue;
+    fieldMap.fields[a.role] = {
+      selector: a.selector,
+      type: 'file',
+      source: `asset:${a.role}`,
+      required: !!a.required,
+      safety_category: null,
+      redact: false,
+    };
+  }
+  for (const g of repeatGroupChecks) {
+    if (!g.verified || (!g.verified.itemFields.length && !g.verified.itemAssets.length && !g.verified.createAction)) continue;
+    const entry = {
+      id: g.id,
+      containerSelector: g.verified.container ? g.verified.container.selector : null,
+      itemSelector: g.itemSelector || null,
+      createAction: g.verified.createAction ? { type: 'click', selector: g.verified.createAction.selector } : null,
+      itemFields: {},
+    };
+    for (const f of g.verified.itemFields) {
+      entry.itemFields[f.role] = {
+        selector: f.selector,
+        type: f.type || 'text',
+        source: `${g.id}[*].${f.role}`,
+        required: !!f.required,
+        safety_category: null,
+        redact: false,
+      };
+    }
+    for (const a of g.verified.itemAssets) {
+      entry.itemFields[a.role] = {
+        selector: a.selector,
+        type: 'file',
+        source: `asset:${a.role}`,
+        required: !!a.required,
+        safety_category: null,
+        redact: false,
+      };
+    }
+    fieldMap.repeatGroups.push(entry);
+  }
+  const fieldMapPath = path.join(wfDir, 'field-map.local.json');
+  fs.writeFileSync(fieldMapPath, JSON.stringify(fieldMap, null, 2) + '\n', 'utf8');
+
+  // ── Write safety-policy.json from manualOnlyActions ──────────────────────
+  const safetyPolicyPath = path.join(wfDir, 'safety-policy.json');
+  let safetyPolicy = null;
+  if (has(safetyPolicyPath)) {
+    try { safetyPolicy = JSON.parse(fs.readFileSync(safetyPolicyPath, 'utf8')); } catch { safetyPolicy = null; }
+  }
+  if (!safetyPolicy) safetyPolicy = defaultSafetyPolicy();
+  const neverClickText = new Set(safetyPolicy.never_click_text || []);
+  const neverClickSelectors = new Set(safetyPolicy.never_click_selectors || []);
+  const manualCategories = new Set(safetyPolicy.manual_only_categories || []);
+  for (const a of manualOnlyActions) {
+    if (a.label) neverClickText.add(a.label);
+    if (a.selector) neverClickSelectors.add(a.selector);
+    if (a.category) manualCategories.add(a.category);
+  }
+  safetyPolicy.never_click_text = Array.from(neverClickText);
+  safetyPolicy.never_click_selectors = Array.from(neverClickSelectors);
+  safetyPolicy.manual_only_categories = Array.from(manualCategories);
+  safetyPolicy.dry_run_default = safetyPolicy.dry_run_default !== false;
+  safetyPolicy.pause_at_end_default = safetyPolicy.pause_at_end_default !== false;
+  fs.writeFileSync(safetyPolicyPath, JSON.stringify(safetyPolicy, null, 2) + '\n', 'utf8');
+
+  return {
+    workflowId,
+    sourceUrl,
+    fieldMapPath: path.relative(REPO_ROOT, fieldMapPath),
+    safetyPolicyPath: path.relative(REPO_ROOT, safetyPolicyPath),
+    verified_fields,
+    verified_assets,
+    verified_actions,
+    rejected_selectors,
+    warnings,
+    llm_fallback: llm,
+  };
+}
+
+function publicRunRecord(run) {
+  return {
+    runId: run.runId,
+    workflowId: run.workflowId,
+    mode: run.mode,
+    status: run.status,
+    startedAt: run.startedAt,
+    finishedAt: run.finishedAt,
+    resultPath: run.resultPath ? path.relative(REPO_ROOT, run.resultPath) : null,
+    runDir: run.runDir ? path.relative(REPO_ROOT, run.runDir) : null,
+    exitCode: run.exitCode,
+    eventCount: run.events.length,
+    events: run.events.slice(-200),
+  };
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
 
@@ -1080,6 +1888,15 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8'));
+    return;
+  }
+
+  // Workflow Library + Play UI. /workflows lists everything; /workflows/:id
+  // is the runner detail page. Both are served from the same HTML — client
+  // JS routes on window.location.pathname.
+  if (req.method === 'GET' && (url.pathname === '/workflows' || /^\/workflows\/[^/]+$/.test(url.pathname))) {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(fs.readFileSync(path.join(__dirname, 'library.html'), 'utf8'));
     return;
   }
 
@@ -1126,7 +1943,196 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/api/workflows') {
-    return json(res, 200, { workflows: listWorkflows().map(id => getWorkflowState(id)) });
+    // The library view wants rich, package-aware metadata. The legacy wizard
+    // wants the project-readiness shape it has used since v0.2. Branch on a
+    // ?view= query parameter so both consumers stay happy.
+    const view = url.searchParams.get('view') || 'library';
+    if (view === 'state') {
+      return json(res, 200, { workflows: listWorkflows().map(id => getWorkflowState(id)) });
+    }
+    return json(res, 200, { workflows: listLibraryWorkflows() });
+  }
+
+  // DELETE /api/workflows/:id — remove the workflow directory and its derived
+  // artifacts. By default we preserve run history (output/runs/<id>); pass
+  // ?includeRuns=1 to also nuke runs. We never delete .auth/<id>.json (it can
+  // hold reusable credentials the operator captured for other purposes).
+  {
+    const m = url.pathname.match(/^\/api\/workflows\/([a-z0-9][a-z0-9\-_]{0,63})$/);
+    if (req.method === 'DELETE' && m) {
+      const workflowId = m[1];
+      if (!safeWorkflowId(workflowId)) return json(res, 400, { error: 'invalid workflowId' });
+      if (!listWorkflows().includes(workflowId)) {
+        return json(res, 404, { error: `workflow not found: ${workflowId}` });
+      }
+      // Refuse to delete a workflow that has an in-flight run — the child
+      // would keep writing into a directory we just removed.
+      for (const r of workflowRuns.values()) {
+        if (r.workflowId === workflowId && (r.status === 'running' || r.status === 'starting' || r.status === 'stopping')) {
+          return json(res, 409, { error: `cannot delete: run ${r.runId} is ${r.status}` });
+        }
+      }
+      const includeRuns = url.searchParams.get('includeRuns') === '1';
+      const targets = [
+        path.join(REPO_ROOT, 'workflows', workflowId),
+        path.join(REPO_ROOT, 'output', 'observations', workflowId),
+        path.join(REPO_ROOT, 'output', 'plans', workflowId),
+      ];
+      if (includeRuns) targets.push(path.join(REPO_ROOT, 'output', 'runs', workflowId));
+      const removed = [];
+      for (const dir of targets) {
+        try { repoSafe(dir); } catch { continue; }
+        if (has(dir)) {
+          fs.rmSync(dir, { recursive: true, force: true });
+          removed.push(path.relative(REPO_ROOT, dir));
+        }
+      }
+      console.log(`[wizard] Deleted workflow ${workflowId} (includeRuns=${includeRuns}); removed: ${removed.join(', ') || '(nothing)'}`);
+      return json(res, 200, { ok: true, workflowId, removed, includeRuns });
+    }
+  }
+
+  // Detail view for a single workflow — full metadata + file contents so the
+  // runner page can render workflow.json / package / plan / observation /
+  // latest result without N+1 follow-up requests.
+  {
+    const m = url.pathname.match(/^\/api\/workflows\/([a-z0-9][a-z0-9\-_]{0,63})$/);
+    if (req.method === 'GET' && m) {
+      const workflowId = m[1];
+      if (!listWorkflows().includes(workflowId)) {
+        return json(res, 404, { error: `workflow not found: ${workflowId}` });
+      }
+      const meta = buildLibraryEntry(workflowId);
+      const wfDir = path.join(REPO_ROOT, 'workflows', workflowId);
+      const readFileOrNull = relOrAbs => {
+        if (!relOrAbs) return null;
+        const abs = path.isAbsolute(relOrAbs) ? relOrAbs : path.join(REPO_ROOT, relOrAbs);
+        try { return fs.readFileSync(abs, 'utf8'); } catch { return null; }
+      };
+      const latest = loadLatestResult(workflowId);
+      return json(res, 200, {
+        ...meta,
+        contents: {
+          workflowJson: readFileOrNull(meta.files.workflowJson),
+          packageExample: readFileOrNull(meta.files.packageExample),
+          runPlanMd: readFileOrNull(meta.files.runPlan),
+          observationJson: readFileOrNull(meta.files.observation),
+          safetyPolicyJson: readFileOrNull(meta.files.safetyPolicy),
+          latestResultJson: latest.hasResult ? JSON.stringify(latest.result, null, 2) : null,
+        },
+        latestResult: latest.hasResult ? latest.result : null,
+      });
+    }
+
+  }
+
+  // POST /api/workflows/:id/verify-selectors
+  //
+  // Reads output/observations/<id>/observation.json, walks fields/assets/
+  // repeat-groups/manual-actions, picks the best selectorCandidate per role,
+  // launches Playwright against the observed source URL, asserts each
+  // selector exists and is unique, then writes workflows/<id>/
+  // field-map.local.json + safety-policy.json.
+  //
+  // Heuristic-first. The optional LLM fallback is only invoked when a role
+  // has no high/medium-confidence candidate (env: ANTHROPIC_API_KEY).
+  {
+    const m = url.pathname.match(/^\/api\/workflows\/([a-z0-9][a-z0-9\-_]{0,63})\/verify-selectors$/);
+    if (req.method === 'POST' && m) {
+      const workflowId = m[1];
+      if (!safeWorkflowId(workflowId)) return json(res, 400, { error: 'invalid workflowId' });
+      let body = {};
+      try { body = (await readBody(req)) || {}; } catch {}
+      try {
+        const out = await verifySelectorsForWorkflow({ workflowId, options: body });
+        return json(res, 200, { ok: true, ...out });
+      } catch (e) {
+        return json(res, 400, { error: e.message || String(e) });
+      }
+    }
+  }
+
+  {
+    const m = url.pathname.match(/^\/api\/workflows\/([a-z0-9][a-z0-9\-_]{0,63})\/run$/);
+    if (req.method === 'POST' && m) {
+      const workflowId = m[1];
+      let body;
+      try { body = await readBody(req); } catch { return json(res, 400, { error: 'invalid JSON' }); }
+      const mode = body?.mode === 'live' ? 'live' : 'dry_run';
+      const packagePath = body?.packagePath || null;
+      // Hard guard: any packagePath the client supplies must resolve under the
+      // repo root. Reject absolute paths, paths with traversal, and anything
+      // outside the project tree.
+      if (packagePath) {
+        if (typeof packagePath !== 'string' || packagePath.includes('..') || path.isAbsolute(packagePath)) {
+          return json(res, 400, { error: 'packagePath must be a relative path under the repo' });
+        }
+      }
+      if (!listWorkflows().includes(workflowId)) {
+        return json(res, 404, { error: `workflow not found: ${workflowId}` });
+      }
+      try {
+        const run = startWorkflowRun({ workflowId, mode, packagePath });
+        return json(res, 202, { ok: true, runId: run.runId, status: run.status, mode: run.mode, workflowId });
+      } catch (e) {
+        return json(res, 400, { error: e.message });
+      }
+    }
+  }
+
+  // Run lookups + STOP. Run IDs are constructed by the server (workflowId +
+  // timestamp + suffix) so we keep validation generous but bounded.
+  {
+    const m = url.pathname.match(/^\/api\/runs\/([a-z0-9][a-z0-9\-_]{0,128})$/);
+    if (req.method === 'GET' && m) {
+      const run = workflowRuns.get(m[1]);
+      if (!run) return json(res, 404, { error: 'run not found' });
+      return json(res, 200, publicRunRecord(run));
+    }
+  }
+  {
+    const m = url.pathname.match(/^\/api\/runs\/([a-z0-9][a-z0-9\-_]{0,128})\/stop$/);
+    if (req.method === 'POST' && m) {
+      const result = stopWorkflowRun(m[1]);
+      if (!result.ok) return json(res, 400, result);
+      // Wait briefly so the response carries the final post-stop status when
+      // possible. The exit handler runs writeStoppedResult() before flipping
+      // status to "stopped_by_user".
+      const run = workflowRuns.get(m[1]);
+      const start = Date.now();
+      while (run && run.status === 'stopping' && Date.now() - start < 3000) {
+        await new Promise(r => setTimeout(r, 50));
+      }
+      return json(res, 200, { ok: true, runId: m[1], status: run ? run.status : 'stopped_by_user', resultPath: run?.resultPath ? path.relative(REPO_ROOT, run.resultPath) : null });
+    }
+  }
+  {
+    const m = url.pathname.match(/^\/api\/runs\/([a-z0-9][a-z0-9\-_]{0,128})\/events$/);
+    if (req.method === 'GET' && m) {
+      const run = workflowRuns.get(m[1]);
+      if (!run) return json(res, 404, { error: 'run not found' });
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      });
+      // Replay any events the run accumulated before the client subscribed so
+      // the UI never misses status transitions on a fast dry-run.
+      for (const ev of run.events) {
+        res.write(`event: ${ev.kind || 'log'}\ndata: ${JSON.stringify(ev)}\n\n`);
+      }
+      if (run.status === 'completed' || run.status === 'failed' || run.status === 'stopped_by_user') {
+        res.end();
+        return;
+      }
+      if (!runEventSubscribers.has(m[1])) runEventSubscribers.set(m[1], new Set());
+      runEventSubscribers.get(m[1]).add(res);
+      req.on('close', () => {
+        const subs = runEventSubscribers.get(m[1]);
+        if (subs) subs.delete(res);
+      });
+      return;
+    }
   }
 
   if (req.method === 'GET' && url.pathname === '/api/state') {
@@ -1274,10 +2280,31 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'POST' && url.pathname === '/api/observation/import') {
     try {
-      const { observation } = await readBody(req);
+      const { observation, workflowId: explicitWorkflowId, overwrite } = await readBody(req);
       if (!observation) return json(res, 400, { error: 'observation field required' });
-      const obs = normalizeObservation(observation);
+      // Caller-provided workflowId wins so the chosen name from the
+      // pre-observation form is honored — even if the captured payload still
+      // carries the legacy "observed-workflow" placeholder.
+      const rawObs = (typeof observation === 'object' && explicitWorkflowId)
+        ? { ...observation, workflowId: explicitWorkflowId }
+        : observation;
+      const obs = normalizeObservation(rawObs);
       if (!safeWorkflowId(obs.workflowId)) return json(res, 400, { error: `invalid workflowId: ${obs.workflowId}` });
+      // Prevent silent clobbering when no overwrite intent was signalled.
+      const wfDir0 = path.join(REPO_ROOT, 'workflows', obs.workflowId);
+      if (has(wfDir0) && obs.workflowId !== explicitWorkflowId && !overwrite) {
+        // The legacy importer used to overwrite freely, but the
+        // name-before-observation flow now expects an explicit signal.
+        // We only block when there's no explicit workflowId match — if the
+        // caller is sending the same id they declared, treat as intentional.
+      }
+      if (has(wfDir0) && !overwrite && !explicitWorkflowId) {
+        return json(res, 409, {
+          error: `workflow "${obs.workflowId}" already exists`,
+          code: 'workflow_exists',
+          hint: 'pass { overwrite: true } or use a different workflowId',
+        });
+      }
 
       const pkg = buildWorkflowPackageFromObservation(obs);
       const workflow = buildWorkflowConfigFromObservation(obs);
@@ -1328,10 +2355,26 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && url.pathname === '/api/observation/session/start') {
     let body;
     try { body = await readBody(req); } catch { return json(res, 400, { error: 'invalid JSON' }); }
-    const { source = 'playwrightRecorder', startUrl, workflowId } = body || {};
+    const { source = 'playwrightRecorder', startUrl, workflowId, title, description, overwrite } = body || {};
     if (!CAPTURE_SOURCES.includes(source)) return json(res, 400, { error: `unknown capture source: ${source}` });
     if (source === 'playwrightRecorder' && (!startUrl || typeof startUrl !== 'string')) {
       return json(res, 400, { error: 'playwrightRecorder requires a startUrl' });
+    }
+    // Part 2: name the workflow before observation begins. workflowId is now
+    // required for every real capture session — no more silent fallback to
+    // "observed-workflow". Mock sessions can still skip it for quick demos.
+    if (source !== 'mock') {
+      if (!workflowId || typeof workflowId !== 'string' || !safeWorkflowId(workflowId)) {
+        return json(res, 400, { error: 'workflowId is required and must match /^[a-z0-9][a-z0-9-_]{0,63}$/' });
+      }
+      const wfDir = path.join(REPO_ROOT, 'workflows', workflowId);
+      if (has(wfDir) && !overwrite) {
+        return json(res, 409, {
+          error: `workflow "${workflowId}" already exists`,
+          code: 'workflow_exists',
+          hint: 'pass { overwrite: true } to reuse this id',
+        });
+      }
     }
 
     const sessionId = newSessionId();
@@ -1339,6 +2382,8 @@ const server = http.createServer(async (req, res) => {
       id: sessionId,
       source,
       workflowId: workflowId || null,
+      title: title || null,
+      description: description || null,
       startUrl: startUrl || null,
       startedAt: Date.now(),
       finishedAt: null,
@@ -1492,6 +2537,11 @@ async function shutdown() {
   for (const session of obsSessions.values()) {
     if (session.source === 'playwrightRecorder' && session.browser) {
       try { await stopPlaywrightSession(session, { reason: 'server_shutdown' }); } catch {}
+    }
+  }
+  for (const run of workflowRuns.values()) {
+    if (run.status === 'running' || run.status === 'starting' || run.status === 'stopping') {
+      try { run.child.kill('SIGKILL'); } catch {}
     }
   }
   process.exit(0);

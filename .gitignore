@@ -6,4 +6,5 @@ output/
 playwright-report/
 test-results/
 workflows/*/field-map.local.json
+tmp/
 .DS_Store

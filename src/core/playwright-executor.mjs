@@ -146,9 +146,11 @@ async function extractFinalState(page) {
 //   headless       — launch headless (default true)
 //   trace          — save Playwright trace beside the fixture (default false)
 //   safetyPolicy   — safety policy object (defaults to defaultSafetyPolicy())
+//   downloadsDir   — optional directory to save downloaded files; downloads are
+//                    always captured in downloadedFiles[] but only persisted when set
 //
 // Returns:
-//   { ok, executedSteps, skippedSteps, checkpoint, finalState }
+//   { ok, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles }
 //   ok=false also sets .error with the message.
 export async function executeRunPlanWithPlaywright({
   runPlan,
@@ -159,17 +161,20 @@ export async function executeRunPlanWithPlaywright({
   trace = false,
   safetyPolicy,
   fieldMap,
+  downloadsDir = null,
 }) {
-  const policy        = safetyPolicy ?? defaultSafetyPolicy();
-  const executedSteps = [];
-  const skippedSteps  = [];
+  const policy          = safetyPolicy ?? defaultSafetyPolicy();
+  const executedSteps   = [];
+  const skippedSteps    = [];
+  const capturedOutputs = {};
+  const downloadedFiles = [];
   let checkpoint  = null;
   let finalState  = null;
   let browser     = null;
 
   try {
     browser = await chromium.launch({ headless });
-    const ctx  = await browser.newContext();
+    const ctx  = await browser.newContext({ acceptDownloads: true });
 
     if (trace) {
       await ctx.tracing.start({ screenshots: true, snapshots: true });
@@ -178,6 +183,26 @@ export async function executeRunPlanWithPlaywright({
     const page = await ctx.newPage();
     const url  = targetUrl ?? pathToFileURL(path.resolve(fixturePath)).href;
     await page.goto(url);
+
+    // Capture downloads — always record metadata; persist bytes only when downloadsDir is set.
+    page.on('download', async download => {
+      const suggested = (() => { try { return download.suggestedFilename(); } catch { return null; } })();
+      const entry = { filename: suggested || 'download', url: (() => { try { return download.url(); } catch { return null; } })() };
+      if (downloadsDir) {
+        try {
+          fs.mkdirSync(downloadsDir, { recursive: true });
+          const filename = suggested && /^[A-Za-z0-9._-]+$/.test(suggested)
+            ? suggested
+            : `download-${Date.now()}.bin`;
+          const filePath = path.join(downloadsDir, filename);
+          await download.saveAs(filePath);
+          entry.path = filePath;
+        } catch (err) {
+          entry.error = err.message;
+        }
+      }
+      downloadedFiles.push(entry);
+    });
 
     // For live URLs with repeat groups, wait for at least one section to appear before
     // detecting the selector — sections may load asynchronously.
@@ -278,6 +303,28 @@ export async function executeRunPlanWithPlaywright({
           }
         }
 
+      // ── Click a safe (non-dangerous) action ─────────────────────────────────
+      } else if (step.type === 'click_safe_action') {
+        const btn = page.locator(step.selector).first();
+        if (await btn.count() > 0) {
+          await btn.click();
+          executedSteps.push({ type: step.type, selector: step.selector, label: step.label });
+        } else {
+          skippedSteps.push({ type: step.type, selector: step.selector, reason: 'element not found' });
+        }
+
+      // ── Capture text content of an output element ────────────────────────────
+      } else if (step.type === 'capture_output') {
+        const el = page.locator(step.selector).first();
+        if (await el.count() > 0) {
+          const text = await el.textContent();
+          capturedOutputs[step.outputId] = { status: 'captured', value: text?.trim() || null };
+          executedSteps.push({ type: step.type, outputId: step.outputId, captured: true });
+        } else {
+          capturedOutputs[step.outputId] = { status: 'not_found', value: null };
+          executedSteps.push({ type: step.type, outputId: step.outputId, captured: false });
+        }
+
       // ── Human checkpoint — always stop here ──────────────────────────────────
       } else if (step.type === 'human_checkpoint') {
         checkpoint = step;
@@ -298,10 +345,10 @@ export async function executeRunPlanWithPlaywright({
     await browser.close();
     browser = null;
 
-    return { ok: true, executedSteps, skippedSteps, checkpoint, finalState };
+    return { ok: true, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles };
 
   } catch (err) {
     if (browser) await browser.close().catch(() => {});
-    return { ok: false, error: err.message, executedSteps, skippedSteps, checkpoint, finalState };
+    return { ok: false, error: err.message, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles };
   }
 }

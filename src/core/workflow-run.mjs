@@ -174,6 +174,14 @@ export async function runWorkflowPackage(options = {}) {
     // Nothing to execute beyond the analyses above.
   }
 
+  // 11a. Testing-only delay knob. Lets acceptance tests start a run, race the
+  //      STOP endpoint against it, and assert the partial result file is
+  //      written before the runner finishes. Off (0) in production.
+  const delayMs = Number(process.env.BROWSY_RUN_DELAY_MS) || 0;
+  if (delayMs > 0) {
+    await new Promise(r => setTimeout(r, delayMs));
+  }
+
   // 12. Finalize status
   result.status = computeStatus({
     mode: pkg.mode,

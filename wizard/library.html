@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browsy Workflow Library</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root {
+  --bg: #f7f6f2;
+  --card: #fff;
+  --dark: #1c1936;
+  --muted: #6b6889;
+  --border: #e2dfd6;
+  --teal:   #2ec4b4;
+  --orange: #f47c30;
+  --purple: #7048c8;
+  --green:  #28c87a;
+  --yellow: #f5c030;
+  --coral:  #f03c52;
+  --navy:   #1c1936;
+  --accent: var(--teal);
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--dark);
+  min-height: 100vh;
+  padding: 24px 24px 64px;
+}
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.topbar h1 {
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.topbar h1 .logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.topbar h1 .logo img { width: 100%; height: 100%; object-fit: contain; }
+.topbar nav { display: flex; gap: 10px; align-items: center; }
+.topbar nav a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+.topbar nav a:hover { background: var(--border); }
+.topbar nav a.back { background: var(--navy); color: white; }
+
+/* ── Library table ── */
+.lib-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.lib-toolbar .count {
+  font-size: 13px;
+  color: var(--muted);
+}
+.lib-toolbar input[type=search] {
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 240px;
+  background: var(--card);
+}
+.lib-table-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: auto;
+  box-shadow: 0 1px 3px rgba(28,25,54,0.04);
+}
+table.lib {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+table.lib th, table.lib td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  white-space: nowrap;
+}
+table.lib th {
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--muted);
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+table.lib tr:last-child td { border-bottom: none; }
+table.lib tr:hover td { background: #fafaf6; }
+table.lib td.id {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+table.lib td.title { font-weight: 600; min-width: 180px; white-space: normal; }
+table.lib td.title a { color: var(--navy); text-decoration: none; }
+table.lib td.title a:hover { color: var(--accent); }
+table.lib td.url {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+table.lib td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.badge.good   { background: #d6f5e3; color: #1f7a4d; }
+.badge.warn   { background: #fdf2cf; color: #8a5a00; }
+.badge.bad    { background: #ffd9de; color: #a31a2e; }
+.badge.muted  { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+.badge.live   { background: #ffd9de; color: #a31a2e; }
+.row-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+button.btn, a.btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--navy);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+button.btn:hover, a.btn:hover { background: var(--bg); }
+button.btn.primary  { background: var(--accent); color: white; border-color: var(--accent); }
+button.btn.secondary { background: var(--purple); color: white; border-color: var(--purple); }
+button.btn.warning { background: var(--orange); color: white; border-color: var(--orange); }
+button.btn.danger { background: var(--coral); color: white; border-color: var(--coral); }
+button.btn.stop {
+  background: var(--coral);
+  color: white;
+  border-color: var(--coral);
+  font-weight: 700;
+}
+button.btn:disabled { opacity: .5; cursor: not-allowed; }
+.empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--muted);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+/* ── Delete confirmation modal ── */
+.modal-back {
+  position: fixed; inset: 0;
+  background: rgba(28,25,54,.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+.modal {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 22px 22px 18px;
+  width: 100%; max-width: 420px;
+  box-shadow: 0 12px 40px rgba(28,25,54,.25);
+}
+.modal h2 { font-size: 17px; margin-bottom: 8px; }
+.modal p { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.modal label { font-size: 13px; display: flex; align-items: center; gap: 6px; margin: 8px 0; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+
+/* ── Runner detail ── */
+.detail {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.detail .full { grid-column: 1 / -1; }
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+}
+.panel h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.panel pre, .panel code {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 460px;
+  display: block;
+}
+.runner-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.stop-big {
+  font-size: 17px;
+  font-weight: 800;
+  padding: 12px 28px;
+  background: var(--coral);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.stop-big:disabled { opacity: .4; cursor: not-allowed; }
+.event-log {
+  max-height: 460px;
+  overflow: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  background: #111;
+  color: #d8d8d8;
+  border-radius: 10px;
+  padding: 10px;
+}
+.event-log .line.stderr { color: #ff8d8d; }
+.event-log .line.status { color: #ffcb6a; }
+.event-log .line.stopped { color: #ff8d8d; font-weight: 700; }
+.event-log .line.done { color: #a4f8a4; font-weight: 700; }
+.event-log .ts { color: #6b6b6b; margin-right: 6px; }
+.dangerous-policy {
+  background: #fff3f3;
+  border: 1px solid #ffd9de;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+}
+.dangerous-policy ul { padding-left: 18px; }
+.dangerous-policy li code {
+  background: white;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.status-pill {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 12px;
+}
+.status-pill.running, .status-pill.starting { background: #fff7d6; color: #8a5a00; }
+.status-pill.stopping { background: #ffd9de; color: #a31a2e; }
+.status-pill.completed, .status-pill.live_run_completed, .status-pill.dry_run_passed { background: #d6f5e3; color: #1f7a4d; }
+.status-pill.failed { background: #ffd9de; color: #a31a2e; }
+.status-pill.stopped_by_user { background: #ffd9de; color: #a31a2e; }
+.status-pill.blocked { background: #fdd6c2; color: #a3461a; }
+.status-pill.live_run_gated { background: #fdf2cf; color: #8a5a00; }
+.status-pill.idle { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+.muted { color: var(--muted); font-size: 12px; }
+.error { color: #a31a2e; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1><span class="logo"><img src="/logo.png" alt=""></span><span id="page-title">Workflow Library</span></h1>
+  <nav>
+    <a href="/" data-testid="back-to-wizard">Back to wizard</a>
+    <a href="/workflows" id="back-to-library" style="display:none" class="back">All workflows</a>
+  </nav>
+</div>
+
+<main id="main"></main>
+
+<template id="library-view">
+  <div class="lib-toolbar">
+    <span class="count" id="lib-count">…</span>
+    <input type="search" id="lib-search" placeholder="Filter by id or title" />
+  </div>
+  <div class="lib-table-wrap">
+    <table class="lib" data-testid="workflow-table">
+      <thead>
+        <tr>
+          <th>Workflow ID</th>
+          <th>Title</th>
+          <th>Source URL</th>
+          <th>Package</th>
+          <th>Selector map</th>
+          <th>Last run</th>
+          <th class="num">Fields</th>
+          <th class="num">Assets</th>
+          <th class="num">Repeats</th>
+          <th class="num">Outputs</th>
+          <th class="num">Manual</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="lib-tbody"></tbody>
+    </table>
+  </div>
+  <div id="library-empty" class="empty" style="display:none;margin-top:20px">No workflows found under <code>workflows/</code>.</div>
+</template>
+
+<template id="detail-view">
+  <div class="detail">
+    <div class="panel full">
+      <h3>Status</h3>
+      <div data-testid="detail-status">
+        <span class="status-pill idle" data-detail-status>idle</span>
+        <span class="muted" data-detail-meta></span>
+      </div>
+      <div class="runner-controls" style="margin-top:14px">
+        <button class="btn primary" data-action="validate-package" data-testid="btn-validate-package">Validate Package</button>
+        <button class="btn warning" data-action="verify-selectors" data-testid="btn-verify-selectors">Verify Selectors</button>
+        <button class="btn secondary" data-action="run-live" data-testid="btn-play-safe-mode">Play in Browser — Safe Mode</button>
+        <button class="stop-big" data-action="stop" data-testid="big-stop" disabled>⛔ STOP</button>
+      </div>
+      <p class="muted" style="margin-top:8px">Safe Mode honors <code>safety-policy.json</code> and the workflow's <code>human_gate</code>. Submit / publish / pay / delete are never clicked.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Dangerous-action policy</h3>
+      <div class="dangerous-policy" data-detail-policy data-testid="danger-policy">Loading…</div>
+    </div>
+
+    <div class="panel">
+      <h3>Counts</h3>
+      <div data-detail-counts class="muted"></div>
+    </div>
+
+    <div class="panel full">
+      <h3>Live event panel</h3>
+      <div class="event-log" data-detail-events data-testid="event-log">No active run yet — press Validate Package or Play in Browser — Safe Mode.</div>
+    </div>
+
+    <div class="panel">
+      <h3>workflow.json</h3>
+      <pre data-detail-file="workflowJson" data-testid="file-workflow-json">(missing)</pre>
+    </div>
+    <div class="panel">
+      <h3>workflow-package.example.json</h3>
+      <pre data-detail-file="packageExample" data-testid="file-package">(missing)</pre>
+    </div>
+    <div class="panel">
+      <h3>run-plan.md</h3>
+      <pre data-detail-file="runPlanMd" data-testid="file-run-plan">(missing)</pre>
+    </div>
+    <div class="panel">
+      <h3>observation.json (summary)</h3>
+      <pre data-detail-file="observationJson" data-testid="file-observation">(missing)</pre>
+    </div>
+    <div class="panel full">
+      <h3>Latest result.json</h3>
+      <pre data-detail-file="latestResultJson" data-testid="file-latest-result">(missing)</pre>
+    </div>
+  </div>
+</template>
+
+<script>
+// ── helpers ──────────────────────────────────────────────────────────────────
+function $(sel, root = document) { return root.querySelector(sel); }
+function $$(sel, root = document) { return Array.from(root.querySelectorAll(sel)); }
+function el(tag, props = {}, ...children) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === 'class') e.className = v;
+    else if (k === 'dataset') Object.assign(e.dataset, v);
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (v != null) e.setAttribute(k, v);
+  }
+  for (const c of children) {
+    if (c == null) continue;
+    e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  }
+  return e;
+}
+async function api(path, opts = {}) {
+  const res = await fetch(path, opts);
+  const text = await res.text();
+  let body; try { body = JSON.parse(text); } catch { body = text; }
+  if (!res.ok) {
+    const msg = (body && body.error) || text || res.statusText;
+    throw new Error(`${res.status} ${msg}`);
+  }
+  return body;
+}
+function formatTs(iso) {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleString(); } catch { return iso; }
+}
+
+// ── runStatusLabel: collapse server status into UI semantics ─────────────────
+// Returns { label, kind: 'good'|'warn'|'bad'|'muted', testid }.
+// Key rule: a blocked result.status must NOT render as "Completed" — even if
+// the spawned-process exit code was non-zero-but-expected.
+function runStatusLabel(latestRun, selectorMap) {
+  if (!latestRun) return { label: 'no run', kind: 'muted', testid: 'last-run-none' };
+  const s = latestRun.status || '';
+  if (s === 'blocked') {
+    const br = latestRun.blockedReason || {};
+    if (br.type === 'selector_verification_required' || (br.reason || '').toLowerCase().includes('field map')) {
+      return { label: 'Needs selector verification', kind: 'bad', testid: 'last-run-needs-verify' };
+    }
+    return { label: 'Blocked', kind: 'bad', testid: 'last-run-blocked' };
+  }
+  if (s === 'failed') return { label: 'Failed', kind: 'bad', testid: 'last-run-failed' };
+  if (s === 'stopped_by_user') return { label: 'Stopped', kind: 'bad', testid: 'last-run-stopped' };
+  if (s === 'live_run_gated') return { label: 'Gated', kind: 'warn', testid: 'last-run-gated' };
+  if (s === 'live_run_completed') return { label: 'Live completed', kind: 'good', testid: 'last-run-live-completed' };
+  if (s === 'dry_run_passed') return { label: 'Dry-run passed', kind: 'good', testid: 'last-run-dry-passed' };
+  if (s === 'completed') return { label: 'Completed', kind: 'good', testid: 'last-run-completed' };
+  return { label: s || 'unknown', kind: 'muted', testid: 'last-run-unknown' };
+}
+
+// ── router ───────────────────────────────────────────────────────────────────
+const path = window.location.pathname;
+const detailMatch = path.match(/^\/workflows\/([a-z0-9][a-z0-9\-_]*)$/);
+
+if (detailMatch) {
+  renderDetail(detailMatch[1]);
+} else {
+  renderLibrary();
+}
+
+// ── library view ─────────────────────────────────────────────────────────────
+async function renderLibrary() {
+  $('#page-title').textContent = 'Workflow Library';
+  const main = $('#main');
+  main.innerHTML = '';
+  main.appendChild($('#library-view').content.cloneNode(true));
+  let data;
+  try {
+    data = await api('/api/workflows');
+  } catch (e) {
+    main.innerHTML = `<div class="empty error">Failed to load workflows: ${e.message}</div>`;
+    return;
+  }
+  const tbody = $('#lib-tbody');
+  const empty = $('#library-empty');
+  const search = $('#lib-search');
+  const count = $('#lib-count');
+  const workflows = data.workflows || [];
+  if (!workflows.length) { empty.style.display = 'block'; count.textContent = '0 workflows'; return; }
+
+  function paint(filter = '') {
+    tbody.innerHTML = '';
+    const filtered = workflows.filter(w => {
+      if (!filter) return true;
+      const q = filter.toLowerCase();
+      return (w.workflowId || '').toLowerCase().includes(q) || (w.title || '').toLowerCase().includes(q);
+    });
+    for (const w of filtered) tbody.appendChild(buildRow(w));
+    count.textContent = `${filtered.length} of ${workflows.length} workflows`;
+  }
+  paint('');
+  search.addEventListener('input', () => paint(search.value.trim()));
+}
+
+function buildRow(w) {
+  const tr = el('tr', { 'data-workflow-row': w.workflowId, 'data-testid': `workflow-row-${w.workflowId}` });
+
+  tr.appendChild(el('td', { class: 'id' }, w.workflowId));
+
+  const titleA = el('a', { href: `/workflows/${w.workflowId}`, 'data-testid': 'workflow-title-link' }, w.title || w.workflowId);
+  tr.appendChild(el('td', { class: 'title' }, titleA));
+
+  tr.appendChild(el('td', { class: 'url', title: (w.urls || []).join('\n') }, (w.urls || [])[0] || '—'));
+
+  // Package status
+  const pkgBadge = el('span', {
+    class: 'badge ' + (w.package.valid ? 'good' : w.package.exists ? 'bad' : 'muted'),
+    'data-testid': 'package-validity',
+  }, w.package.valid ? 'valid' : w.package.exists ? 'invalid' : 'missing');
+  tr.appendChild(el('td', {}, pkgBadge));
+
+  // Selector map status
+  const sm = w.selectorMap || {};
+  const smBadge = el('span', {
+    class: 'badge ' + (sm.valid ? 'good' : 'warn'),
+    'data-testid': 'selector-map-status',
+  }, sm.valid ? `${sm.fieldCount} fields` : sm.exists ? 'invalid' : 'not verified');
+  tr.appendChild(el('td', {}, smBadge));
+
+  // Last run status
+  const runInfo = runStatusLabel(w.latestRun, sm);
+  const runBadge = el('span', {
+    class: 'badge ' + runInfo.kind,
+    'data-testid': runInfo.testid,
+    title: w.latestRun ? (w.latestRun.blockedReason?.reason || '') : '',
+  }, runInfo.label);
+  tr.appendChild(el('td', {}, runBadge));
+
+  // Counts
+  tr.appendChild(el('td', { class: 'num', 'data-testid': 'count-fields' }, String(w.counts.globalFields ?? 0)));
+  tr.appendChild(el('td', { class: 'num', 'data-testid': 'count-assets' }, String(w.counts.assets ?? 0)));
+  tr.appendChild(el('td', { class: 'num', 'data-testid': 'count-repeats' }, String(w.counts.repeatGroups ?? 0)));
+  tr.appendChild(el('td', { class: 'num', 'data-testid': 'count-outputs' }, String(w.counts.capturedOutputs ?? 0)));
+  tr.appendChild(el('td', { class: 'num', 'data-testid': 'count-manual' }, String(w.safetyPolicy?.neverClickText?.length ?? 0)));
+
+  // Actions — Details, Validate Package, Verify Selectors, Play Safe Mode,
+  // Open Latest Result, Delete. When the workflow is blocked because
+  // selector verification is missing, Verify Selectors becomes primary.
+  const needsVerify = !sm.valid;
+  const actions = el('div', { class: 'row-actions' });
+  actions.appendChild(el('a', {
+    class: 'btn',
+    href: `/workflows/${w.workflowId}`,
+    'data-testid': 'btn-details',
+  }, 'Details'));
+  actions.appendChild(el('button', {
+    class: 'btn primary',
+    'data-testid': 'btn-validate-package',
+    onclick: () => triggerRun(w.workflowId, 'dry_run'),
+  }, 'Validate Package'));
+  actions.appendChild(el('button', {
+    class: needsVerify ? 'btn warning' : 'btn',
+    'data-testid': 'btn-verify-selectors',
+    onclick: ev => verifySelectors(w.workflowId, ev.currentTarget),
+  }, needsVerify ? 'Verify Selectors ⚠' : 'Verify Selectors'));
+  actions.appendChild(el('button', {
+    class: 'btn secondary',
+    'data-testid': 'btn-play-safe-mode',
+    onclick: () => triggerRun(w.workflowId, 'live'),
+  }, 'Play — Safe Mode'));
+  if (w.latestRun && w.latestRun.hasResult) {
+    actions.appendChild(el('a', {
+      class: 'btn',
+      href: '/' + w.latestRun.relResultPath,
+      target: '_blank',
+      'data-testid': 'btn-open-latest-result',
+    }, 'Open Latest Result'));
+  }
+  if ((w.urls || []).length) {
+    actions.appendChild(el('a', { class: 'btn', href: w.urls[0], target: '_blank', 'data-testid': 'btn-open-target' }, 'Open Target ↗'));
+  }
+  actions.appendChild(el('button', {
+    class: 'btn danger',
+    'data-testid': 'btn-delete',
+    onclick: () => confirmDelete(w.workflowId),
+  }, 'Delete'));
+  tr.appendChild(el('td', {}, actions));
+
+  return tr;
+}
+
+async function triggerRun(workflowId, mode) {
+  try {
+    const r = await api(`/api/workflows/${workflowId}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    });
+    window.location.href = `/workflows/${workflowId}?runId=${r.runId}`;
+  } catch (e) {
+    alert('Failed to start run: ' + e.message);
+  }
+}
+
+async function verifySelectors(workflowId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Verifying…'; }
+  try {
+    const r = await api(`/api/workflows/${workflowId}/verify-selectors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const ok = (r.verified_fields?.length || 0) + (r.verified_assets?.length || 0) + (r.verified_actions?.length || 0);
+    const rejected = r.rejected_selectors?.length || 0;
+    alert(`Verified ${ok} selector(s); rejected ${rejected}.\n\nWrote ${r.fieldMapPath}.`);
+    renderLibrary();
+  } catch (e) {
+    alert('Verify Selectors failed: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Verify Selectors'; }
+  }
+}
+
+function confirmDelete(workflowId) {
+  const back = el('div', { class: 'modal-back', 'data-testid': 'delete-modal' });
+  const modal = el('div', { class: 'modal' });
+  const heading = el('h2', {}, `Delete ${workflowId}?`);
+  const desc = el('p', {}, 'This removes the workflow directory, captured observation, and generated plan. Run history is preserved by default.');
+  const optionRow = el('label', {},
+    el('input', { type: 'checkbox', id: 'del-include-runs', 'data-testid': 'delete-include-runs' }),
+    document.createTextNode(' Also delete run history under output/runs/'),
+  );
+  const cancel = el('button', { class: 'btn', 'data-testid': 'delete-cancel', onclick: () => back.remove() }, 'Cancel');
+  const confirm = el('button', {
+    class: 'btn danger',
+    'data-testid': 'delete-confirm',
+    onclick: async () => {
+      confirm.disabled = true;
+      confirm.textContent = 'Deleting…';
+      const includeRuns = $('#del-include-runs', back).checked ? '1' : '0';
+      try {
+        await api(`/api/workflows/${workflowId}?includeRuns=${includeRuns}`, { method: 'DELETE' });
+        back.remove();
+        renderLibrary();
+      } catch (e) {
+        confirm.disabled = false;
+        confirm.textContent = 'Delete';
+        alert('Delete failed: ' + e.message);
+      }
+    },
+  }, 'Delete');
+  const actions = el('div', { class: 'modal-actions' }, cancel, confirm);
+  modal.appendChild(heading);
+  modal.appendChild(desc);
+  modal.appendChild(optionRow);
+  modal.appendChild(actions);
+  back.appendChild(modal);
+  document.body.appendChild(back);
+  back.addEventListener('click', e => { if (e.target === back) back.remove(); });
+}
+
+// ── detail view ──────────────────────────────────────────────────────────────
+async function renderDetail(workflowId) {
+  $('#page-title').textContent = workflowId;
+  $('#back-to-library').style.display = 'inline-block';
+  const main = $('#main');
+  main.innerHTML = '';
+  main.appendChild($('#detail-view').content.cloneNode(true));
+
+  let data;
+  try { data = await api(`/api/workflows/${workflowId}`); }
+  catch (e) {
+    main.innerHTML = `<div class="empty error">${e.message}</div>`;
+    return;
+  }
+
+  for (const [key, value] of Object.entries(data.contents || {})) {
+    const pre = main.querySelector(`[data-detail-file="${key}"]`);
+    if (!pre) continue;
+    if (value && value.length > 12000) pre.textContent = value.slice(0, 12000) + '\n…(truncated)';
+    else pre.textContent = value || '(missing)';
+  }
+
+  const countsDiv = main.querySelector('[data-detail-counts]');
+  countsDiv.textContent = `${data.counts.globalFields} fields · ${data.counts.assets} assets · ${data.counts.repeatGroups} repeats · ${data.counts.capturedOutputs} outputs · ${data.safetyPolicy.neverClickText.length} manual-only`;
+
+  const policyEl = main.querySelector('[data-detail-policy]');
+  policyEl.innerHTML = '';
+  if (!data.safetyPolicy.neverClickText.length && !data.safetyPolicy.manualOnlyCategories.length) {
+    policyEl.textContent = 'No safety policy declared.';
+  } else {
+    if (data.safetyPolicy.neverClickText.length) {
+      policyEl.appendChild(el('strong', {}, 'Never click text:'));
+      const ul = el('ul');
+      for (const t of data.safetyPolicy.neverClickText) ul.appendChild(el('li', {}, el('code', {}, t)));
+      policyEl.appendChild(ul);
+    }
+    if (data.safetyPolicy.manualOnlyCategories.length) {
+      policyEl.appendChild(el('strong', {}, 'Manual-only categories:'));
+      const ul = el('ul');
+      for (const c of data.safetyPolicy.manualOnlyCategories) ul.appendChild(el('li', {}, c));
+      policyEl.appendChild(ul);
+    }
+  }
+
+  const btnValidate = main.querySelector('[data-action="validate-package"]');
+  const btnVerify = main.querySelector('[data-action="verify-selectors"]');
+  const btnLive = main.querySelector('[data-action="run-live"]');
+  const btnStop = main.querySelector('[data-action="stop"]');
+  const statusPill = main.querySelector('[data-detail-status]');
+  const statusMeta = main.querySelector('[data-detail-meta]');
+  const eventsEl = main.querySelector('[data-detail-events]');
+
+  let currentRunId = new URL(window.location.href).searchParams.get('runId') || null;
+  let eventSource = null;
+
+  function setStatus(status, meta) {
+    statusPill.className = `status-pill ${status || 'idle'}`;
+    statusPill.textContent = status || 'idle';
+    statusMeta.textContent = meta || '';
+    btnStop.disabled = !(status === 'running' || status === 'starting' || status === 'stopping');
+    const inFlight = !!(status === 'running' || status === 'starting' || status === 'stopping');
+    btnValidate.disabled = btnLive.disabled = btnVerify.disabled = inFlight;
+  }
+
+  function appendEvent(ev) {
+    if (eventsEl.dataset.empty !== 'no') {
+      eventsEl.textContent = '';
+      eventsEl.dataset.empty = 'no';
+    }
+    const line = el('div', { class: `line ${ev.kind || 'log'}` });
+    line.appendChild(el('span', { class: 'ts' }, (ev.ts || '').replace('T', ' ').slice(11, 19)));
+    line.appendChild(document.createTextNode(`[${ev.kind}] ` + (ev.line || ev.status || ev.message || JSON.stringify(ev))));
+    eventsEl.appendChild(line);
+    eventsEl.scrollTop = eventsEl.scrollHeight;
+  }
+
+  async function attachRun(runId) {
+    if (eventSource) { try { eventSource.close(); } catch {} eventSource = null; }
+    currentRunId = runId;
+    try {
+      const r = await api(`/api/runs/${runId}`);
+      setStatus(r.status, `${r.mode} • ${r.runId}`);
+    } catch (e) {
+      setStatus('failed', e.message);
+      return;
+    }
+    eventSource = new EventSource(`/api/runs/${runId}/events`);
+    const handler = ev => {
+      try {
+        const data = JSON.parse(ev.data);
+        appendEvent(data);
+        if (data.kind === 'status') setStatus(data.status, `${ev.type} • ${runId}`);
+        if (data.kind === 'done') {
+          setStatus(data.status, `done • ${runId}`);
+          refreshLatestResult();
+        }
+      } catch {}
+    };
+    for (const k of ['log','stdout','stderr','status','done','stopped','result_path','error']) {
+      eventSource.addEventListener(k, handler);
+    }
+    eventSource.onerror = () => { try { eventSource.close(); } catch {} eventSource = null; };
+  }
+
+  async function refreshLatestResult() {
+    try {
+      const d = await api(`/api/workflows/${workflowId}`);
+      const pre = main.querySelector('[data-detail-file="latestResultJson"]');
+      if (pre) pre.textContent = (d.contents && d.contents.latestResultJson) || '(missing)';
+    } catch {}
+  }
+
+  btnValidate.addEventListener('click', async () => {
+    try {
+      const r = await api(`/api/workflows/${workflowId}/run`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'dry_run' }),
+      });
+      attachRun(r.runId);
+    } catch (e) { alert('Validate Package failed: ' + e.message); }
+  });
+  btnLive.addEventListener('click', async () => {
+    try {
+      const r = await api(`/api/workflows/${workflowId}/run`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'live' }),
+      });
+      attachRun(r.runId);
+    } catch (e) { alert('Play — Safe Mode failed: ' + e.message); }
+  });
+  btnVerify.addEventListener('click', async () => {
+    btnVerify.disabled = true;
+    const original = btnVerify.textContent;
+    btnVerify.textContent = 'Verifying…';
+    try {
+      const r = await api(`/api/workflows/${workflowId}/verify-selectors`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+      });
+      const ok = (r.verified_fields?.length || 0) + (r.verified_assets?.length || 0) + (r.verified_actions?.length || 0);
+      alert(`Verified ${ok} selector(s).\nRejected: ${r.rejected_selectors?.length || 0}.\nWrote ${r.fieldMapPath}.`);
+    } catch (e) {
+      alert('Verify Selectors failed: ' + e.message);
+    } finally {
+      btnVerify.disabled = false;
+      btnVerify.textContent = original;
+    }
+  });
+  btnStop.addEventListener('click', async () => {
+    if (!currentRunId) return;
+    btnStop.disabled = true;
+    try {
+      const r = await api(`/api/runs/${currentRunId}/stop`, { method: 'POST' });
+      setStatus(r.status, `stopped • ${currentRunId}`);
+    } catch (e) { alert('Stop failed: ' + e.message); }
+  });
+
+  if (currentRunId) attachRun(currentRunId);
+  else if (data.activeRun) attachRun(data.activeRun.runId);
+}
+</script>
+</body>
+</html>

@@ -147,6 +147,8 @@ export function buildWorkflowPackageFromObservation(observation) {
     required: output.required !== false,
     verify: output.verify || null,
     storesTo: output.storesTo || `captured.${output.id}`,
+    selector: output.selector || null,
+    captureAfter: output.captureAfter || null,
   }));
 
   // Flatten observation-derived assets (global + per-repeat-item) into the

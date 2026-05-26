@@ -1,0 +1,42 @@
+{
+  "$id": "distributor-album-submit/manifest.schema.json",
+  "type": "object",
+  "required": ["album", "tracks"],
+  "properties": {
+    "album": {
+      "type": "object",
+      "required": ["title", "artistName", "releaseDate"],
+      "properties": {
+        "title": { "type": "string" },
+        "artistName": { "type": "string" },
+        "releaseDate": { "type": "string", "format": "date" },
+        "language": { "type": "string" },
+        "genrePrimary": { "type": "string" },
+        "genreSecondary": { "type": "string" },
+        "recordLabel": { "type": "string" },
+        "upc": { "type": ["string", "null"] },
+        "explicit": { "type": "boolean" },
+        "aiDisclosure": { "type": "object" }
+      }
+    },
+    "tracks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["trackNumber", "trackTitle"],
+        "properties": {
+          "trackNumber": { "type": ["integer", "string"] },
+          "trackTitle": { "type": "string" },
+          "songwriter": { "type": "string" },
+          "producer": { "type": "string" },
+          "performer": { "type": "string" },
+          "isrc": { "type": ["string", "null"] },
+          "explicit": { "type": "boolean" },
+          "instrumental": { "type": "boolean" },
+          "aiDisclosure": { "type": "object" }
+        }
+      }
+    }
+  }
+}

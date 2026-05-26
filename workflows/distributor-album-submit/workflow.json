@@ -1,0 +1,25 @@
+{
+  "id": "distributor-album-submit",
+  "description": "Materialized scaffold: upload an album-style multi-track release to a music distributor up to the human-gated final submit. Verified against fixtures/distrokid-wizard/index.html.",
+  "auth": {
+    "mode": "manual-save-state",
+    "storage_state": ".auth/distributor-album-submit.json"
+  },
+  "runtime": {
+    "dry_run_default": true,
+    "headed_default": true,
+    "pause_at_end_default": true
+  },
+  "targets": {
+    "start_url": "file:///Users/kchapman/browsy/fixtures/distrokid-wizard/index.html",
+    "urls": []
+  },
+  "discovery_urls": [],
+  "execution_strategy": "playwright",
+  "artifacts": {
+    "screenshots": true,
+    "html_snapshot": true,
+    "page_text_snapshot": true,
+    "discovered_fields": true
+  }
+}

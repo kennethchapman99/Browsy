@@ -1093,6 +1093,23 @@ body {
             </div>
             <div id="obs-source-status-text" class="obs-source-status-text">Connected: Playwright Recorder — local automation-grade capture</div>
           </div>
+          <!-- Part 2: name the workflow before observation. Without this we
+               silently created everything as "observed-workflow". -->
+          <div class="field" id="obs-naming-fields" style="display:flex;flex-direction:column;gap:12px">
+            <div class="field">
+              <label for="obs-title-input">Workflow title <span style="color:#a31a2e">*</span></label>
+              <input id="obs-title-input" type="text" placeholder="e.g. Distrokid album submit" data-testid="obs-title-input" style="padding:12px 16px;font-size:1rem" oninput="onObsTitleInput()">
+            </div>
+            <div class="field">
+              <label for="obs-workflowid-input">Workflow ID <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.82rem">(kebab-case, derived from title — edit if you like)</span></label>
+              <input id="obs-workflowid-input" type="text" placeholder="distrokid-album-submit" pattern="[a-z0-9][a-z0-9\-_]*" data-testid="obs-workflowid-input" style="padding:12px 16px;font-size:1rem;font-family:ui-monospace,monospace">
+              <div id="obs-workflowid-warning" class="muted" style="font-size:.85rem;color:#a31a2e;display:none"></div>
+            </div>
+            <div class="field">
+              <label for="obs-description-input">Description <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.82rem">(optional)</span></label>
+              <textarea id="obs-description-input" rows="2" placeholder="What does this workflow do?" data-testid="obs-description-input" style="padding:12px 16px;font-size:.95rem;width:100%;resize:vertical"></textarea>
+            </div>
+          </div>
           <div class="field" id="obs-start-url-field">
             <label for="obs-start-url-input">Target URL <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.82rem">(the page you want to observe — required for Playwright)</span></label>
             <input id="obs-start-url-input" type="text" placeholder="https://example.com/your-form  or  http://localhost:3333/fixtures/observation-test-form/index.html" style="padding:14px 18px;font-size:1rem">
@@ -3390,15 +3407,68 @@ function selectObsSource(source) {
   if (urlField) urlField.style.display = source === 'playwrightRecorder' ? '' : 'none';
 }
 
+function slugifyWorkflowId(text) {
+  return (text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64) || '';
+}
+
+function onObsTitleInput() {
+  const titleEl = document.getElementById('obs-title-input');
+  const idEl = document.getElementById('obs-workflowid-input');
+  if (!titleEl || !idEl) return;
+  // Keep the ID linked to the title until the user edits the ID manually.
+  if (idEl.dataset.userEdited === '1') return;
+  idEl.value = slugifyWorkflowId(titleEl.value);
+}
+
 async function startObsSession() {
   const startUrlInput = document.getElementById('obs-start-url-input');
   const startUrl = startUrlInput ? startUrlInput.value.trim() : '';
+  const titleEl = document.getElementById('obs-title-input');
+  const idEl = document.getElementById('obs-workflowid-input');
+  const descEl = document.getElementById('obs-description-input');
+  const idWarn = document.getElementById('obs-workflowid-warning');
+  if (idEl && !idEl.dataset.bound) {
+    idEl.dataset.bound = '1';
+    idEl.addEventListener('input', () => { idEl.dataset.userEdited = '1'; });
+  }
+
+  const title = titleEl ? titleEl.value.trim() : '';
+  const description = descEl ? descEl.value.trim() : '';
+  let workflowId = idEl ? idEl.value.trim() : '';
+  if (!workflowId && title) workflowId = slugifyWorkflowId(title);
+
+  // Real-capture sessions require a name. Mock/demo can still skip.
+  if (obsSource !== 'mock') {
+    if (!title) {
+      alert('Enter a workflow title — Browsy uses it to name the saved workflow.');
+      if (titleEl) titleEl.focus();
+      return;
+    }
+    if (!/^[a-z0-9][a-z0-9\-_]{0,63}$/.test(workflowId)) {
+      if (idWarn) {
+        idWarn.style.display = 'block';
+        idWarn.textContent = 'Workflow ID must match /^[a-z0-9][a-z0-9-_]{0,63}$/';
+      }
+      if (idEl) idEl.focus();
+      return;
+    }
+    if (idWarn) idWarn.style.display = 'none';
+  }
 
   if (obsSource === 'playwrightRecorder' && !startUrl) {
     alert('Enter a target URL — Playwright Recorder needs a real page to observe.');
     if (startUrlInput) startUrlInput.focus();
     return;
   }
+
+  // Mirror into the wizard state object so the rest of the flow (preview,
+  // import) sees the same id we just declared.
+  S.id = workflowId || S.id || '';
+  S.workflowName = title || S.workflowName || '';
 
   const connectingLabels = {
     chromeExtension: 'Waiting for Chrome Extension…',
@@ -3410,15 +3480,25 @@ async function startObsSession() {
   if (connectingEl) connectingEl.textContent = connectingLabels[obsSource] || 'Setting up observation session…';
   showObsState('connecting');
 
-  let resp;
-  try {
+  async function postStart(overwrite) {
     const r = await fetch('/api/observation/session/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source: obsSource, startUrl, workflowId: (S.id || '').trim() || null }),
+      body: JSON.stringify({ source: obsSource, startUrl, workflowId: workflowId || null, title, description, overwrite: !!overwrite }),
     });
-    resp = await r.json();
-    if (!r.ok || !resp.ok) throw new Error(resp.error || `Server returned ${r.status}`);
+    return { r, body: await r.json() };
+  }
+
+  let resp;
+  try {
+    let first = await postStart(false);
+    if (first.r.status === 409 && first.body && first.body.code === 'workflow_exists') {
+      const proceed = confirm(`Workflow "${workflowId}" already exists.\n\nProceed and overwrite when you save?`);
+      if (!proceed) { showObsState('not-started'); return; }
+      first = await postStart(true);
+    }
+    if (!first.r.ok || !first.body.ok) throw new Error(first.body.error || `Server returned ${first.r.status}`);
+    resp = first.body;
   } catch (e) {
     alert('Could not start observation session: ' + e.message);
     showObsState('not-started');
@@ -3899,9 +3979,10 @@ async function importObservation() {
   if (createBtn) { createBtn.disabled = true; createBtn.textContent = 'Creating…'; }
 
   try {
+    const explicitId = (S.id && S.id.trim()) || (parsed && parsed.workflowId) || null;
     const res = await fetch('/api/observation/import', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ observation: parsed }),
+      body: JSON.stringify({ observation: parsed, workflowId: explicitId, overwrite: true }),
     });
     const data = await res.json();
     if (!res.ok || !data.ok) {

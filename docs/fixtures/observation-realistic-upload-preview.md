@@ -22,25 +22,19 @@
 
 ## Fields detected
 
-### Global fields (11)
+### Global fields (7)
 
 - `release_title` — Release title* (text, required) — selector: `#release-title` _(high confidence)_
 - `primary_artist` — Primary artist* (text, required) — selector: `#primary-artist` _(high confidence)_
 - `release_date` — Release date* (text, required) — selector: `#release-date` _(high confidence)_
 - `genre` — Genre (select-one) — selector: `#genre` _(high confidence)_
 - `label_email` — Label contact email (email) — selector: `#label-email` _(high confidence)_
-- `track_title_1` — Track 1 title (text, required) — selector: `#track-title-1` _(high confidence)_
-- `track_isrc_1` — ISRC (text) — selector: `#track-isrc-1` _(high confidence)_
-- `track_title_2` — Track 2 title (text) — selector: `#track-title-2` _(high confidence)_
-- `track_isrc_2` — ISRC (text) — selector: `#track-isrc-2` _(high confidence)_
 - `confirm_rights` — confirm_rights (checkbox, required) — selector: `#chk-rights` _(high confidence)_
 - `confirm_terms` — confirm_terms (checkbox, required) — selector: `#chk-terms` _(high confidence)_
 
-### Global assets (file inputs) (3)
+### Global assets (file inputs) (1)
 
 - `cover_art` — Cover image (JPG / PNG, ≥ 3000×3000)* (file, required) — selector: `#cover-art` _(high confidence)_
-- `track_audio_1` — Audio file (file, required) — selector: `#track-audio-1` _(high confidence)_
-- `track_audio_2` — Audio file (file) — selector: `#track-audio-2` _(high confidence)_
 
 ## Repeat groups (1)
 
@@ -64,7 +58,7 @@
   - Matched keyword: `Submit`
   - Detected by: `dangerous_action_candidate_detected` (heuristic confidence 0.85)
 
-## Suggested assertions / checkpoints (10)
+## Suggested assertions / checkpoints (8)
 
 > These are *not* automation steps. They are things the runner should
 > verify before / after, and that a human reviewer should sanity-check.
@@ -82,11 +76,9 @@
 - Required field "Release title*" must hold the expected value before progressing — selector `#release-title` _(high)_ _(confidence 0.75)_
 - Required field "Primary artist*" must hold the expected value before progressing — selector `#primary-artist` _(high)_ _(confidence 0.75)_
 - Required field "Release date*" must hold the expected value before progressing — selector `#release-date` _(high)_ _(confidence 0.75)_
-- Required field "Track 1 title" must hold the expected value before progressing — selector `#track-title-1` _(high)_ _(confidence 0.75)_
 - Required field "confirm_rights" must hold the expected value before progressing — selector `#chk-rights` _(high)_ _(confidence 0.75)_
 - Required field "confirm_terms" must hold the expected value before progressing — selector `#chk-terms` _(high)_ _(confidence 0.75)_
 - Required field "Cover image (JPG / PNG, ≥ 3000×3000)*" must hold the expected value before progressing — selector `#cover-art` _(high)_ _(confidence 0.75)_
-- Required field "Audio file" must hold the expected value before progressing — selector `#track-audio-1` _(high)_ _(confidence 0.75)_
 
 ## Selector confidence warnings (0)
 
