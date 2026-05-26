@@ -1,0 +1,151 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>DistroKid-album-style — Browsy Architecture Fixture</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 920px; margin: 32px auto; padding: 0 20px; }
+    fieldset { margin: 18px 0; padding: 16px; border-radius: 12px; border: 1px solid #ccc; }
+    label { display: block; margin: 10px 0; font-weight: 600; }
+    input, textarea, select, button, a { font-size: 16px; padding: 8px; margin-top: 4px; }
+    .track { border: 1px dashed #888; padding: 12px; margin: 12px 0; border-radius: 10px; }
+    .danger { background: #ffe2e2; }
+    pre { background: #111827; color: #f9fafb; padding: 16px; border-radius: 10px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>DistroKid-album-style upload</h1>
+  <p>
+    This fixture mimics a streaming distributor's album-upload form: a single
+    album-level section with one-time fields, a tracks section that adds a new
+    block per track, a safe "Build Distro Draft" button that produces a
+    captured output, and a downloadable draft package. The dangerous final
+    submit must never be clicked by the automation.
+  </p>
+
+  <form id="albumForm">
+    <fieldset id="album-section">
+      <legend>Album (filled once)</legend>
+
+      <label>Album title
+        <input name="album_title" id="album_title" type="text" required />
+      </label>
+
+      <label>Primary artist
+        <input name="album_artist" id="album_artist" type="text" required />
+      </label>
+
+      <label>Record label
+        <input name="record_label" id="record_label" type="text" />
+      </label>
+
+      <label>UPC
+        <input name="upc" id="upc" type="text" />
+      </label>
+
+      <label>Release date
+        <input name="release_date" id="release_date" type="date" />
+      </label>
+
+      <label>Cover art
+        <input name="cover_art" id="cover_art" type="file" accept=".png,.jpg,.jpeg" />
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Tracks (one block per track)</legend>
+      <div id="tracks"></div>
+      <button type="button" id="addTrack">Add another track</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Safe actions</legend>
+      <button type="button" id="buildDraft">Build Distro Draft</button>
+      <a id="downloadPackage" href="#" download="distrokid-style-draft.json">Download draft package</a>
+    </fieldset>
+
+    <fieldset class="danger">
+      <legend>Manual-only / dangerous (must never auto-click)</legend>
+      <button type="button" id="submitToStores">Submit to stores</button>
+      <button type="button" id="confirmPayment">Confirm payment</button>
+    </fieldset>
+  </form>
+
+  <h2>Captured draft</h2>
+  <pre id="draftOutput">No draft built yet.</pre>
+
+<script>
+let trackCount = 0;
+
+function addTrack() {
+  trackCount++;
+  const i = trackCount;
+  const div = document.createElement('div');
+  div.className = 'track';
+  div.dataset.trackIndex = String(i);
+  div.innerHTML = `
+    <h3>Track ${i}</h3>
+    <label>Track title <input name="tracks[${i}][title]" data-repeat-group="tracks" data-field="title" type="text" /></label>
+    <label>Track artist <input name="tracks[${i}][artist]" data-repeat-group="tracks" data-field="artist" type="text" /></label>
+    <label>ISRC <input name="tracks[${i}][isrc]" data-repeat-group="tracks" data-field="isrc" type="text" /></label>
+    <label><input name="tracks[${i}][explicit]" data-repeat-group="tracks" data-field="explicit" type="checkbox" /> Explicit lyrics</label>
+    <label>Audio file <input name="tracks[${i}][audio]" data-repeat-group="tracks" data-field="audio" type="file" accept=".mp3,.wav,.flac,.txt" /></label>
+  `;
+  document.getElementById('tracks').appendChild(div);
+}
+
+function readTracks() {
+  return [...document.querySelectorAll('#tracks .track')].map((row, idx) => ({
+    position: idx + 1,
+    title: row.querySelector('[data-field="title"]').value,
+    artist: row.querySelector('[data-field="artist"]').value,
+    isrc: row.querySelector('[data-field="isrc"]').value,
+    explicit: row.querySelector('[data-field="explicit"]').checked,
+    audioFile: (() => {
+      const el = row.querySelector('[data-field="audio"]');
+      return el && el.files && el.files[0] ? el.files[0].name : null;
+    })(),
+  }));
+}
+
+function fileName(el) {
+  return el && el.files && el.files[0] ? el.files[0].name : null;
+}
+
+function buildDraft() {
+  const draft = {
+    status: 'draft_built',
+    distroJobId: 'DK-' + Math.floor(Math.random() * 1e9).toString(36).toUpperCase(),
+    album: {
+      title:       document.getElementById('album_title').value,
+      artist:      document.getElementById('album_artist').value,
+      recordLabel: document.getElementById('record_label').value,
+      upc:         document.getElementById('upc').value,
+      releaseDate: document.getElementById('release_date').value,
+      coverArt:    fileName(document.getElementById('cover_art')),
+    },
+    trackCount: trackCount,
+    tracks: readTracks(),
+    builtAt: new Date().toISOString(),
+  };
+  const json = JSON.stringify(draft, null, 2);
+  document.getElementById('draftOutput').textContent = json;
+  const blob = new Blob([json], { type: 'application/json' });
+  document.getElementById('downloadPackage').href = URL.createObjectURL(blob);
+}
+
+document.getElementById('addTrack').onclick = addTrack;
+document.getElementById('buildDraft').onclick = buildDraft;
+
+['submitToStores', 'confirmPayment'].forEach(id => {
+  document.getElementById(id).onclick = () => {
+    document.getElementById('draftOutput').textContent = 'MANUAL_ONLY_ACTION_CLICKED: ' + id;
+  };
+});
+
+// Two tracks pre-rendered so the fixture matches a typical observation.
+addTrack();
+addTrack();
+</script>
+</body>
+</html>
