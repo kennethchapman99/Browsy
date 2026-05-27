@@ -35,6 +35,14 @@ function latestActiveVersion(versions) {
   return active[0]?.version || null;
 }
 
+function arrayOrEmpty(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function objectOrEmpty(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
 // ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
@@ -42,18 +50,30 @@ function latestActiveVersion(versions) {
 export function registerWorkflow({
   appId,
   workflowId,
+  name = null,
+  description = '',
   version = '1.0.0',
   inputSchema = {},
   outputSchema = {},
   requiredFiles = [],
+  requiredAssets = [],
   requiredSessionProfile = null,
-  supportedModes = ['preview', 'live', 'discover', 'repair'],
+  supportedModes = ['preview', 'live', 'dry_run'],
   safetyPolicy = {},
   artifactPolicy = {},
   successAssertions = [],
   failureAssertions = [],
   packagePath = null,
   packageWorkflowId = null,
+  tabs = [],
+  auth = [],
+  humanApprovalCheckpoints = [],
+  recordedSteps = [],
+  variableBindings = {},
+  fileUploadBindings = [],
+  expectedOutputs = [],
+  validationRules = [],
+  replaySettings = {},
 }) {
   if (!appId || typeof appId !== 'string') throw new Error('appId is required');
   if (!workflowId || typeof workflowId !== 'string') throw new Error('workflowId is required');
@@ -96,17 +116,29 @@ export function registerWorkflow({
   record.versions[version] = {
     version,
     status: 'active',
-    inputSchema,
-    outputSchema,
-    requiredFiles,
+    name: name || workflowId,
+    description,
+    inputSchema: objectOrEmpty(inputSchema),
+    outputSchema: objectOrEmpty(outputSchema),
+    requiredFiles: arrayOrEmpty(requiredFiles),
+    requiredAssets: arrayOrEmpty(requiredAssets),
     requiredSessionProfile,
-    supportedModes,
-    safetyPolicy,
-    artifactPolicy,
-    successAssertions,
-    failureAssertions,
+    supportedModes: arrayOrEmpty(supportedModes).length ? arrayOrEmpty(supportedModes) : ['preview', 'live', 'dry_run'],
+    safetyPolicy: objectOrEmpty(safetyPolicy),
+    artifactPolicy: objectOrEmpty(artifactPolicy),
+    successAssertions: arrayOrEmpty(successAssertions),
+    failureAssertions: arrayOrEmpty(failureAssertions),
     packagePath: packagePath || null,
     packageWorkflowId: packageWorkflowId || null,
+    tabs: arrayOrEmpty(tabs),
+    auth: arrayOrEmpty(auth),
+    humanApprovalCheckpoints: arrayOrEmpty(humanApprovalCheckpoints),
+    recordedSteps: arrayOrEmpty(recordedSteps),
+    variableBindings: objectOrEmpty(variableBindings),
+    fileUploadBindings: arrayOrEmpty(fileUploadBindings),
+    expectedOutputs: arrayOrEmpty(expectedOutputs),
+    validationRules: arrayOrEmpty(validationRules),
+    replaySettings: objectOrEmpty(replaySettings),
     registeredAt: record.versions[version]?.registeredAt || now,
     updatedAt: now,
     frozenAt: null,
