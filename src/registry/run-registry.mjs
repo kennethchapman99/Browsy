@@ -2,6 +2,7 @@ import fs from 'fs';
 import { join } from 'path';
 import { REGISTRY_DIR, ensureDir, exists, readJson, writeJson } from '../core/paths.mjs';
 import crypto from 'crypto';
+import { buildRunResult, toPublicStatus } from './run-result.mjs';
 
 const RUNS_DIR = join(REGISTRY_DIR, 'runs');
 
@@ -24,8 +25,10 @@ export function createRun({
   version,
   mode,
   payload = {},
+  options = {},
   sessionProfileId = null,
   callerId = null,
+  callbackUrl = null,
 }) {
   const runId = generateRunId(workflowObjectId);
   const now = new Date().toISOString();
@@ -39,12 +42,19 @@ export function createRun({
     version,
     mode,
     payload,
+    options,
     sessionProfileId,
     callerId,
+    callbackUrl: callbackUrl || options.callbackUrl || null,
+    status: 'running',
     processStatus: 'running',
     workflowOutcome: null,
     startedAt: now,
     completedAt: null,
+    approvedAt: null,
+    canceledAt: null,
+    blockingReason: null,
+    checkpoints: [],
     artifacts: [],
     validationErrors: [],
     assertionResults: null,
@@ -61,25 +71,76 @@ export function getRun(runId) {
   return exists(fp) ? readJson(fp) : null;
 }
 
+export function getRunResult(runId) {
+  const record = getRun(runId);
+  return record ? buildRunResult(record) : null;
+}
+
 export function updateRun(runId, updates) {
   const record = getRun(runId);
   if (!record) throw new Error(`run "${runId}" not found`);
   const updated = { ...record, ...updates };
+  if (!updated.status) updated.status = toPublicStatus(updated);
   writeJson(runFilePath(runId), updated);
   return updated;
 }
 
-export function stopRun(runId) {
+export function waitRun(runId, checkpoint) {
   const record = getRun(runId);
   if (!record) throw new Error(`run "${runId}" not found`);
-  if (record.processStatus === 'completed' || record.processStatus === 'failed') {
-    return record;
+  const status = checkpoint?.status || 'waiting_for_human_review';
+  const entry = {
+    status,
+    reason: checkpoint?.reason || null,
+    createdAt: new Date().toISOString(),
+    ...checkpoint,
+  };
+  return updateRun(runId, {
+    status,
+    processStatus: status,
+    workflowOutcome: 'blocked',
+    blockingReason: entry.reason || status,
+    checkpoints: [...(record.checkpoints || []), entry],
+  });
+}
+
+export function approveRun(runId, approval = {}) {
+  const record = getRun(runId);
+  if (!record) throw new Error(`run "${runId}" not found`);
+  const now = new Date().toISOString();
+  const approvalRecord = {
+    approvedAt: now,
+    approvedBy: approval.approvedBy || approval.user || 'human',
+    approvalNote: approval.note || approval.reason || null,
+  };
+  return updateRun(runId, {
+    status: 'running',
+    processStatus: 'running',
+    workflowOutcome: null,
+    blockingReason: null,
+    approvedAt: now,
+    approval: approvalRecord,
+  });
+}
+
+export function cancelRun(runId, reason = 'canceled by user') {
+  const record = getRun(runId);
+  if (!record) throw new Error(`run "${runId}" not found`);
+  if (['completed', 'failed', 'blocked', 'canceled'].includes(toPublicStatus(record))) {
+    if (toPublicStatus(record) === 'canceled') return record;
   }
   return updateRun(runId, {
+    status: 'canceled',
     processStatus: 'stopped',
     workflowOutcome: 'stopped',
+    blockingReason: reason,
+    canceledAt: new Date().toISOString(),
     completedAt: new Date().toISOString(),
   });
+}
+
+export function stopRun(runId) {
+  return cancelRun(runId, 'stopped by user');
 }
 
 export function getRunArtifacts(runId) {
@@ -87,9 +148,11 @@ export function getRunArtifacts(runId) {
   if (!record) return null;
   const dir = runDir(runId);
   const listed = exists(dir) ? fs.readdirSync(dir).filter(f => f !== 'run.json') : [];
+  const result = buildRunResult(record);
   return {
     runId,
     artifacts: record.artifacts,
+    groupedArtifacts: result.artifacts,
     files: listed.map(f => join(dir, f)),
   };
 }
