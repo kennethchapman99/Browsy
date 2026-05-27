@@ -3,7 +3,7 @@
 // Gates are evaluated before any browser launch. A blocked gate means the run
 // is rejected immediately with processStatus='rejected' and no browser opens.
 
-export const SUPPORTED_MODES = ['preview', 'live', 'discover', 'repair'];
+export const SUPPORTED_MODES = ['preview', 'live', 'dry_run', 'discover', 'repair'];
 
 // Check whether a run may proceed given its mode, the workflow version's safety
 // policy, and any caller-supplied credentials.
@@ -18,7 +18,11 @@ export function checkSafetyGates({ workflowVersion, mode, approvalToken }) {
   }
 
   const supported = workflowVersion.supportedModes || SUPPORTED_MODES;
-  if (!supported.includes(mode)) {
+  const supportedWithAliases = new Set(supported);
+  if (supportedWithAliases.has('preview')) supportedWithAliases.add('dry_run');
+  if (supportedWithAliases.has('dry_run')) supportedWithAliases.add('preview');
+
+  if (!supportedWithAliases.has(mode)) {
     errors.push(`workflow does not support mode "${mode}"; supported: ${supported.join(', ')}`);
     return { ok: false, errors };
   }
@@ -59,7 +63,7 @@ export function checkSessionProfile({ workflowVersion, sessionProfileId, resolve
 }
 
 // Map a registry mode to the internal workflow-contract mode.
-// preview → dry_run, live → live, others → dry_run (safe default).
+// preview/dry_run → dry_run, live → live, others → dry_run (safe default).
 export function toInternalMode(mode) {
   if (mode === 'live') return 'live';
   return 'dry_run';
