@@ -52,6 +52,7 @@ export function extractWorkflowPackageMetadata(workflowJson = {}, executionPacka
     recordedSteps: array(workflowJson.steps || workflowJson.recordedSteps || executionPackage.steps || executionPackage.recordedSteps),
     variableBindings: object(workflowJson.variableBindings || workflowJson.variable_bindings || executionPackage.variableBindings || executionPackage.variable_bindings),
     payloadBindings: object(workflowJson.payloadBindings || workflowJson.payload_bindings || executionPackage.payloadBindings || executionPackage.payload_bindings),
+    examplePayload: object(workflowJson.examplePayload || workflowJson.example_payload || executionPackage.examplePayload || executionPackage.example_payload),
     fileUploadBindings: array(workflowJson.fileUploadBindings || workflowJson.file_upload_bindings || executionPackage.fileUploadBindings || executionPackage.file_upload_bindings),
     fileBindings: array(workflowJson.fileBindings || workflowJson.file_bindings || executionPackage.fileBindings || executionPackage.file_bindings),
     repeatGroups: array(workflowJson.repeatGroups || workflowJson.repeat_groups || executionPackage.repeatGroups || executionPackage.repeat_groups),
