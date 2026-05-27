@@ -1,26 +1,20 @@
 // Workflow package import — validates a workflow package directory and registers
 // it as a versioned workflow in the Browsy registry.
-//
-// A workflow package directory must contain:
-//   workflow.json         — workflow config with an "id" field
-//   manifest.schema.json  — JSON Schema for the input payload
-//
-// Optional (enables real browser execution):
-//   workflow-package.local.json   — preferred execution entrypoint
-//   workflow-package.example.json — fallback execution entrypoint
 
 import fs from 'fs';
 import { join, resolve } from 'path';
 import { exists, readJson } from '../core/paths.mjs';
 import { getApp, registerApp } from './app-registry.mjs';
 import { registerWorkflow } from './workflow-registry.mjs';
+import { extractWorkflowPackageMetadata, validateGenericSteps } from './generic-actions.mjs';
 
 const REQUIRED_FILES = ['workflow.json', 'manifest.schema.json'];
 const EXECUTION_PKG_CANDIDATES = ['workflow-package.local.json', 'workflow-package.example.json'];
 
-// Validate a workflow package directory and extract metadata.
-// Returns { ok, errors, metadata }.
-// metadata is null when ok === false.
+function arrayOrEmpty(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 export function validateWorkflowPackageDir(packagePath) {
   const abs = resolve(packagePath);
   const errors = [];
@@ -40,10 +34,8 @@ export function validateWorkflowPackageDir(packagePath) {
   for (const f of REQUIRED_FILES) {
     if (!exists(join(abs, f))) errors.push(`missing required file: ${f}`);
   }
-
   if (errors.length) return { ok: false, errors, metadata: null };
 
-  // workflow.json
   let workflowJson;
   try {
     workflowJson = readJson(join(abs, 'workflow.json'));
@@ -54,36 +46,36 @@ export function validateWorkflowPackageDir(packagePath) {
     errors.push('workflow.json must have a string "id" field');
   }
 
-  // manifest.schema.json
   let inputSchema;
   try {
     inputSchema = readJson(join(abs, 'manifest.schema.json'));
   } catch (e) {
     errors.push(`manifest.schema.json invalid JSON: ${e.message}`);
   }
-
   if (errors.length) return { ok: false, errors, metadata: null };
 
-  // Optional: execution entrypoint
   let executionPackagePath = null;
+  let executionPackage = {};
   for (const f of EXECUTION_PKG_CANDIDATES) {
     const candidate = join(abs, f);
-    if (exists(candidate)) { executionPackagePath = candidate; break; }
+    if (exists(candidate)) {
+      executionPackagePath = candidate;
+      try { executionPackage = readJson(candidate); } catch { executionPackage = {}; }
+      break;
+    }
   }
 
-  // Derive requiredAssets from execution package if present
-  let requiredAssets = [];
-  if (executionPackagePath) {
-    try {
-      const execPkg = readJson(executionPackagePath);
-      requiredAssets = (execPkg.assets || [])
-        .map(a => a.role || a.path || null)
-        .filter(Boolean);
-    } catch { /* ignore — entrypoint file is optional */ }
-  }
+  const generic = extractWorkflowPackageMetadata(workflowJson, executionPackage);
+  const stepErrors = validateGenericSteps(generic.recordedSteps);
+  if (stepErrors.length) return { ok: false, errors: stepErrors, metadata: null };
+
+  const requiredAssets = [
+    ...arrayOrEmpty(executionPackage.assets).map(a => a.role || a.path || null).filter(Boolean),
+    ...arrayOrEmpty(generic.requiredFiles),
+  ];
 
   const requiredInputs = Array.isArray(inputSchema?.required) ? inputSchema.required : [];
-  const supportedModes = workflowJson.supported_modes || ['preview', 'live', 'discover', 'repair'];
+  const supportedModes = workflowJson.supported_modes || workflowJson.supportedModes || ['preview', 'live', 'dry_run'];
 
   const metadata = {
     packageWorkflowId: workflowJson.id,
@@ -93,24 +85,12 @@ export function validateWorkflowPackageDir(packagePath) {
     supportedModes,
     executionPackagePath,
     hasRealExecutor: !!executionPackagePath,
-    description: workflowJson.description || '',
+    ...generic,
   };
 
   return { ok: true, errors: [], metadata };
 }
 
-// Import a workflow package directory into the registry.
-//
-// Options:
-//   packagePath     — path to the workflow package directory
-//   appId           — target app ID (must be registered, unless autoRegisterApp is true)
-//   workflowId      — workflow ID to register under
-//   version         — semver version string (default: '1.0.0')
-//   autoRegisterApp — if true, register app automatically (requires appName)
-//   appName         — app display name (required when autoRegisterApp is true)
-//
-// Returns { ok, errors?, appId, workflowId, version, workflowRef, packagePath,
-//           requiredInputs, requiredAssets, supportedModes, hasRealExecutor }
 export function importWorkflowPackage({
   packagePath,
   appId,
@@ -128,7 +108,6 @@ export function importWorkflowPackage({
 
   const { metadata } = validation;
 
-  // App registration
   let app = getApp(appId);
   if (!app) {
     if (autoRegisterApp) {
@@ -154,10 +133,28 @@ export function importWorkflowPackage({
       appId,
       workflowId,
       version,
+      name: metadata.name || workflowId,
+      description: metadata.description || '',
       inputSchema: metadata.inputSchema,
+      outputSchema: metadata.outputSchema,
+      requiredFiles: metadata.requiredFiles,
+      requiredAssets: metadata.requiredAssets,
       supportedModes: metadata.supportedModes,
+      safetyPolicy: metadata.safetyPolicy,
+      artifactPolicy: metadata.artifactPolicy,
+      successAssertions: metadata.successAssertions,
+      failureAssertions: metadata.failureAssertions,
       packagePath: abs,
       packageWorkflowId: metadata.packageWorkflowId,
+      tabs: metadata.tabs,
+      auth: metadata.auth,
+      humanApprovalCheckpoints: metadata.humanApprovalCheckpoints,
+      recordedSteps: metadata.recordedSteps,
+      variableBindings: metadata.variableBindings,
+      fileUploadBindings: metadata.fileUploadBindings,
+      expectedOutputs: metadata.expectedOutputs,
+      validationRules: metadata.validationRules,
+      replaySettings: metadata.replaySettings,
     });
   } catch (e) {
     return { ok: false, errors: [e.message] };
@@ -177,5 +174,9 @@ export function importWorkflowPackage({
     requiredAssets: metadata.requiredAssets,
     supportedModes: metadata.supportedModes,
     hasRealExecutor: metadata.hasRealExecutor,
+    tabs: metadata.tabs,
+    auth: metadata.auth,
+    humanApprovalCheckpoints: metadata.humanApprovalCheckpoints,
+    expectedOutputs: metadata.expectedOutputs,
   };
 }
