@@ -44,6 +44,10 @@ function normalizeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function normalizeObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
 function asArtifactObject(value, fallbackType = 'file') {
   if (!value) return null;
   if (typeof value === 'string') {
@@ -111,21 +115,28 @@ export function buildRunCreateResponse(run = {}) {
   };
 }
 
-export function buildWorkflowContract(workflowVersion, { baseUrl = 'http://localhost:3001' } = {}) {
-  const schema = workflowVersion.inputSchema || {};
+function buildExamplePayload(schema = {}) {
   const requiredPayloadFields = Array.isArray(schema.required) ? schema.required : [];
-  const allFields = Object.keys(schema.properties || {});
-  const optionalPayloadFields = allFields.filter(f => !requiredPayloadFields.includes(f));
-
   const examplePayload = {};
   for (const f of requiredPayloadFields) {
     const prop = schema.properties?.[f] || {};
-    if (prop.type === 'number') examplePayload[f] = 0;
+    if (prop.example !== undefined) examplePayload[f] = prop.example;
+    else if (prop.type === 'number' || prop.type === 'integer') examplePayload[f] = 0;
     else if (prop.type === 'boolean') examplePayload[f] = false;
     else if (prop.type === 'array') examplePayload[f] = [];
     else if (prop.type === 'object') examplePayload[f] = {};
     else examplePayload[f] = `<${f}>`;
   }
+  return examplePayload;
+}
+
+export function buildWorkflowContract(workflowVersion, { baseUrl = 'http://localhost:3001' } = {}) {
+  const schema = workflowVersion.inputSchema || {};
+  const requiredPayloadFields = Array.isArray(schema.required) ? schema.required : [];
+  const allFields = Object.keys(schema.properties || {});
+  const optionalPayloadFields = allFields.filter(f => !requiredPayloadFields.includes(f));
+  const declaredExample = normalizeObject(workflowVersion.examplePayload);
+  const examplePayload = Object.keys(declaredExample).length ? declaredExample : buildExamplePayload(schema);
 
   return {
     workflowRef: `${workflowVersion.workflowObjectId}@${workflowVersion.version}`,
@@ -144,6 +155,12 @@ export function buildWorkflowContract(workflowVersion, { baseUrl = 'http://local
     tabs: workflowVersion.tabs || [],
     auth: workflowVersion.auth || [],
     humanApprovalCheckpoints: workflowVersion.humanApprovalCheckpoints || [],
+    recordedSteps: workflowVersion.recordedSteps || [],
+    variableBindings: workflowVersion.variableBindings || {},
+    payloadBindings: workflowVersion.payloadBindings || {},
+    fileBindings: workflowVersion.fileBindings || [],
+    fileUploadBindings: workflowVersion.fileUploadBindings || [],
+    repeatGroups: workflowVersion.repeatGroups || [],
     expectedOutputs: workflowVersion.expectedOutputs || [],
     validationRules: workflowVersion.validationRules || [],
     replaySettings: workflowVersion.replaySettings || {},
