@@ -1,19 +1,33 @@
 import { chromium } from 'playwright';
-import { ensureDir, writeJson, writeText } from './paths.mjs';
+import { ensureDir, writeJson, writeText, exists } from './paths.mjs';
 import { dirname, join } from 'path';
 
-export async function launchBrowser({ headed = true, storageState } = {}) {
-  const browser = await chromium.launch({
+export async function launchBrowser({ headed = true, storageState, userDataDir } = {}) {
+  const launchOptions = {
     headless: !headed,
     ignoreDefaultArgs: ['--enable-automation'],
     args: ['--disable-blink-features=AutomationControlled', '--disable-infobars']
-  });
-  const context = await browser.newContext(storageState ? { storageState } : {});
+  };
+
+  if (userDataDir) {
+    const context = await chromium.launchPersistentContext(userDataDir, launchOptions);
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+    });
+    const page = context.pages()[0] || await context.newPage();
+    return { browser: context.browser(), context, page, persistent: true };
+  }
+
+  const resolvedState = typeof storageState === 'string'
+    ? (exists(storageState) ? storageState : undefined)
+    : storageState;
+  const browser = await chromium.launch(launchOptions);
+  const context = await browser.newContext(resolvedState ? { storageState: resolvedState } : {});
   await context.addInitScript(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => false });
   });
   const page = await context.newPage();
-  return { browser, context, page };
+  return { browser, context, page, persistent: false };
 }
 
 export async function discoverPage(page) {

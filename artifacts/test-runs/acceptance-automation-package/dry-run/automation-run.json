@@ -2,7 +2,7 @@
   "ok": true,
   "mode": "fixture",
   "dryRun": true,
-  "generatedAt": "2026-05-26T19:08:25.576Z",
+  "generatedAt": "2026-05-27T14:58:15.754Z",
   "request": {
     "path": "/Users/kchapman/browsy/fixtures/album-upload/AUTOMATION_REQUEST.md",
     "workflowId": "album-upload",

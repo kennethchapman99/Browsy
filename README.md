@@ -192,9 +192,54 @@ npm run init:workflow -- --from-request
 ### Save / check auth
 
 ```bash
+npm run auth:list
+npm run auth:save -- --site distrokid --url https://distrokid.com/new
+npm run auth:check -- --site distrokid --url https://distrokid.com/new
 npm run auth:save -- --workflow my-workflow --url https://example.com/login
 npm run auth:check -- --workflow my-workflow --url https://example.com/dashboard
 ```
+
+Site-scoped auth profiles are the preferred path for authenticated recording.
+Browsy stores them locally under `.auth/profiles/<siteId>/` using a persistent
+Chromium `userDataDir`, then exports Playwright `storage-state.json` for reuse.
+Do not record or automate OAuth / login steps.
+
+### Authenticated recording sessions
+
+Use a recording setup manifest when a workflow needs multiple tabs or a manual
+auth preflight. Example: Pancake Robot + DistroKid.
+
+```json
+{
+  "workflowId": "distrokid_album_art_upload",
+  "appId": "pancake-robot",
+  "tabs": [
+    {
+      "siteId": "pancake-robot",
+      "title": "Pancake Robot Release",
+      "url": "http://localhost:3737/releases/album/ALBUM_MPK9H71S_RTCM",
+      "requiresAuth": false
+    },
+    {
+      "siteId": "distrokid",
+      "title": "DistroKid Upload",
+      "url": "https://distrokid.com/new",
+      "requiresAuth": true
+    }
+  ]
+}
+```
+
+In the wizard's Step 4 recording panel:
+
+- Paste the manifest.
+- Click `Authenticate` for each auth-required site.
+- Log in manually in the persistent browser profile and close it.
+- Refresh auth status.
+- Start recording only after required auth is valid or explicitly skipped.
+
+Browsy opens the declared tabs already authenticated and records only the
+business workflow steps.
 
 ### Discover a page DOM
 

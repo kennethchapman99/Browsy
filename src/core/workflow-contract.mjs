@@ -29,6 +29,7 @@ export const VALID_MODES = ['dry_run', 'live'];
 //   failed               — execution hit an unexpected error
 //   stopped_by_user      — the operator pressed STOP from the UI before the run could finish
 export const VALID_STATUSES = [
+  'blocked_auth_required',
   'dry_run_passed',
   'live_run_gated',
   'live_run_completed',

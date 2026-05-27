@@ -1007,7 +1007,7 @@ body {
 
     <div class="field">
       <label>Workflow name <span>(becomes the folder id)</span></label>
-      <input type="text" id="workflowName" placeholder="e.g. distrokid-upload, sheet-row-sync" oninput="slugify(this)">
+      <input type="text" id="workflowName" placeholder="e.g. distributor-upload, sheet-row-sync" oninput="slugify(this)">
     </div>
 
     <div class="field voice-field">
@@ -1102,7 +1102,7 @@ body {
             </div>
             <div class="field">
               <label for="obs-workflowid-input">Workflow ID <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.82rem">(kebab-case, derived from title — edit if you like)</span></label>
-              <input id="obs-workflowid-input" type="text" placeholder="distrokid-album-submit" pattern="[a-z0-9][a-z0-9\-_]*" data-testid="obs-workflowid-input" style="padding:12px 16px;font-size:1rem;font-family:ui-monospace,monospace">
+              <input id="obs-workflowid-input" type="text" placeholder="multi-tab-upload" pattern="[a-z0-9][a-z0-9\-_]*" data-testid="obs-workflowid-input" style="padding:12px 16px;font-size:1rem;font-family:ui-monospace,monospace">
               <div id="obs-workflowid-warning" class="muted" style="font-size:.85rem;color:#a31a2e;display:none"></div>
             </div>
             <div class="field">
@@ -1113,6 +1113,17 @@ body {
           <div class="field" id="obs-start-url-field">
             <label for="obs-start-url-input">Target URL <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.82rem">(the page you want to observe — required for Playwright)</span></label>
             <input id="obs-start-url-input" type="text" placeholder="https://example.com/your-form  or  http://localhost:3333/fixtures/observation-test-form/index.html" style="padding:14px 18px;font-size:1rem">
+          </div>
+          <div class="field" id="obs-recording-setup-field">
+            <label for="obs-recording-setup-input">Recording setup manifest <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.82rem">(optional for multi-tab authenticated recording)</span></label>
+            <textarea id="obs-recording-setup-input" rows="8" placeholder='{"workflowId":"multi_tab_upload","appId":"release-tool","tabs":[{"siteId":"source-app","title":"Source record","url":"http://localhost:3737/releases/item/ITEM_123","requiresAuth":false},{"siteId":"target-platform","title":"Target upload","url":"https://example.com/upload","requiresAuth":true}]}' style="font-family:'SF Mono','Fira Code',monospace;font-size:.82rem;min-height:160px;resize:vertical"></textarea>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+              <button class="btn-session-secondary" type="button" onclick="validateRecordingSetupManifest()">Validate setup</button>
+              <button class="btn-session-secondary" type="button" onclick="loadRecordingSetupExample()">Load multi-tab auth example</button>
+              <button class="btn-session-secondary" type="button" onclick="refreshRecordingSetupAuth()">Refresh auth status</button>
+            </div>
+            <div id="obs-recording-setup-status" class="muted" style="margin-top:10px;font-size:.84rem"></div>
+            <div id="obs-recording-setup-tabs" style="display:flex;flex-direction:column;gap:10px;margin-top:12px"></div>
           </div>
           <button id="obs-start-btn" class="btn-session-primary" onclick="startObsSession()">▶ Start Browser Observation</button>
           <div class="session-instructions">
@@ -1500,6 +1511,152 @@ const S = {
 
 const STEP_NAMES  = ['','Mission','Target Pages','Data Sources','Capture','Variables','Run Inputs','Repeat Groups','Data Wiring','Safety','Generate'];
 const STEP_COLORS = ['','var(--teal)','var(--orange)','#5b9bd5','var(--purple)','var(--green)','#7b4fc8','var(--yellow)','var(--coral)','#c0392b','var(--navy)'];
+let recordingSetupState = { setup: null, requiredAuth: [], authSkips: new Set(), lastError: '' };
+
+function loadRecordingSetupExample() {
+  const workflowId = (document.getElementById('obs-workflowid-input')?.value || 'multi_tab_upload').trim() || 'multi_tab_upload';
+  const setup = {
+    workflowId,
+    appId: 'release-tool',
+    tabs: [
+      {
+        siteId: 'source-app',
+        title: 'Source record',
+        url: document.getElementById('obs-start-url-input')?.value.trim() || 'http://localhost:3737/releases/item/ITEM_123',
+        requiresAuth: false
+      },
+      {
+        siteId: 'target-platform',
+        title: 'Target upload',
+        url: 'https://example.com/upload',
+        requiresAuth: true
+      }
+    ]
+  };
+  document.getElementById('obs-recording-setup-input').value = JSON.stringify(setup, null, 2);
+  validateRecordingSetupManifest();
+}
+
+function renderRecordingSetupState() {
+  const statusEl = document.getElementById('obs-recording-setup-status');
+  const tabsEl = document.getElementById('obs-recording-setup-tabs');
+  const startBtn = document.getElementById('obs-start-btn');
+  if (!statusEl || !tabsEl || !startBtn) return;
+  const setup = recordingSetupState.setup;
+  if (!setup) {
+    tabsEl.innerHTML = '';
+    statusEl.textContent = recordingSetupState.lastError || 'Optional. Use this when you need multiple tabs or a manual auth preflight.';
+    startBtn.disabled = false;
+    startBtn.style.opacity = '';
+    return;
+  }
+  const required = recordingSetupState.requiredAuth || [];
+  const blocked = required.filter(site => site.status !== 'valid' && !recordingSetupState.authSkips.has(site.siteId));
+  statusEl.textContent = blocked.length
+    ? `Auth required before recording: ${blocked.map(site => site.siteId).join(', ')}`
+    : `Setup valid. ${setup.tabs.length} tab(s) will open before recording starts.`;
+  tabsEl.innerHTML = setup.tabs.map(tab => {
+    const auth = required.find(site => site.siteId === tab.siteId);
+    const skipped = recordingSetupState.authSkips.has(tab.siteId);
+    const authBadge = tab.requiresAuth
+      ? `<span style="font-size:.78rem;font-weight:800;color:${auth?.status === 'valid' ? 'var(--green)' : skipped ? 'var(--orange)' : 'var(--coral)'}">${skipped ? 'skipped' : auth?.status || 'missing'}</span>`
+      : `<span style="font-size:.78rem;font-weight:800;color:var(--green)">no auth</span>`;
+    return `
+      <div style="border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;background:var(--card)">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+          <div>
+            <div style="font-weight:800">${esc(tab.title || tab.siteId)}</div>
+            <div style="font-size:.8rem;color:var(--muted);font-family:'SF Mono','Fira Code',monospace;word-break:break-all">${esc(tab.url)}</div>
+          </div>
+          ${authBadge}
+        </div>
+        ${tab.requiresAuth ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <button class="btn-session-secondary" type="button" onclick="authenticateRecordingSite('${esc(tab.siteId)}','${esc((auth && auth.authUrl) || tab.url)}')">Authenticate</button>
+          <button class="btn-session-secondary" type="button" onclick="checkRecordingSite('${esc(tab.siteId)}','${esc((auth && auth.authUrl) || tab.url)}')">Check auth</button>
+          <button class="btn-session-secondary" type="button" onclick="toggleRecordingAuthSkip('${esc(tab.siteId)}')">${skipped ? 'Unskip auth requirement' : 'Skip auth requirement'}</button>
+        </div>` : ''}
+      </div>
+    `;
+  }).join('');
+  const enabled = blocked.length === 0;
+  startBtn.disabled = !enabled;
+  startBtn.style.opacity = enabled ? '' : '.55';
+}
+
+async function validateRecordingSetupManifest() {
+  const input = document.getElementById('obs-recording-setup-input');
+  const raw = input ? input.value.trim() : '';
+  if (!raw) {
+    recordingSetupState = { setup: null, requiredAuth: [], authSkips: new Set(), lastError: '' };
+    renderRecordingSetupState();
+    return;
+  }
+  let parsed;
+  try { parsed = JSON.parse(raw); }
+  catch (e) {
+    recordingSetupState = { setup: null, requiredAuth: [], authSkips: new Set(), lastError: 'Invalid JSON: ' + e.message };
+    renderRecordingSetupState();
+    return;
+  }
+  const res = await fetch('/api/recording/setup/validate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(parsed),
+  });
+  const body = await res.json();
+  if (!res.ok || !body.ok) {
+    recordingSetupState = { setup: null, requiredAuth: [], authSkips: new Set(), lastError: body.error || `Validation failed (${res.status})` };
+    renderRecordingSetupState();
+    return;
+  }
+  const currentSkips = recordingSetupState.authSkips || new Set();
+  recordingSetupState = {
+    setup: body.setup,
+    requiredAuth: body.requiredAuth || [],
+    authSkips: new Set([...currentSkips].filter(siteId => (body.requiredAuth || []).some(site => site.siteId === siteId))),
+    lastError: '',
+  };
+  renderRecordingSetupState();
+}
+
+async function refreshRecordingSetupAuth() {
+  if (!recordingSetupState.setup) { await validateRecordingSetupManifest(); return; }
+  await validateRecordingSetupManifest();
+}
+
+async function authenticateRecordingSite(siteId, url) {
+  const res = await fetch('/api/auth/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ siteId, url }),
+  });
+  const body = await res.json();
+  if (!res.ok || !body.ok) {
+    alert(body.error || `Failed to open auth browser (${res.status})`);
+    return;
+  }
+  alert('Persistent auth browser opened. Log in manually, then close it. After that, click "Refresh auth status".');
+}
+
+async function checkRecordingSite(siteId, url) {
+  const res = await fetch('/api/auth/check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ siteId, url }),
+  });
+  const body = await res.json();
+  if (!res.ok || !body.ok) {
+    alert(body.error || `Auth check failed (${res.status})`);
+    return;
+  }
+  await refreshRecordingSetupAuth();
+}
+
+function toggleRecordingAuthSkip(siteId) {
+  if (recordingSetupState.authSkips.has(siteId)) recordingSetupState.authSkips.delete(siteId);
+  else recordingSetupState.authSkips.add(siteId);
+  renderRecordingSetupState();
+}
 
 // ── Voice (field dictation) ─────────────────────────────────────────────────
 let activeVoiceBtn = null;
@@ -3460,9 +3617,20 @@ async function startObsSession() {
   }
 
   if (obsSource === 'playwrightRecorder' && !startUrl) {
-    alert('Enter a target URL — Playwright Recorder needs a real page to observe.');
-    if (startUrlInput) startUrlInput.focus();
-    return;
+    const setupRaw = document.getElementById('obs-recording-setup-input')?.value.trim() || '';
+    if (!setupRaw) {
+      alert('Enter a target URL — Playwright Recorder needs a real page to observe.');
+      if (startUrlInput) startUrlInput.focus();
+      return;
+    }
+  }
+
+  if (obsSource === 'playwrightRecorder') {
+    await validateRecordingSetupManifest();
+    if (recordingSetupState.lastError) {
+      alert(recordingSetupState.lastError);
+      return;
+    }
   }
 
   // Mirror into the wizard state object so the rest of the flow (preview,
@@ -3484,7 +3652,16 @@ async function startObsSession() {
     const r = await fetch('/api/observation/session/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source: obsSource, startUrl, workflowId: workflowId || null, title, description, overwrite: !!overwrite }),
+      body: JSON.stringify({
+        source: obsSource,
+        startUrl: recordingSetupState.setup?.tabs?.[0]?.url || startUrl,
+        workflowId: workflowId || null,
+        title,
+        description,
+        overwrite: !!overwrite,
+        recordingSetup: recordingSetupState.setup,
+        authSkips: [...(recordingSetupState.authSkips || new Set())],
+      }),
     });
     return { r, body: await r.json() };
   }
@@ -3496,6 +3673,9 @@ async function startObsSession() {
       const proceed = confirm(`Workflow "${workflowId}" already exists.\n\nProceed and overwrite when you save?`);
       if (!proceed) { showObsState('not-started'); return; }
       first = await postStart(true);
+    }
+    if (first.r.status === 409 && first.body?.code === 'blocked_auth_required') {
+      throw new Error((first.body.missingAuth || []).map(site => `${site.siteId}: ${site.command}`).join('\n'));
     }
     if (!first.r.ok || !first.body.ok) throw new Error(first.body.error || `Server returned ${first.r.status}`);
     resp = first.body;

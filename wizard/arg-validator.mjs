@@ -17,7 +17,7 @@ const RULES = {
   'validate-request': { subs: null,                       keys: new Set([]) },
   'plan':             { subs: null,                       keys: new Set(['request']) },
   'init':             { subs: null,                       keys: new Set(['id', 'from-request']) },
-  'auth':             { subs: new Set(['save', 'check']), keys: new Set(['workflow', 'url', 'headed']) },
+  'auth':             { subs: new Set(['save', 'check', 'list']), keys: new Set(['workflow', 'site', 'url', 'headed']) },
   'discover':         { subs: null,                       keys: new Set(['workflow', 'url', 'candidates', 'headed', 'pause']) },
   'discover:all':     { subs: null,                       keys: new Set(['workflow', 'headed']) },
   // allow-final-action deliberately absent — wizard must not enable live submissions
@@ -41,6 +41,7 @@ function checkValue(key, val) {
   switch (key) {
     case 'workflow':
     case 'id':
+    case 'site':
       if (!RE_SAFE_ID.test(val))
         return `--${key} must be [a-z0-9-_] (got: ${val})`;
       break;

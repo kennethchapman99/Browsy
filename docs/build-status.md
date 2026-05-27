@@ -2,7 +2,7 @@
 
 **Updated:** 2026-05-26  
 **Branch:** main  
-**HEAD:** `7164e83` — feat: workflow package import + real registry execution (#9)
+**HEAD:** (post-#9) — add canonical run endpoint + Pancake Robot E2E acceptance test
 
 ---
 
@@ -15,12 +15,14 @@
 ## Verification Passed
 
 ```
-npm test                                           → 51 passed, 0 failed
+npm test                                           → 68 passed, 0 failed (51 prior + 17 new)
 browsy workflow import workflows/local-form-demo \
   --app smoke-app --app-name "Smoke App" \
   --register-app --workflow-id smoke-wf           → workflowRef + packagePath returned ✓
 browsy workflow contract smoke-app.smoke-wf \
-  --format json                                   → full contract JSON with endpoints ✓
+  --format json                                   → contract JSON with runEndpoint ✓
+POST /api/apps/:appId/workflows/:workflowId/runs   → 201 created ✓ (canonical endpoint)
+GET  /api/runs/:runId                              → run status ✓
 ```
 
 ---
@@ -33,7 +35,7 @@ browsy workflow contract smoke-app.smoke-wf \
 | Import a workflow package | `browsy workflow import <path> --app <id> --workflow-id <id>` |
 | Get workflow contract | `browsy workflow contract <ref> --format json\|markdown` |
 | Trigger a run (dry-run) | `browsy workflow run <ref> --mode preview` |
-| Trigger a run (real) | `POST /api/apps/:appId/workflows/import` |
+| Trigger a run (real) | `POST /api/apps/:appId/workflows/:workflowId/runs` |
 | Fetch run status | `GET /api/runs/:runId` |
 | Fetch run artifacts | `GET /api/runs/:runId/artifacts` |
 | Registry stores | `packagePath`, `packageWorkflowId`, full contract |
@@ -58,8 +60,8 @@ Goal: Wire Pancake Robot to call Browsy as its automation runtime.
 
 Context:
 - Browsy API: http://localhost:3001
-- Workflow contract endpoint: GET /api/apps/:appId/workflows/:workflowId/contract
-- Run trigger endpoint: POST /api/apps/:appId/workflows/import (or POST /api/workflows/:ref/runs)
+- Workflow contract: browsy workflow contract &lt;appId&gt;.&lt;workflowId&gt; --format json
+- Run trigger endpoint: POST /api/apps/:appId/workflows/:workflowId/runs  ← canonical
 - Run status: GET /api/runs/:runId
 - Artifacts: GET /api/runs/:runId/artifacts
 - Auth: none yet (add approvalToken: "" for live mode or use mode: "preview" to skip)

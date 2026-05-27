@@ -20,6 +20,18 @@ import { captureVisualEvidence, evidenceToRawEvidence } from '../src/adapters/ob
 import { buildRecorderPackage } from '../src/core/recorder-package.mjs';
 import { loadWorkflowPackage, validateWorkflowPackage, RETURN_CONTRACT_VERSION } from '../src/core/workflow-contract.mjs';
 import { defaultSafetyPolicy } from '../src/core/safety.mjs';
+import {
+  ensureAuthProfile,
+  exportPersistentAuthState,
+  getMissingWorkflowAuth,
+  listAuthProfiles,
+  mergeAuthStorageStates,
+  readAuthProfile,
+  resolveWorkflowAuthSites,
+  writeAuthProfile,
+  launchBrowserWithPersistentProfile,
+} from '../src/core/auth.mjs';
+import { normalizeRecordingSetup, requiredAuthSitesFromSetup, validateRecordingSetup } from '../src/core/recording-setup.mjs';
 import crypto from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -59,9 +71,9 @@ function latestRunInfo(runsDir) {
 function getWorkflowState(workflowId) {
   const wfDir = path.join(REPO_ROOT, 'workflows', workflowId);
   const runsDir = path.join(REPO_ROOT, 'output', 'runs', workflowId);
-  const authFile = path.join(REPO_ROOT, '.auth', `${workflowId}.json`);
   const outputObservationDir = path.join(REPO_ROOT, 'output', 'observations', workflowId);
   const { latestRun, latestRunDir, runs } = latestRunInfo(runsDir);
+  const authStatus = workflowAuthStatus(workflowId);
 
   const scaffolded = has(path.join(wfDir, 'workflow.json'));
   const projectDrafted = has(path.join(wfDir, 'project.json'));
@@ -100,7 +112,7 @@ function getWorkflowState(workflowId) {
       package: { done: projectDrafted },
       observation: { done: readiness.states.observation_captured, needed: readiness.states.observation_needed },
       scaffold: { done: scaffolded },
-      auth: { done: has(authFile) },
+      auth: authStatus,
       discover: { done: hasDiscovery },
       'field-map': { done: readiness.states.field_map_verified, candidates: readiness.states.field_map_candidate_ready },
       'dry-run': { done: latestRun !== null, error: hasErrors, runId: latestRun },
@@ -1004,9 +1016,11 @@ async function handleDownload(session, page, download) {
   captureSnapshot(session, { kind: 'download', hint: suggested || 'download', page }).catch(() => {});
 }
 
-async function launchPlaywrightSession(session, startUrl) {
+async function launchPlaywrightSession(session, startUrl, options = {}) {
   const { chromium } = await import('playwright');
   const headless = process.env.BROWSY_OBS_HEADLESS === '1';
+  const recordingSetup = options.recordingSetup ? normalizeRecordingSetup(options.recordingSetup) : null;
+  const skippedSites = new Set((options.authSkips || []).map(siteId => String(siteId || '').trim().toLowerCase()));
   // BROWSY_OBS_CDP_PORT enables remote DevTools for acceptance tests so they
   // can attach to the very same browser the server launched and drive real
   // DOM interactions — proving the capture pipeline works end-to-end.
@@ -1016,7 +1030,15 @@ async function launchPlaywrightSession(session, startUrl) {
   const browser = await chromium.launch({ headless, args: launchArgs });
   // Auto-accept downloads so page.on('download') always fires with a usable
   // Download object. We persist the bytes ourselves via saveAs().
-  const context = await browser.newContext({ acceptDownloads: true });
+  const requiredAuthSites = recordingSetup
+    ? requiredAuthSitesFromSetup(recordingSetup).filter(site => !skippedSites.has(site.siteId))
+    : [];
+  const mergedStorageState = mergeAuthStorageStates(requiredAuthSites.map(site => site.siteId));
+  const hasMergedState = mergedStorageState.cookies.length || mergedStorageState.origins.length;
+  const context = await browser.newContext({
+    acceptDownloads: true,
+    ...(hasMergedState ? { storageState: mergedStorageState } : {}),
+  });
 
   // Bind once on the context. Playwright invokes the callback with a `source`
   // arg that carries `{ context, page, frame }` — that's how we route DOM
@@ -1059,25 +1081,32 @@ async function launchPlaywrightSession(session, startUrl) {
   session.browser = browser;
   session.context = context;
   session.startUrl = startUrl;
+  session.recordingSetup = recordingSetup;
+  session.authSkips = [...skippedSites];
 
-  // Initial page — open it explicitly so we control the URL and can attach
-  // listeners before navigation begins.
-  const page = await context.newPage();
-  // attachPage runs via context.on('page') above; if listener didn't fire in
-  // time (rare race), attach explicitly so we don't miss the initial events.
-  if (!session.attachedPages?.has(page)) attachPage(session, page, { trigger: 'initial' });
-
-  if (startUrl) {
+  const tabs = recordingSetup?.tabs?.length ? recordingSetup.tabs : [{ url: startUrl, title: 'Primary tab', siteId: null, requiresAuth: false }];
+  let firstPage = null;
+  for (const [index, tab] of tabs.entries()) {
+    const page = index === 0 ? await context.newPage() : await context.newPage();
+    if (!session.attachedPages?.has(page)) attachPage(session, page, { trigger: index === 0 ? 'initial' : 'recording_setup_tab' });
+    if (!firstPage) firstPage = page;
     try {
-      await page.goto(startUrl, { waitUntil: 'domcontentloaded' });
-      // Initial state snapshot — DOM is mounted; let the initial scan flush
-      // before we capture, so the visible-text summary reflects the rendered
-      // page rather than a placeholder shell.
-      await captureSnapshot(session, { kind: 'session_start', hint: 'initial_load', settleMs: 400, page }).catch(() => {});
+      await page.goto(tab.url, { waitUntil: 'domcontentloaded' });
+      await captureSnapshot(session, {
+        kind: index === 0 ? 'session_start' : 'page_opened',
+        hint: tab.title || `tab_${index + 1}`,
+        settleMs: 400,
+        page,
+      }).catch(() => {});
     } catch (e) {
-      pushEventToSession(session, { source: 'playwrightRecorder', type: 'user_note_added', userAnnotation: `navigation failed: ${e.message}` });
+      pushEventToSession(session, {
+        source: 'playwrightRecorder',
+        type: 'user_note_added',
+        userAnnotation: `navigation failed for ${tab.url}: ${e.message}`,
+      });
     }
   }
+  if (firstPage) session.page = firstPage;
 }
 
 async function stopPlaywrightSession(session, { reason = 'user_finished' } = {}) {
@@ -1160,6 +1189,53 @@ function loadWorkflowConfig(workflowId) {
   } catch (e) {
     return { exists: true, config: null, path: cfgPath, error: e.message };
   }
+}
+
+function workflowAuthStatus(workflowId) {
+  const legacyPath = path.join(REPO_ROOT, '.auth', `${workflowId}.json`);
+  const loaded = loadWorkflowConfig(workflowId);
+  const requiredSites = resolveWorkflowAuthSites(loaded.config || {}).filter(site => site.requiresAuth);
+  if (!requiredSites.length) return { done: has(legacyPath), requiredSites: [] };
+  const profiles = requiredSites.map(site => ({ ...site, profile: readAuthProfile(site.siteId) }));
+  return {
+    done: profiles.every(site => site.profile.status === 'valid'),
+    requiredSites: profiles.map(site => ({
+      siteId: site.siteId,
+      siteName: site.siteName,
+      authCheckUrl: site.authCheckUrl || site.url || null,
+      status: site.profile.status,
+    })),
+  };
+}
+
+function looksUnauthenticated(url = '') {
+  return /accounts\.google\.com|\/login\b|\/signin\b|sign-in|auth/i.test(String(url || ''));
+}
+
+async function openAuthPreflight(siteId, url) {
+  const profile = ensureAuthProfile(siteId, { authCheckUrl: url || null });
+  const { context, page } = await launchBrowserWithPersistentProfile({
+    siteId: profile.siteId,
+    url: url || profile.authCheckUrl || profile.baseUrl,
+    headed: true,
+    siteName: profile.siteName,
+    baseUrl: profile.baseUrl,
+    authCheckUrl: url || profile.authCheckUrl || profile.baseUrl,
+  });
+  async function save(trigger) {
+    try {
+      await exportPersistentAuthState(profile.siteId, context, { source: `wizard-auth:${trigger}` });
+    } catch {}
+  }
+  page.on('load', () => save('load'));
+  page.on('domcontentloaded', () => save('domcontentloaded'));
+  page.on('framenavigated', () => save('framenavigated'));
+  const interval = setInterval(() => save('interval'), 5000);
+  context.on('close', async () => {
+    clearInterval(interval);
+    try { await save('close'); } catch {}
+  });
+  return readAuthProfile(profile.siteId);
 }
 
 function loadObservationMetadata(workflowId) {
@@ -2343,6 +2419,81 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/auth/profiles') {
+    return json(res, 200, { ok: true, profiles: listAuthProfiles() });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/auth/save') {
+    let body;
+    try { body = await readBody(req); } catch { return json(res, 400, { error: 'invalid JSON' }); }
+    const siteId = safeWorkflowId(body?.siteId) ? body.siteId : null;
+    const authUrl = typeof body?.url === 'string' ? body.url : null;
+    if (!siteId) return json(res, 400, { error: 'siteId is required' });
+    if (authUrl && !/^https?:\/\//i.test(authUrl)) return json(res, 400, { error: 'url must start with http:// or https://' });
+    try {
+      const profile = await openAuthPreflight(siteId, authUrl);
+      return json(res, 200, {
+        ok: true,
+        profile,
+        message: 'Persistent auth browser opened. Log in manually, then close the browser.',
+      });
+    } catch (e) {
+      return json(res, 500, { error: e.message });
+    }
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/auth/check') {
+    let body;
+    try { body = await readBody(req); } catch { return json(res, 400, { error: 'invalid JSON' }); }
+    const siteId = safeWorkflowId(body?.siteId) ? body.siteId : null;
+    const authUrl = typeof body?.url === 'string' ? body.url : null;
+    if (!siteId) return json(res, 400, { error: 'siteId is required' });
+    const profile = readAuthProfile(siteId);
+    if (profile.status === 'missing') return json(res, 404, { error: 'auth profile not found', profile });
+    const targetUrl = authUrl || profile.authCheckUrl || profile.baseUrl;
+    try {
+      const { launchBrowser } = await import('../src/core/discovery.mjs');
+      const { browser, context, page, persistent } = await launchBrowser({
+        headed: true,
+        storageState: profile.hasStorageState ? profile.authStatePath : undefined,
+        userDataDir: !profile.hasStorageState && profile.hasUserDataDir ? profile.userDataDir : undefined,
+      });
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      const reachedUrl = page.url();
+      const status = looksUnauthenticated(reachedUrl) ? 'expired' : 'valid';
+      const updated = writeAuthProfile(siteId, {
+        status,
+        authCheckUrl: targetUrl,
+        lastCheckedAt: new Date().toISOString(),
+        lastCheckedUrl: targetUrl,
+        lastCheckReachedUrl: reachedUrl,
+      });
+      if (persistent) await context.close();
+      else await browser.close();
+      return json(res, 200, { ok: true, profile: updated, reachedUrl });
+    } catch (e) {
+      return json(res, 500, { error: e.message });
+    }
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/recording/setup/validate') {
+    let body;
+    try { body = await readBody(req); } catch { return json(res, 400, { error: 'invalid JSON' }); }
+    const validated = validateRecordingSetup(body);
+    if (!validated.ok) return json(res, 400, { error: validated.errors.join('; '), errors: validated.errors });
+    const requiredAuth = requiredAuthSitesFromSetup(validated.setup).map(site => ({ ...site, profile: readAuthProfile(site.siteId) }));
+    return json(res, 200, {
+      ok: true,
+      setup: validated.setup,
+      requiredAuth: requiredAuth.map(site => ({
+        siteId: site.siteId,
+        title: site.title,
+        authUrl: site.authCheckUrl || site.url || null,
+        status: site.profile.status,
+      })),
+    });
+  }
+
   // ── Observation session endpoints (real capture bridge) ────────────────────
   //
   // POST /api/observation/session/start { source, startUrl?, workflowId? }
@@ -2355,9 +2506,15 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && url.pathname === '/api/observation/session/start') {
     let body;
     try { body = await readBody(req); } catch { return json(res, 400, { error: 'invalid JSON' }); }
-    const { source = 'playwrightRecorder', startUrl, workflowId, title, description, overwrite } = body || {};
+    const { source = 'playwrightRecorder', startUrl, workflowId, title, description, overwrite, recordingSetup, authSkips = [] } = body || {};
+    let normalizedSetup = null;
+    if (recordingSetup) {
+      const validatedSetup = validateRecordingSetup(recordingSetup);
+      if (!validatedSetup.ok) return json(res, 400, { error: validatedSetup.errors.join('; ') });
+      normalizedSetup = validatedSetup.setup;
+    }
     if (!CAPTURE_SOURCES.includes(source)) return json(res, 400, { error: `unknown capture source: ${source}` });
-    if (source === 'playwrightRecorder' && (!startUrl || typeof startUrl !== 'string')) {
+    if (source === 'playwrightRecorder' && !normalizedSetup && (!startUrl || typeof startUrl !== 'string')) {
       return json(res, 400, { error: 'playwrightRecorder requires a startUrl' });
     }
     // Part 2: name the workflow before observation begins. workflowId is now
@@ -2390,6 +2547,7 @@ const server = http.createServer(async (req, res) => {
       state: 'starting',
       events: [],
       browser: null, context: null, page: null,
+      recordingSetup: normalizedSetup,
     };
     obsSessions.set(sessionId, session);
 
@@ -2397,10 +2555,30 @@ const server = http.createServer(async (req, res) => {
     pushEventToSession(session, { source, type: 'capture_source_selected', payload: { captureSource: source } });
 
     if (source === 'playwrightRecorder') {
+      const skipped = new Set((authSkips || []).map(siteId => String(siteId || '').trim().toLowerCase()));
+      const requiredAuthSites = normalizedSetup
+        ? requiredAuthSitesFromSetup(normalizedSetup).filter(site => !skipped.has(site.siteId))
+        : [];
+      const missingAuth = requiredAuthSites
+        .map(site => ({ ...site, profile: readAuthProfile(site.siteId) }))
+        .filter(site => site.profile.status !== 'valid');
+      if (missingAuth.length) {
+        session.state = 'finished';
+        session.finishedAt = Date.now();
+        return json(res, 409, {
+          error: 'required auth is missing',
+          code: 'blocked_auth_required',
+          missingAuth: missingAuth.map(site => ({
+            siteId: site.siteId,
+            authUrl: site.authCheckUrl || site.url || null,
+            command: `browsy auth save --site ${site.siteId} --url ${site.authCheckUrl || site.url || '<AUTH_URL>'}`,
+          })),
+        });
+      }
       try {
-        await launchPlaywrightSession(session, startUrl);
+        await launchPlaywrightSession(session, normalizedSetup?.tabs?.[0]?.url || startUrl, { recordingSetup: normalizedSetup, authSkips });
         session.state = 'recording';
-        console.log(`[wizard] Playwright observation session ${sessionId} recording: ${startUrl}`);
+        console.log(`[wizard] Playwright observation session ${sessionId} recording: ${normalizedSetup?.tabs?.[0]?.url || startUrl}`);
       } catch (e) {
         session.state = 'finished';
         session.finishedAt = Date.now();

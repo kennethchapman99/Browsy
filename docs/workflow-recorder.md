@@ -8,6 +8,54 @@ package — all from local fixtures, never relying on external sites.
 This document explains what the recorder captures, what it does **not**
 capture, and how to run it.
 
+## Authenticated recording preflight
+
+Some real workflows need multiple tabs and manual authentication before
+recording starts. Browsy now supports a recording setup manifest plus
+site-scoped auth profiles.
+
+- Auth capture uses a persistent Chromium `userDataDir` per site under
+  `.auth/profiles/<siteId>/user-data`.
+- Browsy exports Playwright `storage-state.json` beside that profile and
+  reuses the exported state when it opens the recorder context.
+- The recorder never attempts to automate Google OAuth or any other login
+  flow that rejects automation-controlled browsers.
+- The login step stays manual and separate from the recorded business steps.
+
+Example setup:
+
+```json
+{
+  "workflowId": "distrokid_album_art_upload",
+  "appId": "pancake-robot",
+  "tabs": [
+    {
+      "siteId": "pancake-robot",
+      "title": "Pancake Robot Release",
+      "url": "http://localhost:3737/releases/album/ALBUM_MPK9H71S_RTCM",
+      "requiresAuth": false
+    },
+    {
+      "siteId": "distrokid",
+      "title": "DistroKid Upload",
+      "url": "https://distrokid.com/new",
+      "requiresAuth": true
+    }
+  ]
+}
+```
+
+Recommended flow:
+
+```bash
+npm run auth:save -- --site distrokid --url https://distrokid.com/new
+npm run auth:check -- --site distrokid --url https://distrokid.com/new
+npm run wizard
+```
+
+Paste the setup manifest into the wizard, refresh auth status, then start the
+recorder. Browsy opens every declared tab before recording begins.
+
 ## What it captures
 
 ### Browser context (not just one page)
@@ -151,6 +199,23 @@ npm run wizard
 
 `BROWSY_OBS_HEADLESS=1` makes the recorder launch headless Chromium (used
 by tests). Default = visible browser.
+
+### CDP support
+
+`BROWSY_OBS_CDP_PORT` is already supported, but only for debugging and
+acceptance tests. Example:
+
+```bash
+BROWSY_OBS_CDP_PORT=9322 npm run wizard
+```
+
+That exposes Chromium DevTools on `http://localhost:9322` so another
+Playwright client can attach to the same browser with
+`chromium.connectOverCDP(...)`.
+
+For DistroKid and Google-backed login flows, prefer the persistent
+`userDataDir` auth-profile flow over CDP. CDP does not solve the core issue:
+Google rejects the initial automation-controlled login browser.
 
 ### Run the recorder acceptance suite
 

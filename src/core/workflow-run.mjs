@@ -28,6 +28,7 @@ import {
 } from './paths.mjs';
 import { defaultSafetyPolicy, isDangerousText } from './safety.mjs';
 import { listScaffolds, getScaffold } from './workflow-scaffolds.mjs';
+import { getMissingWorkflowAuth } from './auth.mjs';
 
 // Run a workflow package end-to-end.
 //
@@ -84,6 +85,8 @@ export async function runWorkflowPackage(options = {}) {
   // 4. Load workflow safety policy if present
   const policyPath = path.join(workflowDir, 'safety-policy.json');
   const policy = exists(policyPath) ? readJson(policyPath) : defaultSafetyPolicy();
+  const workflowConfigPath = path.join(workflowDir, 'workflow.json');
+  const workflowConfig = workflowExists && exists(workflowConfigPath) ? readJson(workflowConfigPath) : {};
 
   // 5. Resolve canonical payload (inline or file-backed)
   const canonical = await resolveCanonical(pkg, loaded.packagePath, result);
@@ -102,6 +105,7 @@ export async function runWorkflowPackage(options = {}) {
   let humanGateReached = false;
   let blocked = false;
   let failed = false;
+  let blockedAuthRequired = false;
 
   if (!workflowExists && scaffold) {
     // Workflow is known by name (in the scaffold registry) but not materialized
@@ -114,7 +118,23 @@ export async function runWorkflowPackage(options = {}) {
     }));
     result.next_required_action = 'scaffold_and_discover';
     blocked = true;
-  } else if (!fieldMapVerified) {
+  } else {
+    const missingAuth = getMissingWorkflowAuth(workflowConfig);
+    if (missingAuth.length) {
+      blocked = true;
+      blockedAuthRequired = true;
+      result.client_action_requests.push(...missingAuth.map(site => clientActionRequest({
+        type: 'blocked_auth_required',
+        severity: 'blocking',
+        reason: `Missing or expired auth profile for site "${site.siteId}".`,
+        suggested_action: `Run: browsy auth save --site ${site.siteId} --url ${site.authCheckUrl || site.url || '<AUTH_URL>'}`,
+        siteId: site.siteId,
+        authUrl: site.authCheckUrl || site.url || null,
+      })));
+      result.next_required_action = 'refresh_auth_profile';
+    }
+  }
+  if (!blocked && workflowExists && !fieldMapVerified) {
     result.client_action_requests.push(clientActionRequest({
       type: 'selector_verification_required',
       severity: 'blocking',
@@ -183,7 +203,7 @@ export async function runWorkflowPackage(options = {}) {
   }
 
   // 12. Finalize status
-  result.status = computeStatus({
+  result.status = blockedAuthRequired ? 'blocked_auth_required' : computeStatus({
     mode: pkg.mode,
     humanGateReached,
     blocked,

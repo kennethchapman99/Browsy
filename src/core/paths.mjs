@@ -8,6 +8,7 @@ export const REPO_ROOT = resolve(__dirname, '../..');
 export const WORKFLOWS_DIR = join(REPO_ROOT, 'workflows');
 export const OUTPUT_DIR = join(REPO_ROOT, 'output');
 export const AUTH_DIR = join(REPO_ROOT, '.auth');
+export const AUTH_PROFILES_DIR = join(AUTH_DIR, 'profiles');
 export const REGISTRY_DIR = join(REPO_ROOT, 'registry');
 
 export function workflowDir(workflow) {
@@ -16,6 +17,22 @@ export function workflowDir(workflow) {
 
 export function workflowAuthPath(workflow) {
   return join(AUTH_DIR, workflow + '.json');
+}
+
+export function authProfileDir(siteId) {
+  return join(AUTH_PROFILES_DIR, safeId(siteId));
+}
+
+export function authProfileUserDataDir(siteId) {
+  return join(authProfileDir(siteId), 'user-data');
+}
+
+export function authProfileStorageStatePath(siteId) {
+  return join(authProfileDir(siteId), 'storage-state.json');
+}
+
+export function authProfileMetaPath(siteId) {
+  return join(authProfileDir(siteId), 'profile.json');
 }
 
 export function workflowRunDir(workflow, timestamp = new Date().toISOString().replace(/[:.]/g, '-')) {

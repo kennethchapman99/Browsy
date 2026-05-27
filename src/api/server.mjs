@@ -6,10 +6,12 @@
 // Routes:
 //   POST  /api/apps/register
 //   GET   /api/apps
+//   POST  /api/apps/:appId/workflows/import
+//   POST  /api/apps/:appId/workflows/:workflowId/runs   ← canonical run trigger
 //   POST  /api/workflows/register
 //   GET   /api/workflows
 //   GET   /api/workflows/:workflowObjectId
-//   POST  /api/workflows/:workflowRef/runs     (ref = "objId" or "appId.wfId@ver")
+//   POST  /api/workflows/:workflowRef/runs              (legacy; use canonical above)
 //   GET   /api/runs/:runId
 //   POST  /api/runs/:runId/stop
 //   GET   /api/runs/:runId/artifacts
@@ -124,7 +126,39 @@ async function handleRequest(req, res) {
       return ok(res, { workflows: listWorkflows(appId) });
     }
 
-    // POST /api/workflows/:workflowRef/runs
+    // POST /api/apps/:appId/workflows/:workflowId/runs  ← canonical endpoint for callers
+    {
+      const params = matchRoute('/api/apps/:appId/workflows/:workflowId/runs', url.split('?')[0]);
+      if (params && method === 'POST') {
+        const body = await parseBody(req);
+        const workflowObjectId = `${params.appId}.${params.workflowId}`;
+        const version = body.version || null;
+
+        const wv = getWorkflowVersion(workflowObjectId, version);
+        if (!wv) return notFound(res, `workflow "${workflowObjectId}" version "${version || 'latest'}" not found`);
+
+        const run = createRun({
+          workflowObjectId,
+          version: wv.version,
+          mode: body.mode || 'preview',
+          payload: body.payload || {},
+          sessionProfileId: body.sessionProfileId || null,
+          callerId: body.callerId || null,
+        });
+
+        executeRun({
+          runId: run.runId,
+          workflowVersion: wv,
+          payload: body.payload || {},
+          mode: body.mode || 'preview',
+          approvalToken: body.approvalToken || null,
+        }).catch(() => {});
+
+        return created(res, { runId: run.runId, run });
+      }
+    }
+
+    // POST /api/workflows/:workflowRef/runs  (legacy; prefer /api/apps/:appId/workflows/:workflowId/runs)
     {
       const params = matchRoute('/api/workflows/:workflowRef/runs', url.split('?')[0]);
       if (params && method === 'POST') {
@@ -223,6 +257,7 @@ if (process.argv[1] && new URL(import.meta.url).pathname === new URL('file://' +
     console.log('  POST /api/apps/register');
     console.log('  GET  /api/apps');
     console.log('  POST /api/apps/:appId/workflows/import');
+    console.log('  POST /api/apps/:appId/workflows/:workflowId/runs');
     console.log('  POST /api/workflows/register');
     console.log('  GET  /api/workflows');
     console.log('  GET  /api/workflows/:workflowObjectId');

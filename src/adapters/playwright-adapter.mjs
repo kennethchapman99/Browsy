@@ -1,7 +1,6 @@
 import { launchBrowser, discoverPage } from '../core/discovery.mjs';
 import { isDangerousText, isSelectorBlocked } from '../core/safety.mjs';
 import { saveScreenshot } from '../core/workflow-runtime.mjs';
-import { exists } from '../core/paths.mjs';
 
 // Playwright adapter — the primary execution engine.
 // Implements the Browsy adapter interface:
@@ -14,16 +13,17 @@ export class PlaywrightAdapter {
     this.browser = null;
     this.context = null;
     this.page = null;
+    this._persistent = false;
   }
 
   // Launch Chromium. storageState is loaded only if the file exists.
-  async open({ headed = true, storageState = undefined, dryRun = false } = {}) {
+  async open({ headed = true, storageState = undefined, userDataDir = undefined, dryRun = false } = {}) {
     this._dryRun = dryRun;
-    const resolvedState = storageState && exists(storageState) ? storageState : undefined;
-    const { browser, context, page } = await launchBrowser({ headed, storageState: resolvedState });
+    const { browser, context, page, persistent } = await launchBrowser({ headed, storageState, userDataDir });
     this.browser = browser;
     this.context = context;
     this.page = page;
+    this._persistent = !!persistent;
   }
 
   // Navigate to a URL and return the discovered DOM inventory.
@@ -82,6 +82,12 @@ export class PlaywrightAdapter {
 
   // Close the browser.
   async close() {
+    if (this.context && this._persistent) {
+      await this.context.close().catch(() => {});
+      this.context = null;
+      this.browser = null;
+      return;
+    }
     if (this.browser) {
       await this.browser.close().catch(() => {});
       this.browser = null;
@@ -90,6 +96,10 @@ export class PlaywrightAdapter {
 
   // Wait for user to close the browser (used for manual checkpoint).
   async waitForClose() {
+    if (this.context && this._persistent) {
+      await new Promise(resolve => this.context.on('close', resolve));
+      return;
+    }
     if (!this.browser) return;
     await new Promise(resolve => this.browser.on('disconnected', resolve));
   }

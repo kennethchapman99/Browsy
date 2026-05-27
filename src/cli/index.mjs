@@ -7,6 +7,18 @@ import {
   workflowDir, workflowAuthPath, workflowRunDir,
   ensureDir, exists, writeJson, writeText, readJson, safeId
 } from '../core/paths.mjs';
+import {
+  buildBlockedAuthRequests,
+  ensureAuthProfile,
+  exportPersistentAuthState,
+  getKnownAuthSite,
+  listAuthProfiles,
+  mergeAuthStorageStates,
+  readAuthProfile,
+  resolveWorkflowAuthSites,
+  writeAuthProfile,
+  launchBrowserWithPersistentProfile,
+} from '../core/auth.mjs';
 import { defaultSafetyPolicy } from '../core/safety.mjs';
 import { launchBrowser, writeDiscoveryArtifacts } from '../core/discovery.mjs';
 import { parseRequest, loadAndParseRequest, formatValidationIssues } from '../core/request-parser.mjs';
@@ -40,6 +52,9 @@ function printHelp() {
   console.log('  browsy plan [--request FILE]       Generate build plan from request');
   console.log('  browsy init --id <id>              Create workflow scaffold');
   console.log('  browsy init --from-request         Create workflow from parsed request');
+  console.log('  browsy auth list');
+  console.log('  browsy auth save --site <id> --url <url>');
+  console.log('  browsy auth check --site <id> --url <url>');
   console.log('  browsy auth save --workflow <id> --url <url>');
   console.log('  browsy auth check --workflow <id> --url <url>');
   console.log('  browsy discover --workflow <id> --url <url> [--candidates]');
@@ -48,6 +63,111 @@ function printHelp() {
   console.log('  browsy run --workflow <id> --manifest <path> [--dry-run]');
   console.log('  browsy workflow:run --workflow <id> --package <path> [--dry-run|--live]');
   console.log('  browsy workflow:scaffolds          List reusable workflow scaffolds');
+}
+
+function loadWorkflowConfigMaybe(workflowId) {
+  const configPath = join(workflowDir(workflowId), 'workflow.json');
+  if (!exists(configPath)) return null;
+  try { return readJson(configPath); } catch { return null; }
+}
+
+function getWorkflowAuthConfig(workflowId) {
+  const config = loadWorkflowConfigMaybe(workflowId);
+  return { config, sites: resolveWorkflowAuthSites(config || {}) };
+}
+
+function workflowStorageState(workflowId) {
+  const legacyPath = workflowAuthPath(workflowId);
+  if (exists(legacyPath)) return legacyPath;
+  const { sites } = getWorkflowAuthConfig(workflowId);
+  const requiredSiteIds = sites.filter(site => site.requiresAuth).map(site => site.siteId);
+  if (!requiredSiteIds.length) return undefined;
+  const merged = mergeAuthStorageStates(requiredSiteIds);
+  return merged.cookies.length || merged.origins.length ? merged : undefined;
+}
+
+function syncWorkflowAuthCompatFile(workflowId, config = null) {
+  const resolvedConfig = config || loadWorkflowConfigMaybe(workflowId);
+  const sites = resolveWorkflowAuthSites(resolvedConfig || {}).filter(site => site.requiresAuth).map(site => site.siteId);
+  if (!sites.length) return null;
+  const merged = mergeAuthStorageStates(sites);
+  if (!merged.cookies.length && !merged.origins.length) return null;
+  writeJson(workflowAuthPath(workflowId), merged);
+  return workflowAuthPath(workflowId);
+}
+
+function looksUnauthenticated(url = '') {
+  return /accounts\.google\.com|\/login\b|\/signin\b|sign-in|auth/i.test(String(url || ''));
+}
+
+async function saveSiteAuth(siteId, url, { workflowId = null } = {}) {
+  const known = getKnownAuthSite(siteId);
+  const profile = ensureAuthProfile(siteId, {
+    siteName: known?.siteName || siteId,
+    baseUrl: known?.baseUrl || url,
+    authCheckUrl: url || known?.authCheckUrl || known?.baseUrl || null,
+  });
+  console.log(`Launching persistent browser for manual auth: ${profile.siteName} (${profile.siteId})`);
+  console.log('Log in manually in that browser window. Close the browser when you are finished.');
+  const { context, page } = await launchBrowserWithPersistentProfile({
+    siteId: profile.siteId,
+    url: url || profile.authCheckUrl || profile.baseUrl,
+    headed: true,
+    siteName: profile.siteName,
+    baseUrl: profile.baseUrl,
+    authCheckUrl: url || profile.authCheckUrl || profile.baseUrl,
+  });
+  async function save(trigger) {
+    try {
+      await exportPersistentAuthState(profile.siteId, context, { source: `auth-save:${trigger}` });
+      if (workflowId) syncWorkflowAuthCompatFile(workflowId);
+      console.log(`[auth] saved ${profile.siteId} (${trigger}) at ${new Date().toISOString()}`);
+    } catch {}
+  }
+  page.on('load', () => save('load'));
+  page.on('domcontentloaded', () => save('domcontentloaded'));
+  page.on('framenavigated', () => save('framenavigated'));
+  const interval = setInterval(() => save('interval'), 5000);
+  await new Promise(resolve => context.on('close', resolve));
+  clearInterval(interval);
+  const refreshed = readAuthProfile(profile.siteId);
+  if (refreshed.status !== 'valid') throw new Error('Auth state was not saved: ' + refreshed.authStatePath);
+  console.log('Auth saved: ' + refreshed.authStatePath);
+  console.log('Profile dir: ' + refreshed.userDataDir);
+  if (workflowId) console.log('Workflow compat state: ' + workflowAuthPath(workflowId));
+}
+
+async function checkSiteAuth(siteId, url, { workflowId = null, headed = true } = {}) {
+  const profile = readAuthProfile(siteId);
+  if (profile.status === 'missing') {
+    throw new Error(`Missing auth profile for ${siteId}. Run auth save first: browsy auth save --site ${siteId} --url ${url || profile.authCheckUrl || '<AUTH_URL>'}`);
+  }
+  const targetUrl = url || profile.authCheckUrl || profile.baseUrl;
+  const runDir = workflowRunDir(workflowId || profile.siteId, 'auth-check');
+  const { browser, context, page, persistent } = await launchBrowser({
+    headed,
+    storageState: profile.hasStorageState ? profile.authStatePath : undefined,
+    userDataDir: !profile.hasStorageState && profile.hasUserDataDir ? profile.userDataDir : undefined,
+  });
+  await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  ensureDir(runDir);
+  await page.screenshot({ path: join(runDir, 'auth-check.png'), fullPage: true }).catch(() => {});
+  writeText(join(runDir, 'auth-check-url.txt'), page.url() + '\n');
+  const reachedUrl = page.url();
+  const status = looksUnauthenticated(reachedUrl) ? 'expired' : 'valid';
+  writeAuthProfile(profile.siteId, {
+    status,
+    lastCheckedAt: new Date().toISOString(),
+    lastCheckedUrl: targetUrl,
+    lastCheckReachedUrl: reachedUrl,
+    authCheckUrl: targetUrl,
+  });
+  console.log('Reached: ' + reachedUrl);
+  console.log('Status: ' + status);
+  console.log('Artifacts: ' + runDir);
+  if (persistent) await context.close();
+  else await browser.close();
+  if (workflowId) syncWorkflowAuthCompatFile(workflowId);
 }
 
 // ---------------------------------------------------------------------------
@@ -916,8 +1036,30 @@ console.log('PASS: ${id} smoke checks passed.');
 // ---------------------------------------------------------------------------
 
 async function authSave() {
+  const url = args.url || null;
+  const site = args.site ? safeId(args.site) : null;
+  if (site) {
+    if (!url && !getKnownAuthSite(site)?.authCheckUrl && !getKnownAuthSite(site)?.baseUrl) {
+      throw new Error(`No default URL known for site "${site}". Pass --url.`);
+    }
+    await saveSiteAuth(site, url);
+    return;
+  }
+
   const workflow = safeId(requireArg(args, 'workflow'));
-  const url = requireArg(args, 'url');
+  const { config, sites } = getWorkflowAuthConfig(workflow);
+  if (sites.length > 1) {
+    throw new Error(
+      `Workflow "${workflow}" requires multiple auth profiles. Save each site separately:\n` +
+      buildBlockedAuthRequests(config).map(req => `  ${req.command}`).join('\n')
+    );
+  }
+  if (sites.length === 1) {
+    await saveSiteAuth(sites[0].siteId, url || sites[0].authCheckUrl || sites[0].url, { workflowId: workflow });
+    return;
+  }
+
+  if (!url) throw new Error('--url is required for workflow-scoped auth save');
   ensureDir(join(REPO_ROOT, '.auth'));
   const authPath = workflowAuthPath(workflow);
   console.log('Launching browser for manual auth. Log in, then close the browser after auth saves.');
@@ -940,8 +1082,24 @@ async function authSave() {
 }
 
 async function authCheck() {
+  const url = args.url || null;
+  const site = args.site ? safeId(args.site) : null;
+  if (site) {
+    await checkSiteAuth(site, url, { headed: boolArg(args.headed, true) });
+    return;
+  }
+
   const workflow = safeId(requireArg(args, 'workflow'));
-  const url = requireArg(args, 'url');
+  const { sites } = getWorkflowAuthConfig(workflow);
+  if (sites.length > 1) {
+    throw new Error(`Workflow "${workflow}" has multiple auth profiles. Check each site separately with browsy auth check --site <siteId>.`);
+  }
+  if (sites.length === 1) {
+    await checkSiteAuth(sites[0].siteId, url || sites[0].authCheckUrl || sites[0].url, { workflowId: workflow, headed: boolArg(args.headed, true) });
+    return;
+  }
+
+  if (!url) throw new Error('--url is required for workflow-scoped auth check');
   const authPath = workflowAuthPath(workflow);
   if (!exists(authPath)) throw new Error('Missing auth file. Run auth save first: ' + authPath);
   const runDir = workflowRunDir(workflow, 'auth-check');
@@ -955,6 +1113,17 @@ async function authCheck() {
   await browser.close();
 }
 
+function authList() {
+  const profiles = listAuthProfiles();
+  if (!profiles.length) {
+    console.log('No auth profiles found.');
+    return;
+  }
+  for (const profile of profiles) {
+    console.log(`${profile.siteId}\t${profile.status}\t${profile.authCheckUrl || profile.baseUrl || ''}\t${profile.lastSavedAt || '(never saved)'}`);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // discover (with optional --candidates flag)
 // ---------------------------------------------------------------------------
@@ -963,8 +1132,7 @@ async function discover() {
   const workflow = safeId(requireArg(args, 'workflow'));
   const url = requireArg(args, 'url');
   const withCandidates = boolArg(args.candidates, false);
-  const authPath = workflowAuthPath(workflow);
-  const storageState = exists(authPath) ? authPath : undefined;
+  const storageState = workflowStorageState(workflow);
   const runDir = workflowRunDir(workflow);
   const { browser, page } = await launchBrowser({ headed: boolArg(args.headed, true), storageState });
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -1037,8 +1205,7 @@ async function discoverAll() {
   console.log(`Discovering ${urls.length} URL(s) for workflow: ${workflow}`);
   for (const url of urls) {
     console.log('\n─── ' + url + ' ───');
-    const authPath = workflowAuthPath(workflow);
-    const storageState = exists(authPath) ? authPath : undefined;
+    const storageState = workflowStorageState(workflow);
     const runDir = workflowRunDir(workflow);
     const { browser, page } = await launchBrowser({ headed: boolArg(args.headed, true), storageState });
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -1502,7 +1669,8 @@ async function workflowContract() {
     supportedModes: wv.supportedModes,
     approvalRequired,
     exampleCLIRun: `browsy workflow run ${wv.workflowObjectId}@${wv.version} --payload payload.json --mode preview`,
-    exampleHTTPCall: `POST ${baseUrl}/api/workflows/${wv.workflowObjectId}@${wv.version}/runs`,
+    runEndpoint: `POST ${baseUrl}/api/apps/${wv.appId}/workflows/${wv.workflowId}/runs`,
+    exampleHTTPCall: `POST ${baseUrl}/api/apps/${wv.appId}/workflows/${wv.workflowId}/runs`,
     exampleHTTPBody: { payload: examplePayload, mode: 'preview' },
     runStatusEndpoint: `GET ${baseUrl}/api/runs/:runId`,
     artifactEndpoint: `GET ${baseUrl}/api/runs/:runId/artifacts`,
@@ -1712,6 +1880,7 @@ try {
   else if (command === 'validate-request') validateRequest();
   else if (command === 'plan') generatePlan();
   else if (command === 'init') initWorkflow();
+  else if (command === 'auth' && subcommand === 'list') authList();
   else if (command === 'auth' && subcommand === 'save') await authSave();
   else if (command === 'auth' && subcommand === 'check') await authCheck();
   else if (command === 'discover') await discover();
