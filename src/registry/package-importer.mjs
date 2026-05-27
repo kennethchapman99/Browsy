@@ -151,7 +151,10 @@ export function importWorkflowPackage({
       humanApprovalCheckpoints: metadata.humanApprovalCheckpoints,
       recordedSteps: metadata.recordedSteps,
       variableBindings: metadata.variableBindings,
+      payloadBindings: metadata.payloadBindings,
       fileUploadBindings: metadata.fileUploadBindings,
+      fileBindings: metadata.fileBindings,
+      repeatGroups: metadata.repeatGroups,
       expectedOutputs: metadata.expectedOutputs,
       validationRules: metadata.validationRules,
       replaySettings: metadata.replaySettings,
@@ -177,6 +180,9 @@ export function importWorkflowPackage({
     tabs: metadata.tabs,
     auth: metadata.auth,
     humanApprovalCheckpoints: metadata.humanApprovalCheckpoints,
+    payloadBindings: metadata.payloadBindings,
+    fileBindings: metadata.fileBindings,
+    repeatGroups: metadata.repeatGroups,
     expectedOutputs: metadata.expectedOutputs,
   };
 }
