@@ -8,11 +8,49 @@ import { getApp, registerApp } from './app-registry.mjs';
 import { registerWorkflow } from './workflow-registry.mjs';
 import { extractWorkflowPackageMetadata, validateGenericSteps } from './generic-actions.mjs';
 
-const REQUIRED_FILES = ['workflow.json', 'manifest.schema.json'];
+const REQUIRED_FILES = ['workflow.json'];
 const EXECUTION_PKG_CANDIDATES = ['workflow-package.local.json', 'workflow-package.example.json'];
 
 function arrayOrEmpty(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function objectOrEmpty(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function schemaTypeFor(value) {
+  if (Array.isArray(value)) return 'array';
+  if (typeof value === 'boolean') return 'boolean';
+  if (typeof value === 'number') return Number.isInteger(value) ? 'integer' : 'number';
+  if (value && typeof value === 'object') return 'object';
+  return 'string';
+}
+
+function inferSchemaFromPackage(workflowJson = {}, executionPackage = {}, generic = {}) {
+  if (workflowJson.inputSchema && typeof workflowJson.inputSchema === 'object') return workflowJson.inputSchema;
+  if (workflowJson.input_schema && typeof workflowJson.input_schema === 'object') return workflowJson.input_schema;
+  if (executionPackage.inputSchema && typeof executionPackage.inputSchema === 'object') return executionPackage.inputSchema;
+  if (executionPackage.input_schema && typeof executionPackage.input_schema === 'object') return executionPackage.input_schema;
+
+  const payload = objectOrEmpty(executionPackage.canonical_payload);
+  const example = Object.keys(objectOrEmpty(generic.examplePayload)).length ? generic.examplePayload : {
+    ...objectOrEmpty(payload.globals),
+    ...objectOrEmpty(payload.defaults),
+    ...objectOrEmpty(payload.assets),
+  };
+  const properties = {};
+  const required = [];
+  for (const [key, value] of Object.entries(example)) {
+    properties[key] = { type: schemaTypeFor(value) };
+    required.push(key);
+  }
+  for (const group of arrayOrEmpty(payload.repeatGroups || generic.repeatGroups)) {
+    if (!group?.id) continue;
+    properties[group.id] = { type: 'array' };
+    if (!required.includes(group.id)) required.push(group.id);
+  }
+  return { type: 'object', required, properties };
 }
 
 export function validateWorkflowPackageDir(packagePath) {
@@ -46,14 +84,6 @@ export function validateWorkflowPackageDir(packagePath) {
     errors.push('workflow.json must have a string "id" field');
   }
 
-  let inputSchema;
-  try {
-    inputSchema = readJson(join(abs, 'manifest.schema.json'));
-  } catch (e) {
-    errors.push(`manifest.schema.json invalid JSON: ${e.message}`);
-  }
-  if (errors.length) return { ok: false, errors, metadata: null };
-
   let executionPackagePath = null;
   let executionPackage = {};
   for (const f of EXECUTION_PKG_CANDIDATES) {
@@ -68,6 +98,19 @@ export function validateWorkflowPackageDir(packagePath) {
   const generic = extractWorkflowPackageMetadata(workflowJson, executionPackage);
   const stepErrors = validateGenericSteps(generic.recordedSteps);
   if (stepErrors.length) return { ok: false, errors: stepErrors, metadata: null };
+
+  let inputSchema;
+  const manifestPath = join(abs, 'manifest.schema.json');
+  if (exists(manifestPath)) {
+    try {
+      inputSchema = readJson(manifestPath);
+    } catch (e) {
+      errors.push(`manifest.schema.json invalid JSON: ${e.message}`);
+    }
+  } else {
+    inputSchema = inferSchemaFromPackage(workflowJson, executionPackage, generic);
+  }
+  if (errors.length) return { ok: false, errors, metadata: null };
 
   const requiredAssets = [
     ...arrayOrEmpty(executionPackage.assets).map(a => a.role || a.path || null).filter(Boolean),
