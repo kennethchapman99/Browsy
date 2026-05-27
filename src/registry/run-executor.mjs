@@ -1,11 +1,12 @@
 // Run executor for the registry layer.
 //
 // Responsibility chain:
-//   1. Validate payload against inputSchema             → fail closed before browser launch
-//   2. Check safety gates (mode, approvalToken, etc.)   → fail closed before browser launch
-//   3. Execute via runWorkflowPackage (existing engine) → captures processStatus
-//   4. Evaluate assertions                              → determines workflowOutcome
-//   5. Update run record with normalized result + artifacts
+//   1. Validate app-facing payload against inputSchema     → fail closed before browser launch
+//   2. Normalize payload/assets via generic bindings       → keep app payload shape decoupled
+//   3. Check safety gates (mode, approvalToken, etc.)      → fail closed before browser launch
+//   4. Execute via runWorkflowPackage (existing engine)    → captures processStatus
+//   5. Evaluate assertions                                 → determines workflowOutcome
+//   6. Update run record with normalized result + artifacts
 
 import http from 'http';
 import https from 'https';
@@ -16,6 +17,7 @@ import { checkSafetyGates, toInternalMode } from './safety-gates.mjs';
 import { updateRun, getRun } from './run-registry.mjs';
 import { buildRunResult } from './run-result.mjs';
 import { runWorkflowPackage } from '../core/workflow-run.mjs';
+import { normalizePayloadForWorkflow } from './payload-bindings.mjs';
 
 function postJson(url, data) {
   return new Promise((resolve, reject) => {
@@ -81,6 +83,8 @@ export async function executeRun({ runId, workflowVersion, payload, mode, approv
     });
   }
 
+  const normalized = normalizePayloadForWorkflow(payload, workflowVersion);
+
   const { ok: gateOk, errors: gateErrors } = checkSafetyGates({
     workflowVersion,
     mode,
@@ -131,7 +135,8 @@ export async function executeRun({ runId, workflowVersion, payload, mode, approv
           const realPkg = readJson(candidate);
           pkgToWrite = {
             ...realPkg,
-            canonical_payload: payload,
+            canonical_payload: normalized.canonicalPayload,
+            assets: normalized.boundAssets.length ? normalized.boundAssets : (realPkg.assets || []),
             mode: internalMode,
             human_gate: stopBeforeSubmit || mode === 'live',
           };
@@ -149,8 +154,8 @@ export async function executeRun({ runId, workflowVersion, payload, mode, approv
       entity_id: runId,
       mode: internalMode,
       human_gate: stopBeforeSubmit || mode === 'live',
-      canonical_payload: payload,
-      assets: [],
+      canonical_payload: normalized.canonicalPayload,
+      assets: normalized.boundAssets,
       capture_outputs: [],
       return_contract_version: 'automation-result-v1',
       on_failure: 'stop_and_return_blocked_result',
