@@ -221,18 +221,23 @@ async function settlePage(page, { timeout, settleMs, targetHost } = {}) {
   await page.waitForTimeout(Math.min(settleMs || 1500, 5000)).catch(() => {});
 }
 
-// Prefer semantic locators (role/aria/text) before brittle recorded CSS.
-async function locate(page, step, timeout, attempts = []) {
+// Locate a target element. For clicks (preferLabels) we try semantic locators
+// (role/aria/text) before brittle recorded CSS, since nav links and buttons
+// move around in dynamic apps. For data-targeting steps (fill/select/upload/
+// extract) the recorded selector is authoritative and tried first — label text
+// like "output" or "title" matches the wrong element otherwise.
+async function locate(page, step, timeout, attempts = [], { preferLabels = false } = {}) {
   const selectors = [step.selector, ...(Array.isArray(step.fallbackSelectors) ? step.fallbackSelectors : [])].filter(Boolean);
-  const tries = [];
+  const labelTries = [];
   for (const label of candidateLabels(step)) {
-    tries.push({ kind: 'role-link', label });
-    tries.push({ kind: 'role-button', label });
-    tries.push({ kind: 'aria', label });
-    tries.push({ kind: 'text-exact', label });
-    tries.push({ kind: 'text-contains', label });
+    labelTries.push({ kind: 'role-link', label });
+    labelTries.push({ kind: 'role-button', label });
+    labelTries.push({ kind: 'aria', label });
+    labelTries.push({ kind: 'text-exact', label });
+    labelTries.push({ kind: 'text-contains', label });
   }
-  for (const selector of selectors) tries.push({ kind: 'css', selector });
+  const cssTries = selectors.map(selector => ({ kind: 'css', selector }));
+  const tries = preferLabels ? [...labelTries, ...cssTries] : [...cssTries, ...labelTries];
 
   let last = null;
   for (const trial of tries) {
@@ -260,7 +265,7 @@ async function locateWithRecovery({ context, pages, lastUrls, tabId, step, timeo
   let page = pages.get(tabId);
 
   try {
-    return { page, loc: await locate(page, step, timeout, attempts), attempts };
+    return { page, loc: await locate(page, step, timeout, attempts, { preferLabels: true }), attempts };
   } catch (firstErr) {
     pushUnique(screenshots, await shot(page, screenshotsDir, `failed-${step.id}-pre-recovery`));
 
@@ -274,7 +279,7 @@ async function locateWithRecovery({ context, pages, lastUrls, tabId, step, timeo
       page = await recoverPage(context, pages, tabId, lastUrl, settleArgs);
       pushUnique(screenshots, await shot(page, screenshotsDir, `recovered-${step.id}`));
       try {
-        return { page, loc: await locate(page, step, timeout, attempts), attempts, recovered: 'reopen' };
+        return { page, loc: await locate(page, step, timeout, attempts, { preferLabels: true }), attempts, recovered: 'reopen' };
       } catch {
         const viaSearch = await trySearchAndLocate(page, step, timeout, attempts, settleArgs);
         if (viaSearch) return { page, loc: viaSearch, attempts, recovered: 'reopen+search' };
@@ -320,7 +325,7 @@ async function trySearchAndLocate(page, step, timeout, attempts, settleArgs = {}
       attempts.push({ kind: 'search-box', selector, query, ok: true });
       await settlePage(page, settleArgs);
       try {
-        return await locate(page, step, timeout, attempts);
+        return await locate(page, step, timeout, attempts, { preferLabels: true });
       } catch {}
     } catch {
       attempts.push({ kind: 'search-box', selector, ok: false });
