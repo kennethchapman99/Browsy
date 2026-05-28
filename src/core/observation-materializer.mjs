@@ -18,7 +18,7 @@ const PAGE_TYPES = new Set(['page_seen', 'page_opened', 'page_navigated', 'popup
 const DANGEROUS = /submit|release|publish|pay|purchase|checkout|delete|remove|confirm|certify|agree|go live/i;
 const AUTH_FIELD = /^(user(name)?|email|login|password|passwd|passcode|otp|mfa|token|domainUser(name)?|domainPassword)$/i;
 const AUTH_ACTION = /^(sign in|log in|login|continue|verify|next)$/i;
-const AUTH_URL = /login|signin|sso|saml|oauth|openid|frontdoor|contentDoor|authn|iwa|invalid_session|fromLoginToken|RelayState|SAMLRequest|sid=/i;
+const AUTH_URL = /login|signin|sso|saml|oauth|openid|frontdoor|contentDoor|authn|iwa|invalid_session|fromLoginToken|RelayState|SAMLRequest|sid=|session\?url=|session%3Furl%3D/i;
 
 export function compileObservationToWorkflowPackage(observation = {}) {
   const raw = parseInput(observation);
@@ -341,6 +341,7 @@ function buildSteps({ tabs, fields, uploads, actions, checkpoints, outputs, arti
   const steps = [];
   let order = 0;
   const tabId = tabs[0]?.id || 'tab1';
+  const lastActionTabId = [...actions].reverse().find(a => a.tabId)?.tabId || tabs.find(t => !t.requiresAuth)?.id || tabId;
   for (const t of tabs) steps.push(clean({ id: `navigate_${safe(t.id)}`, type: 'navigate', order: ++order, tabId: t.id, url: t.url, waitUntil: 'domcontentloaded', retry: { attempts: 2, backoffMs: 500 } }));
   for (const f of fields) steps.push(clean({ id: `fill_${f.id}`, type: f.inputType === 'select' ? 'select' : 'fill', order: ++order, tabId: f.tabId || tabId, selector: f.selector, fallbackSelectors: f.fallbackSelectors, selectorConfidence: f.selectorConfidence, binding: f.id, value: `{{inputs.${f.id}}}`, required: f.required !== false, sourceEventId: f.sourceEventId }));
   for (const u of uploads) steps.push(clean({ id: `upload_${u.id}`, type: 'uploadFile', order: ++order, tabId: u.tabId || tabId, selector: u.selector, fallbackSelectors: u.fallbackSelectors, selectorConfidence: u.selectorConfidence, binding: u.id, file: `{{files.${u.id}}}`, required: u.required !== false, sourceEventId: u.sourceEventId }));
@@ -349,7 +350,7 @@ function buildSteps({ tabs, fields, uploads, actions, checkpoints, outputs, arti
     if (cp) steps.push(clean({ id: `approve_${cp.id}`, type: 'approve', order: ++order, checkpointId: cp.id, beforeAction: a.id, reason: cp.reason }));
     steps.push(clean({ id: `click_${a.id}`, type: 'click', order: ++order, tabId: a.tabId || tabId, selector: a.selector, fallbackSelectors: a.fallbackSelectors, selectorConfidence: a.selectorConfidence, label: a.label, requiresApproval: !!cp || a.manualOnly || a.dangerous, safetyCategory: a.safetyCategory, sourceEventId: a.sourceEventId }));
   }
-  for (const o of outputs) steps.push(clean({ id: `extract_${o.id}`, type: o.attribute ? 'extractAttribute' : 'extractText', order: ++order, tabId: o.tabId || tabId, selector: o.selector, fallbackSelectors: o.fallbackSelectors, selectorConfidence: o.selectorConfidence, output: o.id, attribute: o.attribute, storesTo: o.storesTo, required: o.required !== false, captureAfter: o.captureAfter, sourceEventId: o.sourceEventId }));
+  for (const o of outputs) steps.push(clean({ id: `extract_${o.id}`, type: o.attribute ? 'extractAttribute' : 'extractText', order: ++order, tabId: o.tabId || lastActionTabId, selector: o.selector, fallbackSelectors: o.fallbackSelectors, selectorConfidence: o.selectorConfidence, output: o.id, attribute: o.attribute, storesTo: o.storesTo, required: o.required !== false, captureAfter: o.captureAfter, sourceEventId: o.sourceEventId }));
   for (const r of artifactRules) steps.push(clean({ id: `artifact_${r.id}`, type: r.kind === 'download_failed' ? 'assert' : 'download', order: ++order, tabId: r.pageId || tabId, artifactId: r.id, suggestedFilename: r.suggestedFilename, sourceEventId: r.sourceEventId }));
   return steps;
 }
@@ -500,7 +501,7 @@ function isAuthFieldLike(input = {}, context = {}) {
 
 function isLikelyAuthUrl(url = '') { return AUTH_URL.test(String(url || '')); }
 function isPlaceholderUrl(url = '') { const value = String(url || '').trim(); return !value || /PASTE_|YOUR_|_HERE/i.test(value); }
-function isEphemeralUrl(url = '') { const value = String(url || '').trim(); if (!value) return true; if (isPlaceholderUrl(value)) return true; if (value === 'about:blank') return true; if (value.length > 700) return true; return /SAMLRequest=|RelayState=|frontdoor\.jsp|contentDoor|fromLoginToken=|OKTA_INVALID_SESSION_REPOST|\/saml\/authn-request|\/login\/sso_iwa|sid=/i.test(value); }
+function isEphemeralUrl(url = '') { const value = String(url || '').trim(); if (!value) return true; if (isPlaceholderUrl(value)) return true; if (value === 'about:blank') return true; if (value.length > 700) return true; if (isLikelyAuthUrl(value)) return true; return /SAMLRequest=|RelayState=|frontdoor\.jsp|contentDoor|fromLoginToken=|OKTA_INVALID_SESSION_REPOST|\/saml\/authn-request|\/login\/sso_iwa|sid=/i.test(value); }
 function hostOf(url = '') { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } }
 function firstSelector(input = {}) { return asArray(input.selectorCandidates || input.rawEvidence?.selectorCandidates)[0]?.selector || null; }
 function asArray(v) { return Array.isArray(v) ? v : v ? [v] : []; }
