@@ -27,6 +27,7 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
   let browser = null;
   let context = null;
   const pages = new Map();
+  const lastUrls = new Map();
   const completedSteps = [];
   const failedSteps = [];
   const skippedSteps = [];
@@ -68,9 +69,11 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
         }
 
         if (type === 'navigate') {
-          const page = await getPage(context, pages, step.tabId || tabs[0]?.id || 'tab1');
+          const tabId = step.tabId || tabs[0]?.id || 'tab1';
+          const page = await getPage(context, pages, tabId);
           await page.goto(step.url, { waitUntil: step.waitUntil || 'domcontentloaded', timeout });
           await settlePage(page, { timeout, settleMs, targetHost: hostFromStep(step) });
+          lastUrls.set(tabId, page.url());
           completedSteps.push({ id: step.id, type, status: 'completed', tabId: step.tabId, url: page.url() });
           pushUnique(screenshots, await shot(page, screenshotsDir, `${step.order || completedSteps.length}-${step.id}`));
           continue;
@@ -101,12 +104,15 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
         }
 
         if (type === 'click') {
-          const page = await getPage(context, pages, step.tabId || tabs[0]?.id || 'tab1');
+          const tabId = step.tabId || tabs[0]?.id || 'tab1';
+          let page = await getPage(context, pages, tabId);
           await settlePage(page, { timeout, settleMs });
-          const loc = await locate(page, step, timeout);
-          await loc.click({ timeout });
+          const located = await locateWithRecovery({ context, pages, lastUrls, tabId, step, timeout, settleArgs: { timeout, settleMs }, screenshotsDir, screenshots });
+          page = located.page;
+          await located.loc.click({ timeout });
           await settlePage(page, { timeout, settleMs });
-          completedSteps.push({ id: step.id, type, status: 'completed', tabId: step.tabId, label: step.label || null });
+          lastUrls.set(tabId, page.url());
+          completedSteps.push({ id: step.id, type, status: 'completed', tabId: step.tabId, label: step.label || null, recovered: located.recovered || undefined });
           pushUnique(screenshots, await shot(page, screenshotsDir, `${step.order || completedSteps.length}-${step.id}`));
           continue;
         }
@@ -133,9 +139,19 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
         skippedSteps.push({ id: step.id, type, status: 'unsupported_step_type' });
       } catch (err) {
         const page = pages.get(step.tabId || tabs[0]?.id || 'tab1');
-        const diagnostic = page ? await pageDiagnostic(page) : {};
-        if (page) pushUnique(screenshots, await shot(page, screenshotsDir, `failed-${step.id || type}`));
-        failedSteps.push({ id: step.id, type, status: 'failed', error: err.message, selector: step.selector || null, tabId: step.tabId || null, ...diagnostic });
+        const diagnostic = page && !isClosedError(err) ? await pageDiagnostic(page) : {};
+        if (page && !isClosedError(err)) pushUnique(screenshots, await shot(page, screenshotsDir, `failed-${step.id || type}`));
+        failedSteps.push({
+          id: step.id,
+          type,
+          status: 'failed',
+          error: err.message,
+          selector: step.selector || null,
+          tabId: step.tabId || null,
+          candidateLabels: err.candidateLabels || candidateLabels(step),
+          selectorAttempts: err.attempts || [],
+          ...diagnostic,
+        });
         if (options.stopOnStepFailure !== false) break;
       }
     }
@@ -205,49 +221,148 @@ async function settlePage(page, { timeout, settleMs, targetHost } = {}) {
   await page.waitForTimeout(Math.min(settleMs || 1500, 5000)).catch(() => {});
 }
 
-async function locate(page, step, timeout) {
+// Prefer semantic locators (role/aria/text) before brittle recorded CSS.
+async function locate(page, step, timeout, attempts = []) {
   const selectors = [step.selector, ...(Array.isArray(step.fallbackSelectors) ? step.fallbackSelectors : [])].filter(Boolean);
   const tries = [];
-  for (const selector of selectors) tries.push({ kind: 'css', selector });
   for (const label of candidateLabels(step)) {
     tries.push({ kind: 'role-link', label });
     tries.push({ kind: 'role-button', label });
     tries.push({ kind: 'aria', label });
-    tries.push({ kind: 'text', label });
+    tries.push({ kind: 'text-exact', label });
+    tries.push({ kind: 'text-contains', label });
   }
+  for (const selector of selectors) tries.push({ kind: 'css', selector });
+
   let last = null;
   for (const trial of tries) {
     try {
       const loc = locatorFor(page, trial).first();
       await loc.waitFor({ state: 'visible', timeout: Math.min(timeout || 15000, 8000) });
+      attempts.push({ ...trial, ok: true });
       return loc;
     } catch (err) {
+      attempts.push({ ...trial, ok: false });
       last = err;
     }
   }
-  throw new Error(`no usable selector for ${step.id || 'step'}: ${last?.message || 'missing selector'}`);
+  const error = new Error(`no usable selector for ${step.id || 'step'}: ${last?.message || 'missing selector'}`);
+  error.attempts = attempts;
+  error.candidateLabels = candidateLabels(step);
+  throw error;
+}
+
+// Attempt the step on the current page; on a closed page/context or an
+// unresolved target, recover the tab (reopen last known URL) and/or search a
+// visible in-page search box for the target label, then retry once.
+async function locateWithRecovery({ context, pages, lastUrls, tabId, step, timeout, settleArgs, screenshotsDir, screenshots }) {
+  const attempts = [];
+  let page = pages.get(tabId);
+
+  try {
+    return { page, loc: await locate(page, step, timeout, attempts), attempts };
+  } catch (firstErr) {
+    pushUnique(screenshots, await shot(page, screenshotsDir, `failed-${step.id}-pre-recovery`));
+
+    if (!isClosedError(firstErr) && pageIsUsable(page)) {
+      const viaSearch = await trySearchAndLocate(page, step, timeout, attempts, settleArgs);
+      if (viaSearch) return { page, loc: viaSearch, attempts, recovered: 'search' };
+    }
+
+    const lastUrl = lastUrls.get(tabId);
+    if (lastUrl) {
+      page = await recoverPage(context, pages, tabId, lastUrl, settleArgs);
+      pushUnique(screenshots, await shot(page, screenshotsDir, `recovered-${step.id}`));
+      try {
+        return { page, loc: await locate(page, step, timeout, attempts), attempts, recovered: 'reopen' };
+      } catch {
+        const viaSearch = await trySearchAndLocate(page, step, timeout, attempts, settleArgs);
+        if (viaSearch) return { page, loc: viaSearch, attempts, recovered: 'reopen+search' };
+      }
+    }
+
+    const error = new Error(firstErr.message);
+    error.attempts = attempts;
+    error.candidateLabels = candidateLabels(step);
+    throw error;
+  }
+}
+
+async function recoverPage(context, pages, tabId, url, settleArgs = {}) {
+  const old = pages.get(tabId);
+  try { if (old && !old.isClosed()) await old.close(); } catch {}
+  const page = await context.newPage();
+  pages.set(tabId, page);
+  try { await page.goto(url, { waitUntil: 'domcontentloaded', timeout: settleArgs.timeout || 15000 }); } catch {}
+  await settlePage(page, settleArgs);
+  return page;
+}
+
+// Generic dynamic-list recovery: fill a visible in-page search box with the
+// target label and retry semantic locators. Not specific to any app.
+async function trySearchAndLocate(page, step, timeout, attempts, settleArgs = {}) {
+  const labels = candidateLabels(step);
+  if (!labels.length || !pageIsUsable(page)) return null;
+  const query = labels[0];
+  const searchSelectors = [
+    'input[type="search"]',
+    'input[placeholder*="Search" i]',
+    'input[aria-label*="Search" i]',
+    '[role="searchbox"]',
+    'input.slds-input',
+  ];
+  for (const selector of searchSelectors) {
+    try {
+      const box = page.locator(selector).first();
+      await box.waitFor({ state: 'visible', timeout: Math.min(timeout || 15000, 3000) });
+      await box.fill(query);
+      await box.press('Enter');
+      attempts.push({ kind: 'search-box', selector, query, ok: true });
+      await settlePage(page, settleArgs);
+      try {
+        return await locate(page, step, timeout, attempts);
+      } catch {}
+    } catch {
+      attempts.push({ kind: 'search-box', selector, ok: false });
+    }
+  }
+  return null;
+}
+
+function pageIsUsable(page) {
+  try { return !!page && !page.isClosed(); } catch { return false; }
+}
+
+function isClosedError(err) {
+  return /has been closed|target closed|target page, context or browser/i.test(err?.message || '');
 }
 
 function locatorFor(page, trial) {
   if (trial.kind === 'role-link') return page.getByRole('link', { name: new RegExp(escapeRegex(trial.label), 'i') });
   if (trial.kind === 'role-button') return page.getByRole('button', { name: new RegExp(escapeRegex(trial.label), 'i') });
   if (trial.kind === 'aria') return page.locator(`[aria-label*="${cssEscape(trial.label)}" i]`);
-  if (trial.kind === 'text') return page.getByText(new RegExp(`^\\s*${escapeRegex(trial.label)}\\s*$`, 'i'));
+  if (trial.kind === 'text-exact') return page.getByText(new RegExp(`^\\s*${escapeRegex(trial.label)}\\s*$`, 'i'));
+  if (trial.kind === 'text-contains') return page.getByText(new RegExp(escapeRegex(trial.label), 'i'));
   return page.locator(trial.selector);
 }
 
 function candidateLabels(step = {}) {
   const values = [];
-  for (const value of [step.label, step.name, step.id, step.selector]) {
+  for (const value of [step.label, step.name, step.ariaLabel, step.text, step.id, step.selector]) {
     if (!value) continue;
     const cleaned = String(value)
       .replace(/^click[_-]?/i, '')
-      .replace(/[_-]+/g, ' ')
-      .replace(/\[[^\]]+\]/g, ' ')
       .replace(/aria-label\s*=\s*["']?([^"'\]]+).*/i, '$1')
+      .replace(/\[[^\]]+\]/g, ' ')
+      .replace(/[_-]+/g, ' ')
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
       .replace(/[^a-zA-Z0-9 ]+/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim();
-    if (cleaned && cleaned.length <= 80) values.push(cleaned);
+    if (!cleaned || cleaned.length > 80) continue;
+    values.push(cleaned);
+    const first = cleaned.split(' ')[0];
+    if (first && first.length >= 3 && first.toLowerCase() !== cleaned.toLowerCase()) values.push(first);
   }
   return [...new Set(values)];
 }

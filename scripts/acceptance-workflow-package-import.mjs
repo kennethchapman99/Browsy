@@ -208,33 +208,33 @@ section('Check 5 — Bad payload fails before browser execution');
 // ---------------------------------------------------------------------------
 section('Check 6 — Valid payload reaches real execution adapter');
 {
-  const run6 = createRun({ workflowObjectId: WOBJ, version: '1.0.0', mode: 'preview', payload: testPayload });
+  const run6 = createRun({ workflowObjectId: WOBJ, version: '1.0.0', mode: 'dry_run', payload: testPayload });
   const result6 = await executeRun({
     runId: run6.runId,
     workflowVersion: wv,
     payload: testPayload,
-    mode: 'preview',
+    mode: 'dry_run',
     approvalToken: null,
     runRoot: TEST_ROOT,
   });
 
-  // processStatus=completed means runWorkflowPackage was invoked and returned
-  // without throwing (dry_run mode, no real browser launch).
+  // dry_run drives the materialized-package adapter (no real browser launch).
   assert('valid payload → processStatus=completed', result6.processStatus === 'completed', result6.processStatus);
   assert('engine-result.json artifact attached', result6.artifacts?.some(a => a.name === 'engine-result.json'));
 
-  // Verify the package written to the run dir uses the real packageWorkflowId,
-  // proving the real adapter wired the execution (not a synthetic fallback).
-  const pkgFile = pathModule.join(TEST_ROOT, 'runs', run6.runId, 'package.json');
-  if (exists(pkgFile)) {
-    const writtenPkg = readJson(pkgFile);
-    assert('executor used packageWorkflowId as workflow_id',
-      writtenPkg.workflow_id === 'local-form-demo',
-      `got: ${writtenPkg.workflow_id}`
-    );
-  } else {
-    assert('run package.json was written to runRoot', false, pkgFile);
-  }
+  // Verify the engine-result reflects the imported package driving the adapter
+  // (materialized dry-run content), proving the adapter is wired end-to-end.
+  const engineFile = pathModule.join(TEST_ROOT, 'runs', run6.runId, 'engine-result.json');
+  assert('engine-result.json written to runRoot', exists(engineFile), engineFile);
+  const engineResult = readJson(engineFile);
+  assert('adapter produced materialized dry-run result',
+    engineResult.source_system === 'registry_dry_run',
+    `got: ${engineResult.source_system}`
+  );
+  assert('adapter used the imported package steps',
+    engineResult.materializedPackage?.stepCount === wv.recordedSteps.length,
+    `got: ${engineResult.materializedPackage?.stepCount}`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -242,12 +242,12 @@ section('Check 6 — Valid payload reaches real execution adapter');
 // ---------------------------------------------------------------------------
 section('Check 7 — Run status can be fetched');
 {
-  const run7 = createRun({ workflowObjectId: WOBJ, version: '1.0.0', mode: 'preview', payload: testPayload });
+  const run7 = createRun({ workflowObjectId: WOBJ, version: '1.0.0', mode: 'dry_run', payload: testPayload });
   await executeRun({
     runId: run7.runId,
     workflowVersion: wv,
     payload: testPayload,
-    mode: 'preview',
+    mode: 'dry_run',
     approvalToken: null,
     runRoot: TEST_ROOT,
   });
@@ -264,12 +264,12 @@ section('Check 7 — Run status can be fetched');
 // ---------------------------------------------------------------------------
 section('Check 8 — Run artifacts can be fetched');
 {
-  const run8 = createRun({ workflowObjectId: WOBJ, version: '1.0.0', mode: 'preview', payload: testPayload });
+  const run8 = createRun({ workflowObjectId: WOBJ, version: '1.0.0', mode: 'dry_run', payload: testPayload });
   await executeRun({
     runId: run8.runId,
     workflowVersion: wv,
     payload: testPayload,
-    mode: 'preview',
+    mode: 'dry_run',
     approvalToken: null,
     runRoot: TEST_ROOT,
   });

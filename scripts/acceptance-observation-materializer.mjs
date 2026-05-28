@@ -232,12 +232,12 @@ try {
     description: 'Materialized description',
     attachment: './examples/cover.png',
   };
-  const run = createRun({ workflowObjectId: WOBJ, version: '1.0.0', mode: 'preview', payload });
+  const run = createRun({ workflowObjectId: WOBJ, version: '1.0.0', mode: 'dry_run', payload });
   const finalRun = await executeRun({
     runId: run.runId,
     workflowVersion: wv,
     payload,
-    mode: 'preview',
+    mode: 'dry_run',
     approvalToken: null,
   });
   assert('run process completes', finalRun.processStatus === 'completed', finalRun.processStatus);

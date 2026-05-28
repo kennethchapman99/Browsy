@@ -4,6 +4,7 @@
 import { join } from 'path';
 import { RETURN_CONTRACT_VERSION } from './workflow-contract.mjs';
 import { WORKFLOWS_DIR, writeJson } from './paths.mjs';
+import { decomposeRepeatId } from './observation-from-events.mjs';
 
 const FILE_INPUT_TYPES = new Set(['file', 'file path', 'upload', 'asset']);
 const DANGEROUS_WORDS = /submit|release|publish|pay|purchase|checkout|delete|remove|confirm|certify|agree/i;
@@ -152,13 +153,20 @@ export function buildWorkflowPackageFromObservation(observation) {
   const assetsByRole = {};
   const defaults = {};
 
+  // Repeat-group instance fields (e.g. "tracks[1][title]" / "tracks1Title") are
+  // represented under repeatGroups[].items[].fields; keep them out of the flat
+  // globals/assets buckets so the same data is not duplicated in the contract.
+  const isRepeatInstance = item => !!decomposeRepeatId(item.id);
+
   for (const field of materialized.fields) {
+    if (isRepeatInstance(field)) continue;
     const value = field.exampleValue ?? field.value ?? placeholderValue(field);
     if (field.scope === 'default') defaults[field.id] = value;
     else globals[field.id] = value;
   }
 
   for (const upload of materialized.uploads) {
+    if (isRepeatInstance(upload)) continue;
     const value = upload.exampleValue ?? upload.value ?? placeholderValue(upload);
     assetsByRole[upload.id] = value;
   }

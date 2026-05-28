@@ -181,7 +181,7 @@ export function normalizeAndDedupeEvents(events = []) {
 // Returns null for anything that doesn't match. Cases 2 and 3 yield a stable
 // underscore-joined `base` (`tracks_title`) so the existing bucketing logic
 // keeps working without further changes.
-function decomposeRepeatId(id) {
+export function decomposeRepeatId(id) {
   const raw = String(id || '');
   if (!raw) return null;
 

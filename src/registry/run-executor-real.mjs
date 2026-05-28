@@ -42,17 +42,23 @@ export async function executeRun(args) {
   }
 
   const assertionResults = evaluateAssertions(workflowVersion.successAssertions || [], workflowVersion.failureAssertions || [], engineResult || {});
-  const artifacts = [];
+  const artifactsByPath = new Map();
+  const addArtifact = ({ name, path: filePath, type }) => {
+    const key = filePath || name;
+    if (!key || artifactsByPath.has(key)) return;
+    artifactsByPath.set(key, { name: name || String(filePath || '').split('/').pop() || 'artifact', path: filePath || null, type: type || artifactType(filePath || name || '') });
+  };
   if (Array.isArray(engineResult?.artifact_paths)) {
-    for (const filePath of engineResult.artifact_paths) artifacts.push({ name: String(filePath).split('/').pop(), path: filePath, type: artifactType(filePath) });
+    for (const filePath of engineResult.artifact_paths) addArtifact({ name: String(filePath).split('/').pop(), path: filePath, type: artifactType(filePath) });
   }
   if (Array.isArray(engineResult?.artifacts)) {
-    for (const artifact of engineResult.artifacts) artifacts.push({ name: artifact.name || String(artifact.path || '').split('/').pop() || 'artifact', path: artifact.path || null, type: artifact.type || artifactType(artifact.path || artifact.name || '') });
+    for (const artifact of engineResult.artifacts) addArtifact({ name: artifact.name, path: artifact.path, type: artifact.type });
   }
 
   const engineResultPath = join(registryRunDir, 'engine-result.json');
   writeJson(engineResultPath, engineResult || {});
-  artifacts.push({ name: 'engine-result.json', path: engineResultPath, type: 'json' });
+  addArtifact({ name: 'engine-result.json', path: engineResultPath, type: 'json' });
+  const artifacts = [...artifactsByPath.values()];
 
   const blocked = engineResult?.ok === false || engineResult?.status === 'replay_failed' || assertionResults.outcome === 'failed';
   return finishRun(runId, { status: blocked ? 'blocked' : 'completed', processStatus: 'completed', workflowOutcome: blocked ? 'failed' : 'success', completedAt: now(), artifacts, assertionResults, internalRunResult: engineResult, blockingReason: blocked ? firstError(engineResult) : null });
@@ -62,6 +68,9 @@ function dryRunResult({ runId, workflowVersion }) {
   const steps = Array.isArray(workflowVersion.recordedSteps) ? workflowVersion.recordedSteps : [];
   const outputs = Array.isArray(workflowVersion.expectedOutputs) ? workflowVersion.expectedOutputs : [];
   const checkpoints = Array.isArray(workflowVersion.humanApprovalCheckpoints) ? workflowVersion.humanApprovalCheckpoints : [];
+  const stepType = s => s.type || s.action;
+  const plannedUploads = steps.filter(s => stepType(s) === 'uploadFile').map(s => ({ role: s.binding || s.id, selector: s.selector || null, status: 'planned_from_materialized_package', sourceStepId: s.id || null }));
+  const plannedDownloads = steps.filter(s => stepType(s) === 'download').map(s => ({ name: s.suggestedFilename || s.artifactId || s.id, artifactId: s.artifactId || s.id, status: 'planned_from_materialized_package', sourceStepId: s.id || null }));
   return {
     ok: true,
     workflow_id: workflowVersion.workflowId || workflowVersion.packageWorkflowId,
@@ -71,7 +80,7 @@ function dryRunResult({ runId, workflowVersion }) {
     entity_id: runId,
     status: 'dry_run_passed',
     captured_outputs: Object.fromEntries(outputs.map(o => [o.id || o.name || String(o), { status: 'planned_from_materialized_package', value: null, selector: o.selector || null, required: o.required !== false }])),
-    downloaded_files: [],
+    downloaded_files: plannedDownloads,
     filled_fields: steps.filter(s => ['fill', 'select'].includes(s.type || s.action)).map(s => ({ field: s.binding || s.id, selector: s.selector || null, status: 'planned_from_materialized_package', sourceStepId: s.id || null })),
     skipped_fields: steps.filter(s => (s.type || s.action) === 'approve' || s.requiresApproval).map(s => ({ field: s.binding || s.label || s.id, reason: 'human checkpoint or approval required', status: 'checkpoint', sourceStepId: s.id || null })),
     screenshots: [],
@@ -83,7 +92,7 @@ function dryRunResult({ runId, workflowVersion }) {
     materializedPackage: { workflowId: workflowVersion.workflowId, stepCount: steps.length, uploadCount: Array.isArray(workflowVersion.fileUploadBindings) ? workflowVersion.fileUploadBindings.length : 0, outputCount: outputs.length, checkpointCount: checkpoints.length, artifactRuleCount: 0 },
     completedSteps: steps.filter(s => !(s.requiresApproval || (s.type || s.action) === 'approve')).map(s => ({ id: s.id, type: s.type || s.action, status: 'planned_from_materialized_package' })),
     skippedSteps: steps.filter(s => s.requiresApproval || (s.type || s.action) === 'approve').map(s => ({ id: s.id, type: s.type || s.action, status: 'checkpoint' })),
-    uploaded_files: [],
+    uploaded_files: plannedUploads,
   };
 }
 

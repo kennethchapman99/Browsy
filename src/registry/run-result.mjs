@@ -60,6 +60,17 @@ function asArtifactObject(value, fallbackType = 'file') {
   return null;
 }
 
+function dedupeByPath(items = []) {
+  const map = new Map();
+  for (const item of items) {
+    if (!item) continue;
+    const key = item.path || item.name;
+    if (!key || map.has(key)) continue;
+    map.set(key, item);
+  }
+  return [...map.values()];
+}
+
 export function groupArtifacts(run = {}) {
   const internal = run.internalRunResult || {};
   const all = [
@@ -68,18 +79,18 @@ export function groupArtifacts(run = {}) {
     ...normalizeArray(internal.artifact_paths).map(p => ({ path: p, name: String(p).split('/').pop(), type: 'file' })),
   ].map(a => asArtifactObject(a)).filter(Boolean);
 
-  const screenshots = [
+  const screenshots = dedupeByPath([
     ...normalizeArray(internal.screenshots).map(s => asArtifactObject(s, 'screenshot')),
     ...all.filter(a => a.type === 'screenshot' || /\.(png|jpg|jpeg|webp)$/i.test(a.path || a.name || '')),
-  ].filter(Boolean);
+  ].filter(Boolean));
 
-  const downloads = [
+  const downloads = dedupeByPath([
     ...normalizeArray(internal.downloaded_files).map(d => asArtifactObject(d, 'download')),
     ...all.filter(a => a.type === 'download' || a.type === 'downloaded_file'),
-  ].filter(Boolean);
+  ].filter(Boolean));
 
-  const logs = all.filter(a => a.type === 'log' || /log|result|json|txt/i.test(a.name || ''));
-  const trace = all.filter(a => a.type === 'trace' || /trace/i.test(a.name || a.path || ''));
+  const logs = dedupeByPath(all.filter(a => a.type === 'log' || /log|result|json|txt/i.test(a.name || '')));
+  const trace = dedupeByPath(all.filter(a => a.type === 'trace' || /trace/i.test(a.name || a.path || '')));
 
   return { screenshots, downloads, trace, logs };
 }
