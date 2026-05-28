@@ -6,51 +6,27 @@ import { validatePayload, evaluateAssertions } from './schema-validator.mjs';
 import { checkSafetyGates } from './safety-gates.mjs';
 import { updateRun, getRun } from './run-registry.mjs';
 import { buildRunResult } from './run-result.mjs';
-import { executeRun as executeDryRun } from './run-executor.mjs';
 import { runReplay } from './replay-executor.mjs';
 
 export async function executeRun(args) {
   const { runId, workflowVersion, payload = {}, mode = 'preview', approvalToken, runRoot } = args;
-  if (mode === 'dry_run' || workflowVersion.replaySettings?.disableRealReplay === true) {
-    return executeDryRun(args);
-  }
-
   const now = () => new Date().toISOString();
   updateRun(runId, { status: 'running', processStatus: 'running' });
 
   const payloadCheck = validatePayload(payload, workflowVersion.inputSchema);
   if (!payloadCheck.ok) {
-    return finishRun(runId, {
-      status: 'failed',
-      processStatus: 'rejected',
-      workflowOutcome: 'failed',
-      completedAt: now(),
-      validationErrors: payloadCheck.errors,
-    });
+    return finishRun(runId, { status: 'failed', processStatus: 'rejected', workflowOutcome: 'failed', completedAt: now(), validationErrors: payloadCheck.errors });
   }
 
   const gateCheck = checkSafetyGates({ workflowVersion, mode, approvalToken });
   if (!gateCheck.ok) {
-    return finishRun(runId, {
-      status: mode === 'live' ? 'waiting_for_approval' : 'failed',
-      processStatus: mode === 'live' ? 'waiting_for_approval' : 'rejected',
-      workflowOutcome: mode === 'live' ? 'blocked' : 'failed',
-      completedAt: mode === 'live' ? null : now(),
-      blockingReason: gateCheck.errors.join('; '),
-      validationErrors: gateCheck.errors,
-    });
+    return finishRun(runId, { status: mode === 'live' ? 'waiting_for_approval' : 'failed', processStatus: mode === 'live' ? 'waiting_for_approval' : 'rejected', workflowOutcome: mode === 'live' ? 'blocked' : 'failed', completedAt: mode === 'live' ? null : now(), blockingReason: gateCheck.errors.join('; '), validationErrors: gateCheck.errors });
   }
 
   const authNeeds = Array.isArray(workflowVersion.auth) ? workflowVersion.auth : [];
   const authCheckpoint = authNeeds.find(a => a?.mode === 'human_required' || a?.mode === 'human_required_if_not_authenticated');
   if (authCheckpoint && !approvalToken && mode === 'live') {
-    return finishRun(runId, {
-      status: 'waiting_for_auth',
-      processStatus: 'waiting_for_auth',
-      workflowOutcome: 'blocked',
-      blockingReason: `auth required for tab ${authCheckpoint.tabId || '(unknown)'}`,
-      checkpoints: [...(getRun(runId)?.checkpoints || []), { status: 'waiting_for_auth', checkpoint: authCheckpoint, createdAt: now() }],
-    });
+    return finishRun(runId, { status: 'waiting_for_auth', processStatus: 'waiting_for_auth', workflowOutcome: 'blocked', blockingReason: `auth required for tab ${authCheckpoint.tabId || '(unknown)'}`, checkpoints: [...(getRun(runId)?.checkpoints || []), { status: 'waiting_for_auth', checkpoint: authCheckpoint, createdAt: now() }] });
   }
 
   const registryRunDir = runRoot ? join(runRoot, 'runs', runId) : join(REGISTRY_DIR, 'runs', runId);
@@ -58,22 +34,11 @@ export async function executeRun(args) {
 
   let engineResult;
   try {
-    engineResult = await runReplay({
-      runId,
-      workflowVersion,
-      payload,
-      mode,
-      options: getRun(runId)?.options || {},
-      runDir: registryRunDir,
-    });
+    engineResult = mode === 'dry_run' || workflowVersion.replaySettings?.disableRealReplay === true
+      ? dryRunResult({ runId, workflowVersion })
+      : await runReplay({ runId, workflowVersion, payload, mode, options: getRun(runId)?.options || {}, runDir: registryRunDir });
   } catch (err) {
-    return finishRun(runId, {
-      status: 'failed',
-      processStatus: 'failed',
-      workflowOutcome: 'failed',
-      completedAt: now(),
-      validationErrors: [`execution error: ${err.message}`],
-    });
+    return finishRun(runId, { status: 'failed', processStatus: 'failed', workflowOutcome: 'failed', completedAt: now(), validationErrors: [`execution error: ${err.message}`] });
   }
 
   const assertionResults = evaluateAssertions(workflowVersion.successAssertions || [], workflowVersion.failureAssertions || [], engineResult || {});
@@ -90,16 +55,36 @@ export async function executeRun(args) {
   artifacts.push({ name: 'engine-result.json', path: engineResultPath, type: 'json' });
 
   const blocked = engineResult?.ok === false || engineResult?.status === 'replay_failed' || assertionResults.outcome === 'failed';
-  return finishRun(runId, {
-    status: blocked ? 'blocked' : 'completed',
-    processStatus: 'completed',
-    workflowOutcome: blocked ? 'failed' : 'success',
-    completedAt: now(),
-    artifacts,
-    assertionResults,
-    internalRunResult: engineResult,
-    blockingReason: blocked ? firstError(engineResult) : null,
-  });
+  return finishRun(runId, { status: blocked ? 'blocked' : 'completed', processStatus: 'completed', workflowOutcome: blocked ? 'failed' : 'success', completedAt: now(), artifacts, assertionResults, internalRunResult: engineResult, blockingReason: blocked ? firstError(engineResult) : null });
+}
+
+function dryRunResult({ runId, workflowVersion }) {
+  const steps = Array.isArray(workflowVersion.recordedSteps) ? workflowVersion.recordedSteps : [];
+  const outputs = Array.isArray(workflowVersion.expectedOutputs) ? workflowVersion.expectedOutputs : [];
+  const checkpoints = Array.isArray(workflowVersion.humanApprovalCheckpoints) ? workflowVersion.humanApprovalCheckpoints : [];
+  return {
+    ok: true,
+    workflow_id: workflowVersion.workflowId || workflowVersion.packageWorkflowId,
+    run_id: runId,
+    source_system: 'registry_dry_run',
+    entity_type: workflowVersion.appId,
+    entity_id: runId,
+    status: 'dry_run_passed',
+    captured_outputs: Object.fromEntries(outputs.map(o => [o.id || o.name || String(o), { status: 'planned_from_materialized_package', value: null, selector: o.selector || null, required: o.required !== false }])),
+    downloaded_files: [],
+    filled_fields: steps.filter(s => ['fill', 'select'].includes(s.type || s.action)).map(s => ({ field: s.binding || s.id, selector: s.selector || null, status: 'planned_from_materialized_package', sourceStepId: s.id || null })),
+    skipped_fields: steps.filter(s => (s.type || s.action) === 'approve' || s.requiresApproval).map(s => ({ field: s.binding || s.label || s.id, reason: 'human checkpoint or approval required', status: 'checkpoint', sourceStepId: s.id || null })),
+    screenshots: [],
+    artifact_paths: [],
+    manual_checkpoints: checkpoints.map(c => ({ type: 'materialized_checkpoint', checkpointId: c.id || c.label || c, label: c.label || c.id || c, beforeAction: c.beforeAction || null, reason: c.reason || 'human approval checkpoint materialized from observation' })),
+    next_required_action: null,
+    return_contract_version: 'automation-result-v1',
+    generated_at: new Date().toISOString(),
+    materializedPackage: { workflowId: workflowVersion.workflowId, stepCount: steps.length, uploadCount: Array.isArray(workflowVersion.fileUploadBindings) ? workflowVersion.fileUploadBindings.length : 0, outputCount: outputs.length, checkpointCount: checkpoints.length, artifactRuleCount: 0 },
+    completedSteps: steps.filter(s => !(s.requiresApproval || (s.type || s.action) === 'approve')).map(s => ({ id: s.id, type: s.type || s.action, status: 'planned_from_materialized_package' })),
+    skippedSteps: steps.filter(s => s.requiresApproval || (s.type || s.action) === 'approve').map(s => ({ id: s.id, type: s.type || s.action, status: 'checkpoint' })),
+    uploaded_files: [],
+  };
 }
 
 async function finishRun(runId, updates) {
