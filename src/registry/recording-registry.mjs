@@ -160,7 +160,7 @@ function normalizeRecordingSetup(setup = {}) {
   return {
     ...setup,
     tabs: asArray(setup.tabs).map((tab, index) => ({
-      id: safeId(tab.id || `tab-${index + 1}`),
+      id: camelId(tab.id || `tab-${index + 1}`),
       title: tab.title || tab.name || `Tab ${index + 1}`,
       url: tab.url || tab.startUrl || '',
       siteId: tab.siteId ? safeId(tab.siteId) : null,
@@ -172,17 +172,18 @@ function normalizeRecordingSetup(setup = {}) {
 }
 
 function normalizeBinding(binding = {}) {
+  const id = camelId(binding.id || binding.role || binding.label || 'file');
   return {
-    id: safeId(binding.id || binding.role || binding.label || 'file'),
+    id,
     label: binding.label || binding.id || binding.role || 'File',
-    source: binding.source || `payload.${safeId(binding.id || binding.role || 'file')}`,
+    source: binding.source || `payload.${id}`,
     required: binding.required !== false,
   };
 }
 
 function normalizeOutput(output = {}) {
   return {
-    id: safeId(output.id || output.name || output.label || 'output'),
+    id: camelId(output.id || output.name || output.label || 'output'),
     label: output.label || output.name || output.id || 'Output',
     required: output.required !== false,
     selector: output.selector || null,
@@ -191,9 +192,9 @@ function normalizeOutput(output = {}) {
 }
 
 function normalizeCheckpoint(checkpoint = {}) {
-  if (typeof checkpoint === 'string') return { id: safeId(checkpoint), label: checkpoint };
+  if (typeof checkpoint === 'string') return { id: camelId(checkpoint), label: checkpoint };
   return {
-    id: safeId(checkpoint.id || checkpoint.name || checkpoint.label || 'checkpoint'),
+    id: camelId(checkpoint.id || checkpoint.name || checkpoint.label || 'checkpoint'),
     label: checkpoint.label || checkpoint.name || checkpoint.id || 'Checkpoint',
     beforeAction: checkpoint.beforeAction || checkpoint.actionId || null,
     reason: checkpoint.reason || checkpoint.notes || null,
@@ -301,6 +302,16 @@ function safePathSegment(value = '') {
 
 function safeId(value = '') {
   return String(value || '').trim().toLowerCase().replace(/[^a-z0-9-_]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function camelId(value = '') {
+  const parts = String(value || '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[^a-zA-Z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+  return parts.map((part, index) => {
+    const cleaned = part.replace(/[^a-zA-Z0-9]/g, '');
+    if (!cleaned) return '';
+    if (index === 0) return cleaned.charAt(0).toLowerCase() + cleaned.slice(1);
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  }).join('') || 'item';
 }
 
 function asArray(value) {
