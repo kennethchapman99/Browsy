@@ -7,6 +7,14 @@ import { createRun, getRun, stopRun, cancelRun, approveRun, getRunArtifacts } fr
 import { executeRun } from '../registry/run-executor.mjs';
 import { buildRunCreateResponse, buildRunResult, buildWorkflowContract } from '../registry/run-result.mjs';
 import { materializeWorkflowPackageFromObservation } from '../core/observation-materializer.mjs';
+import {
+  startRecordingSession,
+  getRecordingSession,
+  stopRecordingSession,
+  importRecordingSession,
+  getRecordingContract,
+  listRecordingSessions,
+} from '../registry/recording-registry.mjs';
 
 export const DEFAULT_PORT = 3001;
 
@@ -93,6 +101,43 @@ export function createServer({ port = DEFAULT_PORT } = {}) {
         return send(res, 200, { ok: true, apps: listApps() });
       }
 
+      if (method === 'GET' && (url === '/api/recordings' || url.startsWith('/api/recordings?'))) {
+        return send(res, 200, { ok: true, recordings: listRecordingSessions() });
+      }
+
+      if (method === 'POST' && url === '/api/recordings/start') {
+        const body = await json(req);
+        const session = startRecordingSession(body, { baseUrl: baseUrl(req, port) });
+        return send(res, 201, { ok: true, ...session, recording: session });
+      }
+
+      let p = route('/api/recordings/:recordingSessionId', url);
+      if (p && method === 'GET') {
+        const session = getRecordingSession(p.recordingSessionId);
+        if (!session) return send(res, 404, { ok: false, error: 'recording session not found' });
+        return send(res, 200, { ok: true, recording: session });
+      }
+
+      p = route('/api/recordings/:recordingSessionId/stop', url);
+      if (p && method === 'POST') {
+        const session = stopRecordingSession(p.recordingSessionId, await json(req));
+        return send(res, 200, { ok: true, recording: session });
+      }
+
+      p = route('/api/recordings/:recordingSessionId/import', url);
+      if (p && method === 'POST') {
+        const result = importRecordingSession(p.recordingSessionId, await json(req), { baseUrl: baseUrl(req, port) });
+        if (!result.materialized?.ok) return send(res, 400, { ok: false, recording: result, error: 'recording import failed' });
+        return send(res, 201, { ok: true, recording: result, workflowRef: result.workflowRef, contract: result.contract });
+      }
+
+      p = route('/api/recordings/:recordingSessionId/contract', url);
+      if (p && method === 'GET') {
+        const contract = getRecordingContract(p.recordingSessionId, { baseUrl: baseUrl(req, port) });
+        if (!contract) return send(res, 404, { ok: false, error: 'recording contract not found; import the recording first' });
+        return send(res, 200, { ok: true, contract });
+      }
+
       if (method === 'POST' && url === '/api/observations/import') {
         const body = await json(req);
         if (!body.observation) return send(res, 400, { ok: false, error: 'observation is required' });
@@ -121,7 +166,7 @@ export function createServer({ port = DEFAULT_PORT } = {}) {
         return send(res, 201, { ok: true, materialized: result, imported: result.importResult || null });
       }
 
-      let p = route('/api/apps/:appId/workflows/import', url);
+      p = route('/api/apps/:appId/workflows/import', url);
       if (p && method === 'POST') {
         const body = await json(req);
         const result = importWorkflowPackage({
@@ -214,7 +259,7 @@ export function createServer({ port = DEFAULT_PORT } = {}) {
 
       return send(res, 404, { ok: false, error: `${method} ${url} not found` });
     } catch (err) {
-      return send(res, 500, { ok: false, error: err.message });
+      return send(res, 500, { ok: false, error: err.message, errors: err.errors || undefined });
     }
   });
 }
