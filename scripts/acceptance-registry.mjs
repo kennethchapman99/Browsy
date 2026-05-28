@@ -341,16 +341,18 @@ assert('G11 processStatus is completed (engine ran fine)', result6.processStatus
 // 7. Preview mode blocks final submit (stopBeforeSubmit in internal package)
 assert('G12 preview mode uses human_gate=true in synthetic package', result3.mode === 'preview');
 
-// 8. Live mode requires approval token (safety gate, rejected before browser)
+// 8. Live mode without approval token waits safely for approval instead of failing.
 const run7 = createRun({ workflowObjectId: E2E_OBJECT_ID, version: '1.0.0', mode: 'live', payload: { title: 'Live' } });
 const result7 = await executeRun({ runId: run7.runId, workflowVersion: e2eWv, payload: { title: 'Live' }, mode: 'live', approvalToken: null, runRoot: TEST_ROOT });
-assert('G13 live without approvalToken → processStatus=rejected', result7.processStatus === 'rejected', result7.processStatus);
-assert('G14 live without approvalToken → validationErrors mentions approvalToken', result7.validationErrors.some(e => e.includes('approvalToken')));
+assert('G13 live without approvalToken → processStatus=waiting_for_approval', result7.processStatus === 'waiting_for_approval', result7.processStatus);
+assert('G14 live without approvalToken → status=waiting_for_approval', result7.status === 'waiting_for_approval', result7.status);
+assert('G15 live without approvalToken → workflowOutcome=blocked', result7.workflowOutcome === 'blocked', result7.workflowOutcome);
+assert('G16 live without approvalToken → validationErrors mentions approvalToken', result7.validationErrors.some(e => e.includes('approvalToken')));
 
 // Live with token proceeds (dry_run equivalent in registry context)
 const run8 = createRun({ workflowObjectId: E2E_OBJECT_ID, version: '1.0.0', mode: 'live', payload: { title: 'Live Approved' } });
 const result8 = await executeRun({ runId: run8.runId, workflowVersion: e2eWv, payload: { title: 'Live Approved' }, mode: 'live', approvalToken: 'operator-token-123', runRoot: TEST_ROOT });
-assert('G15 live with approvalToken proceeds to completion', result8.processStatus === 'completed', result8.processStatus);
+assert('G17 live with approvalToken proceeds to completion', result8.processStatus === 'completed', result8.processStatus);
 
 // ---------------------------------------------------------------------------
 // Part H — HTTP API
