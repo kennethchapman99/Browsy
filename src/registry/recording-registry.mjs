@@ -22,6 +22,7 @@ export function startRecordingSession(input = {}, { baseUrl = 'http://localhost:
     status: 'setup_ready',
     createdAt: now,
     updatedAt: now,
+    startedAt: null,
     stoppedAt: null,
     importedAt: null,
     appId: normalized.appId,
@@ -36,15 +37,44 @@ export function startRecordingSession(input = {}, { baseUrl = 'http://localhost:
     humanCheckpoints: normalized.humanCheckpoints,
     auth: normalized.auth,
     wizardUrl: `${baseUrl.replace(/\/$/, '')}/recordings/${recordingSessionId}`,
+    recorderUrl: normalized.recorderUrl || `http://localhost:3333/?recordingSessionId=${encodeURIComponent(recordingSessionId)}`,
     workflowRefPreview: `${normalized.appId}.${normalized.workflowId}`,
     events: [],
     observation: null,
     materialized: null,
     imported: null,
+    launch: null,
   };
 
   persistSession(session);
   return publicSession(session);
+}
+
+export function beginRecordingSession(recordingSessionId, input = {}) {
+  const session = mustReadSession(recordingSessionId);
+  const now = new Date().toISOString();
+  const launch = {
+    createdAt: now,
+    mode: input.mode || 'manual_playwright_recorder',
+    recorderUrl: input.recorderUrl || session.recorderUrl || `http://localhost:3333/?recordingSessionId=${encodeURIComponent(recordingSessionId)}`,
+    tabs: session.recordingSetup?.tabs || [],
+    auth: session.auth || [],
+    instructions: [
+      'Open recorderUrl in the Browsy wizard/recorder.',
+      'Use the configured tabs as the starting browser state.',
+      'Record the workflow once, preserving observed selectors, uploads, outputs, and checkpoints.',
+      'Stop/import the recording through this recording session.',
+    ],
+  };
+  const updated = {
+    ...session,
+    status: 'recording',
+    updatedAt: now,
+    startedAt: session.startedAt || now,
+    launch,
+  };
+  persistSession(updated);
+  return { ...publicSession(updated), launch };
 }
 
 export function getRecordingSession(recordingSessionId) {
@@ -55,17 +85,19 @@ export function getRecordingSession(recordingSessionId) {
 export function stopRecordingSession(recordingSessionId, input = {}) {
   const session = mustReadSession(recordingSessionId);
   const now = new Date().toISOString();
-  const observation = input.observation || session.observation || buildObservationFromSession(session, input.events || session.events || []);
+  const events = Array.isArray(input.events) ? input.events : session.events;
+  const observation = input.observation || session.observation || buildObservationFromSession(session, events || []);
   const updated = {
     ...session,
     status: 'stopped',
     updatedAt: now,
     stoppedAt: now,
     observation,
-    events: Array.isArray(input.events) ? input.events : session.events,
+    events,
   };
   persistSession(updated);
   writeJson(path.join(recordingDir(recordingSessionId), 'observation.json'), observation);
+  writeJson(path.join(recordingDir(recordingSessionId), 'events.json'), events || []);
   return publicSession(updated);
 }
 
@@ -147,6 +179,7 @@ function normalizeRecordingRequest(input = {}) {
     workflowId,
     workflowName: input.workflowName || input.name || workflowId,
     callbackUrl: input.callbackUrl || null,
+    recorderUrl: input.recorderUrl || null,
     recordingSetup,
     payloadSchema,
     fileBindings: asArray(input.fileBindings).map(normalizeBinding),
@@ -247,6 +280,7 @@ function publicSession(session) {
     workflowRefPreview: session.workflowRefPreview,
     workflowRef: session.workflowRef || null,
     wizardUrl: session.wizardUrl,
+    recorderUrl: session.recorderUrl,
     callbackUrl: session.callbackUrl,
     recordingSetup: session.recordingSetup,
     payloadSchema: session.payloadSchema,
@@ -254,8 +288,10 @@ function publicSession(session) {
     expectedOutputs: session.expectedOutputs,
     humanCheckpoints: session.humanCheckpoints,
     auth: session.auth,
+    launch: session.launch || null,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
+    startedAt: session.startedAt || null,
     stoppedAt: session.stoppedAt,
     importedAt: session.importedAt,
     materializedSummary: session.materialized?.summary || null,
@@ -272,6 +308,7 @@ function persistSession(session) {
     workflowId: session.workflowId,
     workflowName: session.workflowName,
     callbackUrl: session.callbackUrl,
+    recorderUrl: session.recorderUrl,
     recordingSetup: session.recordingSetup,
     payloadSchema: session.payloadSchema,
     fileBindings: session.fileBindings,
