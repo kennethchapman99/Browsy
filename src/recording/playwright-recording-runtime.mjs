@@ -60,11 +60,15 @@ export async function startPlaywrightRecording({ recordingSessionId, session, op
 
   await context.exposeFunction('__browsyRecordEvent', append);
   await context.addInitScript({ content: recorderInitScript(recordingSessionId) });
-  context.on('page', page => attachPageHandlers({ recordingSessionId, page, append }));
+  context.on('page', page => {
+    pages.push(page);
+    attachPageHandlers({ recordingSessionId, page, append });
+    append({ type: 'popup_opened', pageUrl: page.url(), rawEvidence: { opener: 'context_page_event' } });
+  });
 
   for (const tab of tabs) {
     const page = await context.newPage();
-    pages.push(page);
+    if (!pages.includes(page)) pages.push(page);
     attachPageHandlers({ recordingSessionId, page, append, tab });
     append({ type: 'page_opened', pageId: tab.id, pageUrl: tab.url, rawEvidence: { tab, authProfile } });
     try {
@@ -89,6 +93,7 @@ export async function startPlaywrightRecording({ recordingSessionId, session, op
     screenshotSink: `output/recordings/${recordingSessionId}/screenshots`,
     instructions: [
       'Use the opened Playwright browser window to perform the workflow once.',
+      'For SSO flows, put the identity provider tab first and set recordingSetup.authProfileId/authGroupId to a shared value.',
       'Browsy records generic page, input, click, file, download, navigation, candidate output, and screenshot evidence.',
       'Auth storageState is reused and saved when a siteId/auth profile is available.',
       'Stop/import the recording through the recording session page or API.',
@@ -188,97 +193,21 @@ function recorderInitScript(recordingSessionId) {
       if (aria) return el.tagName.toLowerCase() + '[aria-label="' + CSS.escape(aria) + '"]';
       return '';
     }
-    function structuralSelector(el) {
-      const parts = []; let node = el;
-      while (node && node.nodeType === 1 && parts.length < 5) {
-        let part = node.tagName.toLowerCase();
-        if (node.className && typeof node.className === 'string') {
-          const cls = node.className.trim().split(/\s+/).filter(Boolean).slice(0, 2);
-          if (cls.length) part += '.' + cls.map(c => CSS.escape(c)).join('.');
-        }
-        const parent = node.parentElement;
-        if (parent) {
-          const siblings = Array.from(parent.children).filter(child => child.tagName === node.tagName);
-          if (siblings.length > 1) part += ':nth-of-type(' + (siblings.indexOf(node) + 1) + ')';
-        }
-        parts.unshift(part); node = parent;
-      }
-      return parts.join(' > ');
-    }
+    function structuralSelector(el) { const parts = []; let node = el; while (node && node.nodeType === 1 && parts.length < 5) { let part = node.tagName.toLowerCase(); if (node.className && typeof node.className === 'string') { const cls = node.className.trim().split(/\s+/).filter(Boolean).slice(0, 2); if (cls.length) part += '.' + cls.map(c => CSS.escape(c)).join('.'); } const parent = node.parentElement; if (parent) { const siblings = Array.from(parent.children).filter(child => child.tagName === node.tagName); if (siblings.length > 1) part += ':nth-of-type(' + (siblings.indexOf(node) + 1) + ')'; } parts.unshift(part); node = parent; } return parts.join(' > '); }
     function selectorFor(el) { return baseCss(el) || structuralSelector(el); }
-    function candidatesFor(el) {
-      const out = [];
-      const push = (selector, kind, confidence, score) => { if (selector && !out.some(x => x.selector === selector)) out.push({ selector, kind, confidence, score }); };
-      push(el?.id ? '#' + CSS.escape(el.id) : '', 'id', 'high', 100);
-      const testId = el?.getAttribute?.('data-testid') || el?.getAttribute?.('data-test');
-      push(testId ? '[data-testid="' + CSS.escape(testId) + '"]' : '', 'testid', 'high', 95);
-      const name = el?.getAttribute?.('name');
-      push(name ? el.tagName.toLowerCase() + '[name="' + CSS.escape(name) + '"]' : '', 'name', 'high', 90);
-      const role = el?.getAttribute?.('role');
-      const label = labelText(el) || textOf(el);
-      push(role && label ? '[role="' + CSS.escape(role) + '"]' : '', 'role', 'medium', 75);
-      push(label ? el.tagName.toLowerCase() + '[aria-label="' + CSS.escape(label) + '"]' : '', 'aria-or-label', 'medium', 70);
-      push(structuralSelector(el), 'css-path', 'medium', 50);
-      const root = el?.getRootNode?.();
-      if (root && root.host) push(selectorFor(root.host) + ' >>> ' + selectorFor(el), 'shadow-pierce', 'medium', 65);
-      return out.sort((a, b) => b.score - a.score);
-    }
-    function send(type, el, rawEvidence = {}) {
-      const selector = rawEvidence.selector || selectorFor(el);
-      const payload = { id: type + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8), recordingSessionId, timestamp: new Date().toISOString(), source: 'playwrightRecorder', type, pageUrl: location.href, frameUrl: location.href, pageTitle: document.title, selector, rawEvidence: { selector, selectorCandidates: rawEvidence.selectorCandidates || candidatesFor(el), selectorConfidence: rawEvidence.selectorConfidence || (selector && selector.startsWith('#') ? 'high' : 'medium'), labelText: el ? labelText(el) : '', textPreview: el ? textOf(el) : '', ...rawEvidence } };
-      try { window.__browsyRecordEvent(payload); } catch {}
-    }
+    function candidatesFor(el) { const out = []; const push = (selector, kind, confidence, score) => { if (selector && !out.some(x => x.selector === selector)) out.push({ selector, kind, confidence, score }); }; push(el?.id ? '#' + CSS.escape(el.id) : '', 'id', 'high', 100); const testId = el?.getAttribute?.('data-testid') || el?.getAttribute?.('data-test'); push(testId ? '[data-testid="' + CSS.escape(testId) + '"]' : '', 'testid', 'high', 95); const name = el?.getAttribute?.('name'); push(name ? el.tagName.toLowerCase() + '[name="' + CSS.escape(name) + '"]' : '', 'name', 'high', 90); const role = el?.getAttribute?.('role'); const label = labelText(el) || textOf(el); push(role && label ? '[role="' + CSS.escape(role) + '"]' : '', 'role', 'medium', 75); push(label ? el.tagName.toLowerCase() + '[aria-label="' + CSS.escape(label) + '"]' : '', 'aria-or-label', 'medium', 70); push(structuralSelector(el), 'css-path', 'medium', 50); const root = el?.getRootNode?.(); if (root && root.host) push(selectorFor(root.host) + ' >>> ' + selectorFor(el), 'shadow-pierce', 'medium', 65); return out.sort((a, b) => b.score - a.score); }
+    function send(type, el, rawEvidence = {}) { const selector = rawEvidence.selector || selectorFor(el); const payload = { id: type + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8), recordingSessionId, timestamp: new Date().toISOString(), source: 'playwrightRecorder', type, pageUrl: location.href, frameUrl: location.href, pageTitle: document.title, selector, rawEvidence: { selector, selectorCandidates: rawEvidence.selectorCandidates || candidatesFor(el), selectorConfidence: rawEvidence.selectorConfidence || (selector && selector.startsWith('#') ? 'high' : 'medium'), labelText: el ? labelText(el) : '', textPreview: el ? textOf(el) : '', ...rawEvidence } }; try { window.__browsyRecordEvent(payload); } catch {} }
     function scheduleOutputScan() { clearTimeout(outputScanTimer); outputScanTimer = setTimeout(scanOutputs, 250); }
-    function scanOutputs() {
-      const nodes = Array.from(document.querySelectorAll('[id],[data-testid],[data-test],a,button,div,span,p,h1,h2,h3,strong,code,pre')).slice(0, 500);
-      for (const el of nodes) {
-        const text = textOf(el); const id = el.id || el.getAttribute('data-testid') || el.getAttribute('data-test') || '';
-        if (!text || text.length > 240) continue;
-        if (outputWords.test(id + ' ' + text)) send('output_candidate_detected', el, { outputId: id || '', text, reason: 'auto-output-scan' });
-      }
-    }
+    function scanOutputs() { const nodes = Array.from(document.querySelectorAll('[id],[data-testid],[data-test],a,button,div,span,p,h1,h2,h3,strong,code,pre')).slice(0, 500); for (const el of nodes) { const text = textOf(el); const id = el.id || el.getAttribute('data-testid') || el.getAttribute('data-test') || ''; if (!text || text.length > 240) continue; if (outputWords.test(id + ' ' + text)) send('output_candidate_detected', el, { outputId: id || '', text, reason: 'auto-output-scan' }); } }
     document.addEventListener('click', event => { const target = event.composedPath ? event.composedPath()[0] : event.target; const el = target && target.closest ? target.closest('button,a,input,select,textarea,[role="button"],[data-testid],[data-test]') : target; if (!el) return; const label = textOf(el); send(dangerousWords.test(label) ? 'dangerous_action_candidate_detected' : 'action_detected', el, { label, text: label, tagName: el.tagName, inputType: el.getAttribute?.('type') || null }); scheduleOutputScan(); }, true);
     function recordInput(event) { const el = event.target; if (!el || !el.tagName) return; const tag = el.tagName.toLowerCase(); const inputType = (el.getAttribute('type') || tag || 'text').toLowerCase(); if (inputType === 'file') { const files = Array.from(el.files || []).map(file => ({ name: file.name, size: file.size, type: file.type, lastModified: file.lastModified })); send('file_selected', el, { id: el.id || el.name || '', name: el.name || '', label: labelText(el) || el.name || el.id || 'File', inputType: 'file', accept: el.accept || '', multiple: !!el.multiple, files }); return; } send('field_detected', el, { id: el.id || el.name || '', name: el.name || '', label: labelText(el) || el.name || el.id || '', inputType, value: el.type === 'password' ? '[redacted]' : el.value, textPreview: el.type === 'password' ? '[redacted]' : String(el.value || '').slice(0, 240) }); scheduleOutputScan(); }
-    document.addEventListener('change', recordInput, true); document.addEventListener('input', recordInput, true);
-    new MutationObserver(scheduleOutputScan).observe(document.documentElement || document.body, { childList: true, subtree: true, characterData: true });
-    window.__browsyCaptureOutput = (outputId, selector) => { const el = selector ? document.querySelector(selector) : null; send('output_captured', el, { outputId, text: el ? textOf(el) : '', selector }); };
-    setTimeout(scanOutputs, 500);
+    document.addEventListener('change', recordInput, true); document.addEventListener('input', recordInput, true); new MutationObserver(scheduleOutputScan).observe(document.documentElement || document.body, { childList: true, subtree: true, characterData: true }); window.__browsyCaptureOutput = (outputId, selector) => { const el = selector ? document.querySelector(selector) : null; send('output_captured', el, { outputId, text: el ? textOf(el) : '', selector }); }; setTimeout(scanOutputs, 500);
   })();`;
 }
 
-function appendEventsToDisk(recordingSessionId, events = []) {
-  const dir = recordingDir(recordingSessionId);
-  ensureDir(dir);
-  const eventsPath = path.join(dir, 'events.json');
-  const existing = exists(eventsPath) ? readJson(eventsPath) : [];
-  const merged = [...(Array.isArray(existing) ? existing : []), ...events];
-  writeJson(eventsPath, merged);
-  const sessionPath = path.join(dir, 'session.json');
-  if (exists(sessionPath)) {
-    const session = readJson(sessionPath);
-    writeJson(sessionPath, { ...session, events: merged, updatedAt: new Date().toISOString() });
-  }
-}
-
-async function capturePageScreenshot({ recordingSessionId, page, pageId = 'page', reason = 'capture' }) {
-  try {
-    const dir = path.join(recordingDir(recordingSessionId), 'screenshots');
-    ensureDir(dir);
-    const name = `${safeSegment(pageId)}-${safeSegment(reason)}-${Date.now()}.png`;
-    const filePath = path.join(dir, name);
-    await page.screenshot({ path: filePath, fullPage: true });
-    return { name, path: filePath, pageUrl: page.url(), reason };
-  } catch { return null; }
-}
-
-function resolveAuthProfile(session, options = {}) {
-  const firstAuth = Array.isArray(session?.auth) ? session.auth[0] : null;
-  const firstSiteTab = Array.isArray(session?.recordingSetup?.tabs) ? session.recordingSetup.tabs.find(t => t.siteId) : null;
-  const authProfileId = safeSegment(options.authProfileId || firstAuth?.siteId || firstSiteTab?.siteId || session?.appId || 'default');
-  const dir = path.join(OUTPUT_DIR, 'auth-profiles', authProfileId);
-  return { authProfileId, userDataDir: path.join(dir, 'user-data'), storageStatePath: path.join(dir, 'storageState.json') };
-}
-
+function appendEventsToDisk(recordingSessionId, events = []) { const dir = recordingDir(recordingSessionId); ensureDir(dir); const eventsPath = path.join(dir, 'events.json'); const existing = exists(eventsPath) ? readJson(eventsPath) : []; const merged = [...(Array.isArray(existing) ? existing : []), ...events]; writeJson(eventsPath, merged); const sessionPath = path.join(dir, 'session.json'); if (exists(sessionPath)) { const session = readJson(sessionPath); writeJson(sessionPath, { ...session, events: merged, updatedAt: new Date().toISOString() }); } }
+async function capturePageScreenshot({ recordingSessionId, page, pageId = 'page', reason = 'capture' }) { try { const dir = path.join(recordingDir(recordingSessionId), 'screenshots'); ensureDir(dir); const name = `${safeSegment(pageId)}-${safeSegment(reason)}-${Date.now()}.png`; const filePath = path.join(dir, name); await page.screenshot({ path: filePath, fullPage: true }); return { name, path: filePath, pageUrl: page.url(), reason }; } catch { return null; } }
+function resolveAuthProfile(session, options = {}) { const setup = session?.recordingSetup || {}; const tabs = Array.isArray(setup.tabs) ? setup.tabs : []; const firstAuth = Array.isArray(session?.auth) ? session.auth[0] : null; const firstSiteTab = tabs.find(t => t.siteId); const firstProfileTab = tabs.find(t => t.authProfileId || t.authGroupId || t.ssoProfileId); const explicit = options.authProfileId || options.authGroupId || options.ssoProfileId || setup.authProfileId || setup.authGroupId || setup.ssoProfileId || firstProfileTab?.authProfileId || firstProfileTab?.authGroupId || firstProfileTab?.ssoProfileId; const authProfileId = safeSegment(explicit || firstAuth?.siteId || firstSiteTab?.siteId || session?.appId || 'default'); const dir = path.join(OUTPUT_DIR, 'auth-profiles', authProfileId); return { authProfileId, userDataDir: path.join(dir, 'user-data'), storageStatePath: path.join(dir, 'storageState.json') }; }
 function writeRuntimeStatus(recordingSessionId, status) { const dir = recordingDir(recordingSessionId); ensureDir(dir); writeJson(path.join(dir, 'runtime-status.json'), { recordingSessionId, updatedAt: new Date().toISOString(), ...status }); }
 function countEventsOnDisk(recordingSessionId) { const p = path.join(recordingDir(recordingSessionId), 'events.json'); if (!exists(p)) return 0; const events = readJson(p); return Array.isArray(events) ? events.length : 0; }
 function normalizeEvent(recordingSessionId, event = {}) { return { id: event.id || `${event.type || 'event'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, recordingSessionId, timestamp: event.timestamp || new Date().toISOString(), source: event.source || 'playwrightRecorder', pageUrl: event.pageUrl || null, pageTitle: event.pageTitle || null, selector: event.selector || null, rawEvidence: event.rawEvidence || {}, ...event }; }
