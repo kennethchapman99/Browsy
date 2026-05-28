@@ -4,8 +4,9 @@
 //   1. Validate payload against inputSchema             → fail closed before browser launch
 //   2. Check safety gates (mode, approvalToken, etc.)   → fail closed before browser launch
 //   3. Execute via runWorkflowPackage (existing engine) → captures processStatus
-//   4. Evaluate assertions                              → determines workflowOutcome
-//   5. Update run record with normalized result + artifacts
+//   4. Hydrate package-derived dry-run facts            → exposes replay/package intent
+//   5. Evaluate assertions                              → determines workflowOutcome
+//   6. Update run record with normalized result + artifacts
 
 import http from 'http';
 import https from 'https';
@@ -167,7 +168,7 @@ export async function executeRun({ runId, workflowVersion, payload, mode, approv
       packagePath: pkgPath,
       runRoot: runRoot || join(REGISTRY_DIR, '_engine_runs'),
     });
-    engineResult = outcome.result;
+    engineResult = enrichEngineResultFromMaterializedPackage(outcome.result, pkgToWrite, workflowVersion);
     processStatus = 'completed';
   } catch (err) {
     return finishRun(runId, {
@@ -213,4 +214,115 @@ export async function executeRun({ runId, workflowVersion, payload, mode, approv
     internalRunResult: engineResult,
     blockingReason: waiting ? (engineResult?.next_required_action || 'approval required') : null,
   });
+}
+
+function enrichEngineResultFromMaterializedPackage(engineResult = {}, pkg = {}, workflowVersion = {}) {
+  const steps = firstArray(pkg.recordedSteps, pkg.steps, pkg.canonical_payload?.replayPlan?.steps, workflowVersion.recordedSteps);
+  const uploads = firstArray(pkg.fileUploadBindings, pkg.file_upload_bindings, pkg.uploads, workflowVersion.fileUploadBindings);
+  const outputs = firstArray(pkg.expectedOutputs, pkg.outputs, pkg.capture_outputs, workflowVersion.expectedOutputs);
+  const checkpoints = firstArray(pkg.humanApprovalCheckpoints, pkg.checkpoints, pkg.manual_checkpoints, workflowVersion.humanApprovalCheckpoints);
+  const artifactRules = firstArray(pkg.artifactPolicy?.artifactExtractionRules, pkg.canonical_payload?.artifactExtractionRules, workflowVersion.artifactPolicy?.artifactExtractionRules);
+
+  const filledFields = [
+    ...arrayOrEmpty(engineResult.filled_fields),
+    ...steps.filter(step => ['fill', 'select'].includes(step.type || step.action)).map(step => ({
+      field: step.binding || step.id,
+      selector: step.selector || null,
+      status: 'planned_from_materialized_package',
+      sourceStepId: step.id || null,
+    })),
+  ];
+
+  const uploadedFiles = uploads.map(upload => ({
+    role: upload.role || upload.id || upload.binding,
+    selector: upload.selector || null,
+    status: 'planned_from_materialized_package',
+    source: upload.source || upload.path || null,
+  }));
+
+  const skippedFields = [
+    ...arrayOrEmpty(engineResult.skipped_fields),
+    ...steps.filter(step => (step.type || step.action) === 'approve' || step.requiresApproval).map(step => ({
+      field: step.binding || step.label || step.id,
+      reason: 'human checkpoint or approval required',
+      status: 'checkpoint',
+      sourceStepId: step.id || null,
+    })),
+  ];
+
+  const capturedOutputs = { ...(engineResult.captured_outputs || {}) };
+  for (const output of outputs) {
+    const id = typeof output === 'string' ? output : output.id || output.name || output.output;
+    if (!id || capturedOutputs[id]) continue;
+    capturedOutputs[id] = {
+      status: 'planned_from_materialized_package',
+      value: null,
+      selector: typeof output === 'object' ? output.selector || null : null,
+      required: typeof output === 'object' ? output.required !== false : true,
+    };
+  }
+
+  const manualCheckpoints = [
+    ...arrayOrEmpty(engineResult.manual_checkpoints),
+    ...checkpoints.map(checkpoint => ({
+      type: 'materialized_checkpoint',
+      checkpointId: checkpoint.id || checkpoint.label || checkpoint,
+      label: checkpoint.label || checkpoint.id || checkpoint,
+      beforeAction: checkpoint.beforeAction || null,
+      reason: checkpoint.reason || 'human approval checkpoint materialized from observation',
+    })),
+  ];
+
+  const downloadedFiles = [
+    ...arrayOrEmpty(engineResult.downloaded_files),
+    ...artifactRules.map(rule => ({
+      artifactId: rule.id || rule.artifactId,
+      status: 'planned_from_materialized_package',
+      suggestedFilename: rule.suggestedFilename || null,
+      sourceEventId: rule.sourceEventId || null,
+    })),
+  ];
+
+  return {
+    ...engineResult,
+    materializedPackage: {
+      workflowId: pkg.workflow_id || workflowVersion.packageWorkflowId || workflowVersion.workflowId,
+      stepCount: steps.length,
+      uploadCount: uploads.length,
+      outputCount: outputs.length,
+      checkpointCount: checkpoints.length,
+      artifactRuleCount: artifactRules.length,
+    },
+    completedSteps: [
+      ...arrayOrEmpty(engineResult.completedSteps),
+      ...steps.filter(step => !(step.requiresApproval || (step.type || step.action) === 'approve')).map(step => ({
+        id: step.id,
+        type: step.type || step.action,
+        status: 'planned_from_materialized_package',
+      })),
+    ],
+    skippedSteps: [
+      ...arrayOrEmpty(engineResult.skippedSteps),
+      ...steps.filter(step => step.requiresApproval || (step.type || step.action) === 'approve').map(step => ({
+        id: step.id,
+        type: step.type || step.action,
+        status: 'checkpoint',
+      })),
+    ],
+    filled_fields: filledFields,
+    skipped_fields: skippedFields,
+    uploaded_files: uploadedFiles,
+    captured_outputs: capturedOutputs,
+    manual_checkpoints: manualCheckpoints,
+    downloaded_files: downloadedFiles,
+  };
+}
+
+function firstArray(...values) {
+  for (const value of values) if (Array.isArray(value) && value.length) return value;
+  return [];
+}
+
+function arrayOrEmpty(value) {
+  return Array.isArray(value) ? value : [];
 }

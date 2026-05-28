@@ -6,6 +6,7 @@ import { registerWorkflow, getWorkflow, listWorkflows, getWorkflowVersion, parse
 import { createRun, getRun, stopRun, cancelRun, approveRun, getRunArtifacts } from '../registry/run-registry.mjs';
 import { executeRun } from '../registry/run-executor.mjs';
 import { buildRunCreateResponse, buildRunResult, buildWorkflowContract } from '../registry/run-result.mjs';
+import { materializeWorkflowPackageFromObservation } from '../core/observation-materializer.mjs';
 
 export const DEFAULT_PORT = 3001;
 
@@ -90,6 +91,34 @@ export function createServer({ port = DEFAULT_PORT } = {}) {
       }
       if (method === 'GET' && url === '/api/apps') {
         return send(res, 200, { ok: true, apps: listApps() });
+      }
+
+      if (method === 'POST' && url === '/api/observations/import') {
+        const body = await json(req);
+        if (!body.observation) return send(res, 400, { ok: false, error: 'observation is required' });
+        const observation = body.workflowId && body.observation && typeof body.observation === 'object'
+          ? { ...body.observation, workflowId: body.workflowId }
+          : body.observation;
+        const result = materializeWorkflowPackageFromObservation({
+          observation,
+          overwrite: body.overwrite === true,
+          packageKind: body.packageKind || 'example',
+          appId: body.appId || null,
+          appName: body.appName || body.appId || null,
+          version: body.version || '1.0.0',
+          autoRegisterApp: body.autoRegisterApp === true,
+        });
+        if (!result.ok) {
+          return send(res, 400, {
+            ok: false,
+            error: [
+              ...(result.validation?.errors || []),
+              ...(result.importResult?.errors || []),
+            ].join('; ') || 'observation materialization failed',
+            materialized: result,
+          });
+        }
+        return send(res, 201, { ok: true, materialized: result, imported: result.importResult || null });
       }
 
       let p = route('/api/apps/:appId/workflows/import', url);
