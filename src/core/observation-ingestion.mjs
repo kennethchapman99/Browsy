@@ -1,11 +1,19 @@
 // Convert a narrated/browser-observed workflow into generic Browsy artifacts.
 // This module intentionally avoids vendor-specific assumptions.
 
+import { join } from 'path';
 import { RETURN_CONTRACT_VERSION } from './workflow-contract.mjs';
+import { WORKFLOWS_DIR, writeJson } from './paths.mjs';
 
 const FILE_INPUT_TYPES = new Set(['file', 'file path', 'upload', 'asset']);
 const DANGEROUS_WORDS = /submit|release|publish|pay|purchase|checkout|delete|remove|confirm|certify|agree/i;
 const FINAL_WORDS = /final|submit|release|publish|upload to stores|go live/i;
+const FIELD_EVENTS = new Set(['field_detected', 'editor_input', 'rich_text_changed', 'paste_detected']);
+const UPLOAD_EVENTS = new Set(['file_selected', 'file_dropped']);
+const ACTION_EVENTS = new Set(['action_detected', 'dangerous_action_candidate_detected', 'user_marked_dangerous_action']);
+const OUTPUT_EVENTS = new Set(['output_candidate_detected', 'output_captured']);
+const DOWNLOAD_EVENTS = new Set(['download_started', 'download_saved', 'download_failed']);
+const PAGE_EVENTS = new Set(['page_seen', 'page_opened', 'page_navigated', 'popup_opened', 'page_snapshot_captured']);
 
 export function normalizeObservation(input = {}) {
   const raw = typeof input === 'string' ? JSON.parse(input) : (input || {});
@@ -34,6 +42,10 @@ export function normalizeObservation(input = {}) {
     humanCheckpoints: normalizeCheckpoints(raw.humanCheckpoints || raw.checkpoints || []),
     safetyPolicy: raw.safetyPolicy || null,
     notes: raw.notes || '',
+    // Preserve recorder context so the legacy wizard import route can still
+    // materialize real package sidecars after it has already normalized input.
+    recordingSetup: raw.recordingSetup || null,
+    sessionEvents: asArray(raw.sessionEvents || raw.events || []),
   };
 }
 
@@ -63,6 +75,29 @@ export function inferCapturedOutputs(observation) {
     }
   }
 
+  for (const ev of obs.sessionEvents || []) {
+    if (!OUTPUT_EVENTS.has(ev.type)) continue;
+    const raw = ev.rawEvidence || {};
+    const id = toCamel(raw.outputId || raw.label || ev.selector || ev.id || 'captured output');
+    if (!outputs.some(o => o.id === id)) {
+      outputs.push(cleanObject({
+        id,
+        label: raw.label || raw.outputId || humanize(id),
+        scope: 'captured',
+        source: 'captured_from_page',
+        selector: ev.selector || firstSelector(raw),
+        required: true,
+        captureAfter: raw.triggeredBySelector || null,
+        example: raw.text || raw.textPreview || '',
+        storesTo: `captured.${id}`,
+        selectorCandidates: raw.selectorCandidates || [],
+        selectorConfidence: raw.selectorConfidence || null,
+        sourceEventId: ev.id || null,
+        tabId: ev.pageId || null,
+      }));
+    }
+  }
+
   return dedupeById(outputs);
 }
 
@@ -75,6 +110,13 @@ export function inferRuntimeVariables(observation) {
   const inputNames = new Set(declaredInput.map(v => v.name).filter(Boolean));
   for (const field of obs.fields) {
     if (field.scope === 'global' && field.inputType !== 'file') inputNames.add(field.id);
+  }
+
+  for (const ev of obs.sessionEvents || []) {
+    if (!FIELD_EVENTS.has(ev.type)) continue;
+    const raw = ev.rawEvidence || {};
+    const id = toCamel(raw.name || raw.id || raw.label || ev.selector || ev.id || 'field');
+    inputNames.add(id);
   }
 
   const captured = [...declaredCaptured];
@@ -110,23 +152,14 @@ export function inferRuntimeVariables(observation) {
 
 // Build a workflow package conforming to the current Browsy contract
 // (see docs/workflow-package-contract.md + src/core/workflow-contract.mjs).
-//
-// Required envelope fields (workflow_id, source_system, entity_type,
-// entity_id, mode) are populated with generic, contract-valid defaults so the
-// emitted package validates and dry-runs immediately after materialization.
-// Observation-derived structure (globals, defaults, repeatGroups,
-// capturedOutputs, humanCheckpoints) lives inside `canonical_payload`, which
-// Browsy passes to the reusable workflow without inspection.
-//
-// `assets` is an ARRAY of { role, path?, repeat_group? } as the contract
-// requires — never an id→path object.
 export function buildWorkflowPackageFromObservation(observation) {
   const obs = normalizeObservation(observation);
+  const materialized = buildMaterializedDetails(obs);
 
   const globals = {};
   const assetsByRole = {};
   const defaults = {};
-  for (const field of obs.fields) {
+  for (const field of materialized.fields) {
     const value = field.exampleValue ?? field.value ?? placeholderValue(field);
     if (field.scope === 'asset' || field.inputType === 'file') assetsByRole[field.id] = value;
     else if (field.scope === 'default') defaults[field.id] = value;
@@ -147,7 +180,7 @@ export function buildWorkflowPackageFromObservation(observation) {
     items: [buildSampleRepeatItem(group)],
   }));
 
-  const capturedOutputs = inferCapturedOutputs(obs).map(output => cleanObject({
+  const capturedOutputs = materialized.outputs.map(output => cleanObject({
     id: output.id,
     label: output.label,
     scope: output.scope || 'captured',
@@ -159,23 +192,14 @@ export function buildWorkflowPackageFromObservation(observation) {
     captureAfter: output.captureAfter || null,
   }));
 
-  // Flatten observation-derived assets (global + per-repeat-item) into the
-  // contract's array form: each entry is { role, path?, repeat_group? }.
   const assetEntries = [];
   for (const [role, value] of Object.entries(assetsByRole)) {
-    assetEntries.push(cleanObject({
-      role,
-      path: typeof value === 'string' ? value : null,
-    }));
+    assetEntries.push(cleanObject({ role, path: typeof value === 'string' ? value : null }));
   }
   for (const group of repeatGroups) {
     const itemAssets = (group.items && group.items[0] && group.items[0].assets) || {};
     for (const [role, value] of Object.entries(itemAssets)) {
-      assetEntries.push(cleanObject({
-        role,
-        repeat_group: group.id,
-        path: typeof value === 'string' ? value : null,
-      }));
+      assetEntries.push(cleanObject({ role, repeat_group: group.id, path: typeof value === 'string' ? value : null }));
     }
   }
 
@@ -188,10 +212,15 @@ export function buildWorkflowPackageFromObservation(observation) {
     assets: assetsByRole,
     repeatGroups,
     capturedOutputs,
-    humanCheckpoints: obs.humanCheckpoints || [],
+    humanCheckpoints: materialized.checkpoints || [],
+    tabs: materialized.tabs,
+    replayPlan: materialized.replayPlan,
+    bindings: materialized.bindings,
+    expectedOutputs: materialized.outputs,
+    artifactExtractionRules: materialized.artifactRules,
   });
 
-  return {
+  const pkg = cleanObject({
     workflow_id: obs.workflowId,
     source_system: 'external_client',
     entity_type: 'workflow',
@@ -201,9 +230,27 @@ export function buildWorkflowPackageFromObservation(observation) {
     canonical_payload: canonicalPayload,
     assets: assetEntries,
     capture_outputs: captureOutputNames,
+    tabs: materialized.tabs,
+    auth: materialized.auth,
+    recordedSteps: materialized.steps,
+    steps: materialized.steps,
+    bindings: materialized.bindings,
+    variableBindings: materialized.bindings.variables,
+    fileUploadBindings: materialized.fileUploadBindings,
+    uploads: materialized.fileUploadBindings,
+    expectedOutputs: materialized.outputs,
+    outputs: materialized.outputs,
+    humanApprovalCheckpoints: materialized.checkpoints,
+    checkpoints: materialized.checkpoints,
+    replaySettings: materialized.replaySettings,
+    safetyPolicy: materialized.safetyPolicy,
+    artifactPolicy: materialized.artifactPolicy,
     on_failure: 'stop_and_return_blocked_result',
     return_contract_version: RETURN_CONTRACT_VERSION,
-  };
+  });
+
+  writeLegacyMaterializedSidecars(obs, materialized);
+  return pkg;
 }
 
 export function buildWorkflowConfigFromObservation(observation) {
@@ -217,6 +264,7 @@ export function buildWorkflowConfigFromObservation(observation) {
     exampleUrl: page.exampleUrl,
     notes: page.notes,
   }));
+  const materialized = buildMaterializedDetails(obs);
 
   return cleanObject({
     id: obs.workflowId,
@@ -228,9 +276,25 @@ export function buildWorkflowConfigFromObservation(observation) {
     runtimeVariables,
     repeatGroups: inferRepeatGroups(obs),
     capturedOutputs: inferCapturedOutputs(obs),
-    humanCheckpoints: obs.humanCheckpoints,
+    humanCheckpoints: materialized.checkpoints,
     manualOnlyActions,
-    safetyPolicy: obs.safetyPolicy || buildSafetyPolicy(manualOnlyActions),
+    safetyPolicy: materialized.safetyPolicy,
+    tabs: materialized.tabs,
+    auth: materialized.auth,
+    navigationGraph: materialized.navigationGraph,
+    recordedSteps: materialized.steps,
+    steps: materialized.steps,
+    bindings: materialized.bindings,
+    variableBindings: materialized.bindings.variables,
+    fileUploadBindings: materialized.fileUploadBindings,
+    expectedOutputs: materialized.outputs,
+    humanApprovalCheckpoints: materialized.checkpoints,
+    replaySettings: materialized.replaySettings,
+    artifactPolicy: materialized.artifactPolicy,
+    requiredFiles: materialized.uploads.map(u => u.id),
+    supportedModes: ['preview', 'dry_run', 'live'],
+    inputSchema: materialized.manifestSchema,
+    outputSchema: { type: 'object', properties: Object.fromEntries(materialized.outputs.map(o => [o.id, { type: 'string', description: o.label || o.id }])) },
   });
 }
 
@@ -285,6 +349,165 @@ export function buildRunPlanFromObservation(observation) {
   return lines.filter(line => line !== null).join('\n');
 }
 
+function buildMaterializedDetails(obs) {
+  const tabs = inferTabs(obs);
+  const fields = inferObservedFields(obs);
+  const uploads = inferObservedUploads(obs);
+  const actions = inferObservedActions(obs);
+  const checkpoints = inferObservedCheckpoints(obs, actions);
+  const outputs = inferCapturedOutputs(obs);
+  const artifactRules = inferArtifactRules(obs);
+  const bindings = buildBindings(fields, uploads, outputs);
+  const steps = buildRecordedSteps({ tabs, fields, uploads, actions, checkpoints, outputs, artifactRules });
+  const replaySettings = { defaultMode: 'dry_run', stopBeforeFinalAction: true, requireVerifiedSelectorsForLive: true, retry: { attempts: 2, backoffMs: 500 }, timing: { afterNavigationMs: 500, afterActionMs: 250 } };
+  const safetyPolicy = buildSafetyPolicy([...inferManualOnlyActions(obs), ...actions.filter(a => a.manualOnly || a.dangerous)]);
+  const fileUploadBindings = uploads.map(u => cleanObject({ id: u.id, role: u.id, label: u.label, selector: u.selectorHint, fallbackSelectors: u.fallbackSelectors, selectorConfidence: u.selectorConfidence, tabId: u.tabId, source: `payload.${u.id}`, required: u.required !== false }));
+  const navigationGraph = buildNavigationGraph(tabs, obs.sessionEvents || []);
+  const auth = asArray(obs.recordingSetup?.tabs).filter(t => t.requiresAuth || t.siteId).map(t => cleanObject({ tabId: tabs.find(tab => tab.url === t.url)?.id, siteId: t.siteId || toWorkflowId(t.title || t.url || 'site'), siteName: t.title || t.siteId, url: t.url, authCheckUrl: t.authCheckUrl || t.url, mode: t.requiresAuth ? 'human_required_if_not_authenticated' : 'optional' }));
+  const manifestSchema = buildManifestSchema(fields, uploads);
+  const replayPlan = cleanObject({ schemaVersion: 'browsy.replay-plan.v1', workflowId: obs.workflowId, generatedAt: new Date().toISOString(), tabs, navigationGraph, steps, bindings, outputs, checkpoints, artifactExtractionRules: artifactRules, replaySettings });
+  const artifactPolicy = { captureReplayPlan: true, captureOutputs: outputs.map(o => o.id), artifactExtractionRules: artifactRules };
+  return { tabs, fields, uploads, actions, checkpoints, outputs, artifactRules, bindings, steps, replaySettings, safetyPolicy, fileUploadBindings, navigationGraph, auth, manifestSchema, replayPlan, artifactPolicy };
+}
+
+function writeLegacyMaterializedSidecars(obs, materialized) {
+  try {
+    const dir = join(WORKFLOWS_DIR, obs.workflowId);
+    writeJson(join(dir, 'manifest.schema.json'), materialized.manifestSchema);
+    writeJson(join(dir, 'replay-plan.json'), materialized.replayPlan);
+    writeJson(join(dir, 'bindings.json'), materialized.bindings);
+    writeJson(join(dir, 'field-map.local.json'), cleanObject({
+      generatedAt: new Date().toISOString(),
+      generatedBy: 'browsy.legacy-observation-import',
+      workflowId: obs.workflowId,
+      verificationStatus: 'observed_not_verified',
+      fields: Object.fromEntries(materialized.fields.map(f => [f.id, selectorEntry(f)])),
+      uploads: Object.fromEntries(materialized.uploads.map(u => [u.id, selectorEntry(u, 'file')])),
+      actions: Object.fromEntries(materialized.actions.map(a => [a.id, selectorEntry(a, 'click')])),
+      outputs: Object.fromEntries(materialized.outputs.map(o => [o.id, selectorEntry(o, 'output')])),
+    }));
+    writeJson(join(dir, 'safety-policy.json'), materialized.safetyPolicy);
+  } catch {
+    // Sidecar generation should never break preview/import. The caller still
+    // receives the core workflow/package JSON and can inspect warnings manually.
+  }
+}
+
+function inferTabs(obs) {
+  const tabs = [];
+  const add = ({ id, pageId, title, url, siteId, requiresAuth, authCheckUrl, source }) => {
+    if (!url) return;
+    if (tabs.some(t => t.url === url && (t.pageId || null) === (pageId || null))) return;
+    tabs.push(cleanObject({ id: id || pageId || `tab${tabs.length + 1}`, pageId, title: title || `Tab ${tabs.length + 1}`, url, order: tabs.length + 1, siteId, requiresAuth: !!requiresAuth, authCheckUrl, source }));
+  };
+  for (const tab of asArray(obs.recordingSetup?.tabs)) add({ ...tab, source: 'recording_setup' });
+  for (const page of obs.pages || []) add({ id: page.id, title: page.purpose, url: page.urlTemplate || page.url, source: 'observation_page' });
+  for (const ev of obs.sessionEvents || []) if (PAGE_EVENTS.has(ev.type)) add({ id: ev.pageId, pageId: ev.pageId, title: ev.pageTitle || ev.rawEvidence?.title, url: ev.pageUrl || ev.rawEvidence?.url, source: ev.type });
+  return tabs.length ? tabs : [{ id: 'tab1', title: 'Observed tab', url: 'about:blank', order: 1, source: 'fallback' }];
+}
+
+function inferObservedFields(obs) {
+  const fields = [...obs.fields.filter(f => f.inputType !== 'file' && f.scope !== 'asset')];
+  for (const ev of obs.sessionEvents || []) {
+    if (!FIELD_EVENTS.has(ev.type)) continue;
+    const raw = ev.rawEvidence || {};
+    fields.push(cleanObject({ id: toCamel(raw.name || raw.id || raw.label || ev.selector || ev.id || 'field'), label: raw.label || raw.name || ev.selector, inputType: normalizeInputType(raw.inputType || raw.targetTag || 'text'), scope: 'global', selectorHint: ev.selector || firstSelector(raw), selectorCandidates: raw.selectorCandidates || [], selectorConfidence: raw.selectorConfidence || null, exampleValue: raw.textPreview || raw.value, required: true, tabId: ev.pageId, sourceEventId: ev.id }));
+  }
+  return dedupeById(fields.map(enrichSelectorMeta));
+}
+
+function inferObservedUploads(obs) {
+  const uploads = [...obs.fields.filter(f => f.inputType === 'file' || f.scope === 'asset')];
+  for (const ev of obs.sessionEvents || []) {
+    if (!UPLOAD_EVENTS.has(ev.type)) continue;
+    const raw = ev.rawEvidence || {};
+    uploads.push(cleanObject({ id: toCamel(raw.name || raw.id || raw.label || ev.selector || ev.id || 'asset'), label: raw.label || raw.targetLabel || 'Uploaded file', inputType: 'file', scope: 'asset', selectorHint: ev.selector || firstSelector(raw), selectorCandidates: raw.selectorCandidates || [], selectorConfidence: raw.selectorConfidence || null, exampleValue: raw.files?.[0]?.name ? `./examples/${raw.files[0].name}` : undefined, required: true, tabId: ev.pageId, sourceEventId: ev.id, accept: raw.accept, multiple: raw.multiple }));
+  }
+  return dedupeById(uploads.map(enrichSelectorMeta));
+}
+
+function inferObservedActions(obs) {
+  const actions = [...obs.actions];
+  for (const ev of obs.sessionEvents || []) {
+    if (!ACTION_EVENTS.has(ev.type)) continue;
+    const raw = ev.rawEvidence || {};
+    actions.push(normalizeAction({ id: raw.name || raw.id || raw.label || ev.selector || ev.id, label: raw.label || raw.text || ev.selector, selectorHint: ev.selector || firstSelector(raw), selectorCandidates: raw.selectorCandidates || [], selectorConfidence: raw.selectorConfidence || null, manualOnly: ev.type !== 'action_detected', dangerous: ev.type !== 'action_detected', tabId: ev.pageId, sourceEventId: ev.id }));
+  }
+  return dedupeById(actions.map(enrichSelectorMeta));
+}
+
+function inferObservedCheckpoints(obs, actions) {
+  const checkpoints = [...obs.humanCheckpoints];
+  for (const action of actions || []) {
+    if (action.manualOnly || action.dangerous || DANGEROUS_WORDS.test(action.label || '')) {
+      checkpoints.push(cleanObject({ id: `${action.id}Approval`, label: `Review before ${action.label || action.id}`, beforeAction: action.id, reason: action.safetyCategory || 'manual approval required', sourceEventId: action.sourceEventId }));
+    }
+  }
+  return dedupeById(checkpoints.map(c => ({ ...c, id: c.id || toCamel(c.label || 'checkpoint') })));
+}
+
+function inferArtifactRules(obs) {
+  return (obs.sessionEvents || []).filter(ev => DOWNLOAD_EVENTS.has(ev.type)).map((ev, index) => cleanObject({ id: toWorkflowId(ev.rawEvidence?.suggestedFilename || ev.id || `artifact-${index + 1}`), kind: ev.type, pageId: ev.pageId, sourceEventId: ev.id, suggestedFilename: ev.rawEvidence?.suggestedFilename, savedPath: ev.rawEvidence?.savedPath, url: ev.rawEvidence?.url, error: ev.rawEvidence?.error }));
+}
+
+function buildBindings(fields, uploads, outputs) {
+  return {
+    variables: Object.fromEntries(fields.map(f => [f.id, cleanObject({ source: `payload.${f.id}`, selector: f.selectorHint, selectorCandidates: f.selectorCandidates, required: f.required !== false })])),
+    files: Object.fromEntries(uploads.map(u => [u.id, cleanObject({ source: `payload.${u.id}`, selector: u.selectorHint, selectorCandidates: u.selectorCandidates, required: u.required !== false })])),
+    outputs: Object.fromEntries(outputs.map(o => [o.id, cleanObject({ selector: o.selector, source: o.source, attribute: o.attribute, required: o.required !== false, storesTo: o.storesTo })])),
+  };
+}
+
+function buildRecordedSteps({ tabs, fields, uploads, actions, checkpoints, outputs, artifactRules }) {
+  const steps = [];
+  let order = 0;
+  const defaultTab = tabs[0]?.id || 'tab1';
+  for (const tab of tabs) steps.push(cleanObject({ id: `navigate_${toWorkflowId(tab.id)}`, type: 'navigate', order: ++order, tabId: tab.id, url: tab.url, waitUntil: 'domcontentloaded', retry: { attempts: 2, backoffMs: 500 } }));
+  for (const f of fields) steps.push(cleanObject({ id: `fill_${f.id}`, type: f.inputType === 'select' ? 'select' : 'fill', order: ++order, tabId: f.tabId || defaultTab, selector: f.selectorHint, fallbackSelectors: f.fallbackSelectors, selectorConfidence: f.selectorConfidence, binding: f.id, value: `{{inputs.${f.id}}}`, required: f.required !== false, sourceEventId: f.sourceEventId }));
+  for (const u of uploads) steps.push(cleanObject({ id: `upload_${u.id}`, type: 'uploadFile', order: ++order, tabId: u.tabId || defaultTab, selector: u.selectorHint, fallbackSelectors: u.fallbackSelectors, selectorConfidence: u.selectorConfidence, binding: u.id, file: `{{files.${u.id}}}`, required: u.required !== false, sourceEventId: u.sourceEventId }));
+  for (const a of actions) {
+    const cp = checkpoints.find(c => c.beforeAction === a.id);
+    if (cp) steps.push(cleanObject({ id: `approve_${cp.id}`, type: 'approve', order: ++order, checkpointId: cp.id, beforeAction: a.id, reason: cp.reason || cp.notes }));
+    steps.push(cleanObject({ id: `click_${a.id}`, type: 'click', order: ++order, tabId: a.tabId || defaultTab, selector: a.selectorHint, fallbackSelectors: a.fallbackSelectors, selectorConfidence: a.selectorConfidence, label: a.label, requiresApproval: !!cp || a.manualOnly || a.dangerous, safetyCategory: a.safetyCategory, sourceEventId: a.sourceEventId }));
+  }
+  for (const o of outputs) steps.push(cleanObject({ id: `extract_${o.id}`, type: o.attribute ? 'extractAttribute' : 'extractText', order: ++order, tabId: o.tabId || defaultTab, selector: o.selector, selectorConfidence: o.selectorConfidence, output: o.id, attribute: o.attribute, storesTo: o.storesTo, required: o.required !== false, captureAfter: o.captureAfter, sourceEventId: o.sourceEventId }));
+  for (const r of artifactRules) steps.push(cleanObject({ id: `artifact_${r.id}`, type: r.kind === 'download_failed' ? 'assert' : 'download', order: ++order, tabId: r.pageId || defaultTab, artifactId: r.id, suggestedFilename: r.suggestedFilename, sourceEventId: r.sourceEventId }));
+  return steps;
+}
+
+function buildManifestSchema(fields, uploads) {
+  const properties = {};
+  const required = [];
+  for (const item of [...fields, ...uploads]) {
+    properties[item.id] = { type: item.inputType === 'checkbox' ? 'boolean' : 'string', title: item.label || item.id };
+    if (item.required !== false) required.push(item.id);
+  }
+  return { $schema: 'https://json-schema.org/draft/2020-12/schema', type: 'object', additionalProperties: true, required: [...new Set(required)], properties };
+}
+
+function buildNavigationGraph(tabs, events) {
+  const nodes = tabs.map(t => cleanObject({ id: t.id, url: t.url, title: t.title, pageId: t.pageId }));
+  const edges = [];
+  let previous = null;
+  for (const ev of events || []) {
+    if (!PAGE_EVENTS.has(ev.type)) continue;
+    const current = tabs.find(t => t.pageId === ev.pageId || t.url === ev.pageUrl)?.id || ev.pageId;
+    if (previous && current && previous !== current) edges.push({ from: previous, to: current, event: ev.type, eventId: ev.id });
+    if (current) previous = current;
+  }
+  return { nodes, edges };
+}
+
+function enrichSelectorMeta(item) {
+  const selectorCandidates = asArray(item.selectorCandidates);
+  const selector = item.selectorHint || item.selector || firstSelector(item);
+  return cleanObject({ ...item, selectorHint: selector, fallbackSelectors: selectorCandidates.map(c => c.selector).filter(s => s && s !== selector).slice(0, 4), selectorCandidates, selectorConfidence: item.selectorConfidence || selectorCandidates[0]?.confidence || (selector ? 'medium' : 'low') });
+}
+
+function selectorEntry(item, type = item.inputType || 'text') {
+  return cleanObject({ selector: item.selectorHint || item.selector, fallbackSelectors: item.fallbackSelectors, type, source: item.id, required: item.required !== false, selectorConfidence: item.selectorConfidence, sourceEventId: item.sourceEventId });
+}
+
 function normalizePage(page = {}, index = 0) {
   const id = toCamel(page.id || page.name || page.purpose || `page ${index + 1}`);
   return cleanObject({
@@ -311,6 +534,8 @@ function normalizeFields(fields = [], options = {}) {
       scope: field.scope || defaultScope,
       source: field.source || field.sourcePath || id,
       selectorHint: field.selectorHint || field.selector || '',
+      selectorCandidates: field.selectorCandidates || [],
+      selectorConfidence: field.selectorConfidence || '',
       exampleValue: field.exampleValue ?? field.example ?? field.value,
       required: field.required !== false,
       notes: field.notes || '',
@@ -348,6 +573,10 @@ function normalizeAction(action = {}) {
     scope: action.scope || '',
     targetRepeatGroup: action.targetRepeatGroup || action.repeatGroupId || '',
     selectorHint: action.selectorHint || action.selector || '',
+    selectorCandidates: action.selectorCandidates || [],
+    selectorConfidence: action.selectorConfidence || '',
+    tabId: action.tabId || action.pageId || '',
+    sourceEventId: action.sourceEventId || '',
     manualOnly,
     dangerous: action.dangerous === true || manualOnly,
     safetyCategory,
@@ -379,7 +608,7 @@ function normalizeCheckpoints(checkpoints = []) {
   return asArray(checkpoints).map((checkpoint, index) => {
     if (typeof checkpoint === 'string') return { id: toCamel(checkpoint), label: checkpoint };
     const id = toCamel(checkpoint.id || checkpoint.name || checkpoint.label || `checkpoint ${index + 1}`);
-    return cleanObject({ id, label: checkpoint.label || checkpoint.name || humanize(id), beforeAction: checkpoint.beforeAction || '', notes: checkpoint.notes || '' });
+    return cleanObject({ id, label: checkpoint.label || checkpoint.name || humanize(id), beforeAction: checkpoint.beforeAction || '', reason: checkpoint.reason || '', notes: checkpoint.notes || '' });
   });
 }
 
@@ -397,9 +626,13 @@ function buildSampleRepeatItem(group) {
 
 function buildSafetyPolicy(manualOnlyActions) {
   const neverClickText = [...new Set(manualOnlyActions.map(a => a.label).filter(Boolean))];
+  const neverClickSelectors = [...new Set(manualOnlyActions.map(a => a.selectorHint || a.selector).filter(Boolean))];
   return {
     never_click_text: neverClickText,
+    never_click_selectors: neverClickSelectors,
     manual_only_categories: ['final submission', 'payment', 'legal certification', 'destructive action'],
+    dry_run_default: true,
+    pause_at_end_default: true,
   };
 }
 
@@ -466,6 +699,10 @@ function singularize(value = '') {
   if (/ies$/i.test(v)) return v.slice(0, -3) + 'y';
   if (/s$/i.test(v) && v.length > 1) return v.slice(0, -1);
   return v;
+}
+
+function firstSelector(input = {}) {
+  return asArray(input.selectorCandidates || input.rawEvidence?.selectorCandidates)[0]?.selector || '';
 }
 
 function asArray(value) {
