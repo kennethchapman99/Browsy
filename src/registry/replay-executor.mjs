@@ -20,6 +20,7 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
   const slowMo = Number(options.slowMo || process.env.BROWSY_REPLAY_SLOWMO || 0) || 0;
   const leaveOpen = options.leaveBrowserOpen === true || process.env.BROWSY_REPLAY_LEAVE_OPEN === 'true';
   const timeout = Number(options.timeoutMs || process.env.BROWSY_REPLAY_TIMEOUT_MS || 15000) || 15000;
+  const settleMs = Number(options.settleMs || process.env.BROWSY_REPLAY_SETTLE_MS || 2500) || 2500;
   const steps = Array.isArray(workflowVersion.recordedSteps) ? workflowVersion.recordedSteps : [];
   const tabs = Array.isArray(workflowVersion.tabs) ? workflowVersion.tabs : [];
 
@@ -69,13 +70,15 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
         if (type === 'navigate') {
           const page = await getPage(context, pages, step.tabId || tabs[0]?.id || 'tab1');
           await page.goto(step.url, { waitUntil: step.waitUntil || 'domcontentloaded', timeout });
+          await settlePage(page, { timeout, settleMs, targetHost: hostFromStep(step) });
           completedSteps.push({ id: step.id, type, status: 'completed', tabId: step.tabId, url: page.url() });
-          screenshots.push(await shot(page, screenshotsDir, `${step.order || completedSteps.length}-${step.id}`));
+          pushUnique(screenshots, await shot(page, screenshotsDir, `${step.order || completedSteps.length}-${step.id}`));
           continue;
         }
 
         if (type === 'fill' || type === 'select') {
           const page = await getPage(context, pages, step.tabId || tabs[0]?.id || 'tab1');
+          await settlePage(page, { timeout, settleMs });
           const value = valueFor(step.value, payload, step.binding);
           const loc = await locate(page, step, timeout);
           if (type === 'select') await loc.selectOption(String(value ?? ''), { timeout });
@@ -87,6 +90,7 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
 
         if (type === 'uploadFile') {
           const page = await getPage(context, pages, step.tabId || tabs[0]?.id || 'tab1');
+          await settlePage(page, { timeout, settleMs });
           const filePath = fileFor(step.file, payload, step.binding);
           if (!filePath) throw new Error(`missing file for ${step.binding || step.id}`);
           const loc = await locate(page, step, timeout);
@@ -98,17 +102,19 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
 
         if (type === 'click') {
           const page = await getPage(context, pages, step.tabId || tabs[0]?.id || 'tab1');
+          await settlePage(page, { timeout, settleMs });
           const loc = await locate(page, step, timeout);
           await loc.click({ timeout });
-          await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
+          await settlePage(page, { timeout, settleMs });
           completedSteps.push({ id: step.id, type, status: 'completed', tabId: step.tabId, label: step.label || null });
-          screenshots.push(await shot(page, screenshotsDir, `${step.order || completedSteps.length}-${step.id}`));
+          pushUnique(screenshots, await shot(page, screenshotsDir, `${step.order || completedSteps.length}-${step.id}`));
           continue;
         }
 
         if (type === 'extractText' || type === 'extractAttribute') {
           const outputId = step.output || step.binding || step.id;
           const page = await getPage(context, pages, step.tabId || bestOutputTab(tabs));
+          await settlePage(page, { timeout, settleMs });
           let value = null;
           if (step.selector) {
             const loc = await locate(page, step, timeout);
@@ -120,19 +126,24 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
           }
           capturedOutputs[outputId] = { status: value ? 'captured' : 'empty', value, selector: step.selector || null, required: step.required !== false };
           completedSteps.push({ id: step.id, type, status: value ? 'completed' : 'completed_empty', tabId: step.tabId, output: outputId });
-          screenshots.push(await shot(page, screenshotsDir, `${step.order || completedSteps.length}-${step.id}`));
+          pushUnique(screenshots, await shot(page, screenshotsDir, `${step.order || completedSteps.length}-${step.id}`));
           continue;
         }
 
         skippedSteps.push({ id: step.id, type, status: 'unsupported_step_type' });
       } catch (err) {
-        failedSteps.push({ id: step.id, type, status: 'failed', error: err.message, selector: step.selector || null, tabId: step.tabId || null });
+        const page = pages.get(step.tabId || tabs[0]?.id || 'tab1');
+        const diagnostic = page ? await pageDiagnostic(page) : {};
+        if (page) pushUnique(screenshots, await shot(page, screenshotsDir, `failed-${step.id || type}`));
+        failedSteps.push({ id: step.id, type, status: 'failed', error: err.message, selector: step.selector || null, tabId: step.tabId || null, ...diagnostic });
         if (options.stopOnStepFailure !== false) break;
       }
     }
 
-    for (const [tabId, page] of pages.entries()) screenshots.push(await shot(page, screenshotsDir, `final-${tabId}`));
+    for (const [tabId, page] of pages.entries()) pushUnique(screenshots, await shot(page, screenshotsDir, `final-${tabId}`));
 
+    const uniqueScreenshots = uniqueByPath(screenshots.filter(Boolean));
+    const uniqueDownloads = uniqueByPath(downloads.filter(Boolean));
     const result = clean({
       ok: failedSteps.length === 0,
       workflow_id: workflowVersion.workflowId || workflowVersion.packageWorkflowId,
@@ -149,10 +160,10 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
       uploaded_files: uploadedFiles,
       captured_outputs: withExpectedOutputs(capturedOutputs, workflowVersion.expectedOutputs || []),
       manual_checkpoints: manualCheckpoints,
-      downloaded_files: downloads,
-      screenshots: screenshots.filter(Boolean),
-      artifacts: [...screenshots.filter(Boolean).map(s => ({ ...s, type: 'screenshot' })), ...downloads],
-      artifact_paths: [...screenshots.filter(Boolean).map(s => s.path), ...downloads.map(d => d.path)],
+      downloaded_files: uniqueDownloads,
+      screenshots: uniqueScreenshots,
+      artifacts: [...uniqueScreenshots.map(s => ({ ...s, type: 'screenshot' })), ...uniqueDownloads],
+      artifact_paths: [...uniqueScreenshots.map(s => s.path), ...uniqueDownloads.map(d => d.path)],
       logs,
       authProfile,
       next_required_action: null,
@@ -185,19 +196,60 @@ async function getPage(context, pages, tabId) {
   return page;
 }
 
+async function settlePage(page, { timeout, settleMs, targetHost } = {}) {
+  await page.waitForLoadState('domcontentloaded', { timeout: Math.min(timeout || 15000, 10000) }).catch(() => {});
+  await page.waitForLoadState('networkidle', { timeout: Math.min(timeout || 15000, 10000) }).catch(() => {});
+  if (targetHost) {
+    await page.waitForFunction(host => location.hostname === host || location.hostname.endsWith('.' + host), targetHost, { timeout: Math.min(timeout || 15000, 12000) }).catch(() => {});
+  }
+  await page.waitForTimeout(Math.min(settleMs || 1500, 5000)).catch(() => {});
+}
+
 async function locate(page, step, timeout) {
   const selectors = [step.selector, ...(Array.isArray(step.fallbackSelectors) ? step.fallbackSelectors : [])].filter(Boolean);
+  const tries = [];
+  for (const selector of selectors) tries.push({ kind: 'css', selector });
+  for (const label of candidateLabels(step)) {
+    tries.push({ kind: 'role-link', label });
+    tries.push({ kind: 'role-button', label });
+    tries.push({ kind: 'aria', label });
+    tries.push({ kind: 'text', label });
+  }
   let last = null;
-  for (const selector of selectors) {
+  for (const trial of tries) {
     try {
-      const loc = page.locator(selector).first();
-      await loc.waitFor({ state: 'visible', timeout: Math.min(timeout, 8000) });
+      const loc = locatorFor(page, trial).first();
+      await loc.waitFor({ state: 'visible', timeout: Math.min(timeout || 15000, 8000) });
       return loc;
     } catch (err) {
       last = err;
     }
   }
   throw new Error(`no usable selector for ${step.id || 'step'}: ${last?.message || 'missing selector'}`);
+}
+
+function locatorFor(page, trial) {
+  if (trial.kind === 'role-link') return page.getByRole('link', { name: new RegExp(escapeRegex(trial.label), 'i') });
+  if (trial.kind === 'role-button') return page.getByRole('button', { name: new RegExp(escapeRegex(trial.label), 'i') });
+  if (trial.kind === 'aria') return page.locator(`[aria-label*="${cssEscape(trial.label)}" i]`);
+  if (trial.kind === 'text') return page.getByText(new RegExp(`^\\s*${escapeRegex(trial.label)}\\s*$`, 'i'));
+  return page.locator(trial.selector);
+}
+
+function candidateLabels(step = {}) {
+  const values = [];
+  for (const value of [step.label, step.name, step.id, step.selector]) {
+    if (!value) continue;
+    const cleaned = String(value)
+      .replace(/^click[_-]?/i, '')
+      .replace(/[_-]+/g, ' ')
+      .replace(/\[[^\]]+\]/g, ' ')
+      .replace(/aria-label\s*=\s*["']?([^"'\]]+).*/i, '$1')
+      .replace(/[^a-zA-Z0-9 ]+/g, ' ')
+      .trim();
+    if (cleaned && cleaned.length <= 80) values.push(cleaned);
+  }
+  return [...new Set(values)];
 }
 
 function valueFor(value, payload = {}, binding = null) {
@@ -249,6 +301,31 @@ async function shot(page, dir, name) {
   } catch { return null; }
 }
 
+async function pageDiagnostic(page) {
+  try {
+    const title = await page.title().catch(() => null);
+    const bodyText = await page.evaluate(() => document.body?.innerText?.slice(0, 1200) || '').catch(() => '');
+    return { pageUrl: page.url(), pageTitle: title, bodyTextPreview: bodyText };
+  } catch {
+    return {};
+  }
+}
+
+function pushUnique(list, item) {
+  if (!item?.path) return;
+  if (!list.some(x => x?.path === item.path)) list.push(item);
+}
+
+function uniqueByPath(items = []) {
+  const map = new Map();
+  for (const item of items) if (item?.path && !map.has(item.path)) map.set(item.path, item);
+  return [...map.values()];
+}
+
+function hostFromStep(step = {}) {
+  try { return new URL(step.url).hostname.replace(/^www\./, ''); } catch { return null; }
+}
+
 function bestOutputTab(tabs = []) {
   return tabs.find(t => !t.requiresAuth)?.id || tabs[tabs.length - 1]?.id || tabs[0]?.id || 'tab1';
 }
@@ -259,6 +336,14 @@ function safeSegment(value = '') {
 
 function safeName(value = '') {
   return safeSegment(value).slice(0, 120) || 'artifact';
+}
+
+function escapeRegex(value = '') {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function cssEscape(value = '') {
+  return String(value).replace(/["\\]/g, '\\$&');
 }
 
 function clean(obj) {
