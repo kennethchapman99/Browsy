@@ -4,6 +4,7 @@ import { OUTPUT_DIR, ensureDir, exists, readJson, writeJson } from '../core/path
 import { materializeWorkflowPackageFromObservation } from '../core/observation-materializer.mjs';
 import { getWorkflowVersion } from './workflow-registry.mjs';
 import { buildWorkflowContract } from './run-result.mjs';
+import { upsertSitePresetsFromRecordingSetup } from './site-preset-registry.mjs';
 
 export const RECORDINGS_DIR = path.join(OUTPUT_DIR, 'recordings');
 
@@ -47,6 +48,7 @@ export function startRecordingSession(input = {}, { baseUrl = 'http://localhost:
   };
 
   persistSession(session);
+  persistSitePresets(session);
   return publicSession(session);
 }
 
@@ -65,6 +67,7 @@ export function updateRecordingSessionSetup(recordingSessionId, input = {}) {
     launch: null,
   };
   persistSession(updated);
+  persistSitePresets(updated);
   return publicSession(updated);
 }
 
@@ -151,6 +154,12 @@ export function getRecordingContract(recordingSessionId, { baseUrl = 'http://loc
 export function listRecordingSessions() {
   if (!exists(RECORDINGS_DIR)) return [];
   return fs.readdirSync(RECORDINGS_DIR).filter(name => name.startsWith('rec_')).map(name => readSession(name)).filter(Boolean).map(publicSession).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+}
+
+function persistSitePresets(session) {
+  try {
+    upsertSitePresetsFromRecordingSetup(session.recordingSetup, { appId: session.appId, workflowId: session.workflowId });
+  } catch {}
 }
 
 function validateUsableTabs(tabs = []) {
