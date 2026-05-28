@@ -7,31 +7,31 @@ import fs from 'fs';
 import path from 'path';
 import { WORKFLOWS_DIR, OUTPUT_DIR, ensureDir, writeJson, writeText } from './paths.mjs';
 import { RETURN_CONTRACT_VERSION } from './workflow-contract.mjs';
-import {
-  normalizeObservation,
-  buildRunPlanFromObservation,
-} from './observation-ingestion.mjs';
+import { normalizeObservation } from './observation-ingestion.mjs';
 import { importWorkflowPackage, validateWorkflowPackageDir } from '../registry/package-importer.mjs';
 
 const ACTION_TYPES = new Set(['action_detected', 'dangerous_action_candidate_detected', 'user_marked_dangerous_action']);
 const FIELD_TYPES = new Set(['field_detected', 'editor_input', 'rich_text_changed', 'paste_detected']);
 const UPLOAD_TYPES = new Set(['file_selected', 'file_dropped']);
-const OUTPUT_TYPES = new Set(['output_candidate_detected', 'output_captured']);
 const DOWNLOAD_TYPES = new Set(['download_started', 'download_saved', 'download_failed']);
 const PAGE_TYPES = new Set(['page_seen', 'page_opened', 'page_navigated', 'popup_opened', 'page_snapshot_captured']);
 const DANGEROUS = /submit|release|publish|pay|purchase|checkout|delete|remove|confirm|certify|agree|go live/i;
+const AUTH_FIELD = /^(user(name)?|email|login|password|passwd|passcode|otp|mfa|token|domainUser(name)?|domainPassword)$/i;
+const AUTH_ACTION = /^(sign in|log in|login|continue|verify|next)$/i;
+const AUTH_URL = /login|signin|sso|saml|oauth|openid|frontdoor|contentDoor|authn|iwa|invalid_session|fromLoginToken|RelayState|SAMLRequest|sid=/i;
 
 export function compileObservationToWorkflowPackage(observation = {}) {
   const raw = parseInput(observation);
   const obs = normalizeObservation(raw);
   const events = collectEvents(raw);
-  const tabs = inferTabs(obs, raw, events);
-  const fields = inferFields(obs, events);
-  const uploads = inferUploads(obs, events);
-  const actions = inferActions(obs, events);
+  const context = buildContext(raw);
+  const tabs = inferTabs(obs, raw, events, context);
+  const fields = inferFields(obs, events, context, tabs);
+  const uploads = inferUploads(obs, events, context, tabs);
+  const actions = inferActions(obs, events, context, tabs);
   const checkpoints = inferCheckpoints(obs, actions, events);
-  const outputs = inferOutputs(obs, events);
-  const artifactRules = inferArtifactRules(events);
+  const outputs = inferOutputs(obs, events, context, tabs);
+  const artifactRules = inferArtifactRules(events, context, tabs);
   const bindings = buildBindings(fields, uploads, outputs);
   const replaySettings = buildReplaySettings(raw);
   const steps = buildSteps({ tabs, fields, uploads, actions, checkpoints, outputs, artifactRules });
@@ -47,7 +47,7 @@ export function compileObservationToWorkflowPackage(observation = {}) {
     generatedAt: new Date().toISOString(),
     tabs,
     auth: inferAuth(raw, tabs),
-    navigationGraph: buildNavigationGraph(tabs, events),
+    navigationGraph: buildNavigationGraph(tabs, events, context),
     recordedSteps: steps,
     steps,
     bindings,
@@ -156,7 +156,7 @@ export function compileObservationToWorkflowPackage(observation = {}) {
     bindings,
     fieldMap,
     safetyPolicy,
-    runPlanMd: buildRunPlanFromObservation({ ...obs, fields: [...fields, ...uploads], actions, capturedOutputs: outputs, humanCheckpoints: checkpoints, safetyPolicy }),
+    runPlanMd: buildRunPlan({ obs, tabs, fields, uploads, actions, outputs, checkpoints, artifactRules, events, context }),
   };
 }
 
@@ -220,6 +220,15 @@ export function materializeWorkflowPackageFromObservation({
     });
   }
 
+  const summary = {
+    tabs: arr(compiled.workflowJson.tabs).length,
+    recordedSteps: arr(compiled.workflowJson.recordedSteps).length,
+    bindings: Object.keys(obj(compiled.bindings.variables)).length,
+    uploads: arr(compiled.workflowJson.fileUploadBindings).length,
+    outputs: arr(compiled.workflowJson.expectedOutputs).length,
+    checkpoints: arr(compiled.workflowJson.humanApprovalCheckpoints).length,
+  };
+
   return {
     ok: validation.ok && (!importResult || importResult.ok),
     workflowId: compiled.workflowId,
@@ -230,14 +239,7 @@ export function materializeWorkflowPackageFromObservation({
     relativeFiles: Object.values(files).filter(f => fs.existsSync(f)).map(f => path.relative(repoRoot, f)),
     validation,
     importResult,
-    summary: {
-      tabs: compiled.workflowJson.tabs.length,
-      recordedSteps: compiled.workflowJson.recordedSteps.length,
-      bindings: Object.keys(compiled.bindings.variables).length,
-      uploads: compiled.workflowJson.fileUploadBindings.length,
-      outputs: compiled.workflowJson.expectedOutputs.length,
-      checkpoints: compiled.workflowJson.humanApprovalCheckpoints.length,
-    },
+    summary,
   };
 }
 
@@ -254,48 +256,61 @@ function collectEvents(raw) {
   return events.sort((a, b) => String(a.timestamp || '').localeCompare(String(b.timestamp || '')));
 }
 
-function inferTabs(obs, raw, events) {
-  const tabs = [];
-  const add = ({ id, pageId, title, url, siteId, requiresAuth, authCheckUrl, source }) => {
-    if (!url) return;
-    if (tabs.some(t => t.url === url && (t.pageId || null) === (pageId || null))) return;
-    tabs.push(clean({ id: id || pageId || `tab${tabs.length + 1}`, pageId, title: title || `Tab ${tabs.length + 1}`, url, order: tabs.length + 1, siteId, requiresAuth: !!requiresAuth, authCheckUrl, source }));
+function buildContext(raw) {
+  const setupTabs = asArray(raw.recordingSetup?.tabs);
+  const hasSharedAuth = !!(raw.recordingSetup?.authProfileId || raw.recordingSetup?.authGroupId || raw.recordingSetup?.ssoProfileId || setupTabs.some(t => t.authProfileId));
+  return {
+    hasSharedAuth,
+    setupTabs,
+    tabHosts: setupTabs.map(t => ({ id: t.id, host: hostOf(t.url), url: t.url })).filter(t => t.host),
   };
-  for (const tab of asArray(raw.recordingSetup?.tabs)) add({ ...tab, source: 'recording_setup' });
-  for (const page of obs.pages || []) add({ id: page.id, title: page.purpose, url: page.urlTemplate || page.url, source: 'observation_page' });
-  for (const ev of events || []) if (PAGE_TYPES.has(ev.type)) add({ id: ev.pageId, pageId: ev.pageId, title: ev.pageTitle || ev.rawEvidence?.title, url: ev.pageUrl || ev.rawEvidence?.url, source: ev.type });
-  return tabs.length ? tabs : [{ id: 'tab1', title: 'Observed tab', url: raw.startUrl || 'about:blank', order: 1, source: 'fallback' }];
 }
 
-function inferFields(obs, events) {
+function inferTabs(obs, raw, events, context) {
+  const tabs = [];
+  const add = ({ id, pageId, title, url, siteId, requiresAuth, authCheckUrl, source }) => {
+    if (!url || isPlaceholderUrl(url) || isEphemeralUrl(url)) return;
+    const stableId = id || pageId || `tab${tabs.length + 1}`;
+    if (tabs.some(t => t.url === url || (t.id === stableId && t.source === 'recording_setup'))) return;
+    tabs.push(clean({ id: stableId, pageId, title: title || `Tab ${tabs.length + 1}`, url, order: tabs.length + 1, siteId, requiresAuth: !!requiresAuth, authCheckUrl, source }));
+  };
+  for (const tab of context.setupTabs) add({ ...tab, source: 'recording_setup' });
+  for (const page of obs.pages || []) add({ id: page.id, title: page.purpose, url: page.urlTemplate || page.url, source: 'observation_page' });
+  for (const ev of events || []) if (PAGE_TYPES.has(ev.type)) add({ id: tabIdForEvent(ev, context) || ev.pageId, pageId: ev.pageId, title: ev.pageTitle || ev.rawEvidence?.title, url: ev.pageUrl || ev.rawEvidence?.url, source: ev.type });
+  return tabs.length ? tabs.map((t, i) => ({ ...t, order: i + 1 })) : [{ id: 'tab1', title: 'Observed tab', url: raw.startUrl || 'about:blank', order: 1, source: 'fallback' }];
+}
+
+function inferFields(obs, events, context) {
   const fields = [];
-  for (const f of obs.fields || []) if (f.inputType !== 'file' && f.scope !== 'asset') fields.push(role(f, 'field'));
+  for (const f of obs.fields || []) if (f.inputType !== 'file' && f.scope !== 'asset' && !isAuthFieldLike(f, context)) fields.push(role(f, 'field'));
   for (const ev of events || []) {
-    if (!FIELD_TYPES.has(ev.type)) continue;
+    if (!FIELD_TYPES.has(ev.type) || isAuthEvent(ev, context)) continue;
     const raw = ev.rawEvidence || {};
-    fields.push(role({ id: raw.name || raw.id || raw.label || ev.selector, label: raw.label || raw.name || ev.selector, inputType: raw.inputType || raw.targetTag || 'text', selectorHint: ev.selector || firstSelector(raw), selectorCandidates: raw.selectorCandidates, selectorConfidence: raw.selectorConfidence, exampleValue: raw.textPreview || raw.value, tabId: ev.pageId, sourceEventId: ev.id }, 'field'));
+    fields.push(role({ id: raw.name || raw.id || raw.label || ev.selector, label: raw.label || raw.name || ev.selector, inputType: raw.inputType || raw.targetTag || 'text', selectorHint: ev.selector || firstSelector(raw), selectorCandidates: raw.selectorCandidates, selectorConfidence: raw.selectorConfidence, exampleValue: raw.textPreview || raw.value, tabId: tabIdForEvent(ev, context), sourceEventId: ev.id }, 'field'));
   }
   return dedupe(fields);
 }
 
-function inferUploads(obs, events) {
+function inferUploads(obs, events, context) {
   const uploads = [];
   for (const f of obs.fields || []) if (f.inputType === 'file' || f.scope === 'asset') uploads.push(role(f, 'asset'));
   for (const ev of events || []) {
     if (!UPLOAD_TYPES.has(ev.type)) continue;
     const raw = ev.rawEvidence || {};
-    uploads.push(role({ id: raw.name || raw.id || raw.label || ev.selector, label: raw.label || raw.targetLabel || 'Uploaded file', inputType: 'file', scope: 'asset', selectorHint: ev.selector || firstSelector(raw), selectorCandidates: raw.selectorCandidates, selectorConfidence: raw.selectorConfidence, exampleValue: raw.files?.[0]?.name ? `./examples/${raw.files[0].name}` : undefined, tabId: ev.pageId, sourceEventId: ev.id, accept: raw.accept, multiple: raw.multiple }, 'asset'));
+    uploads.push(role({ id: raw.name || raw.id || raw.label || ev.selector, label: raw.label || raw.targetLabel || 'Uploaded file', inputType: 'file', scope: 'asset', selectorHint: ev.selector || firstSelector(raw), selectorCandidates: raw.selectorCandidates, selectorConfidence: raw.selectorConfidence, exampleValue: raw.files?.[0]?.name ? `./examples/${raw.files[0].name}` : undefined, tabId: tabIdForEvent(ev, context), sourceEventId: ev.id, accept: raw.accept, multiple: raw.multiple }, 'asset'));
   }
   return dedupe(uploads);
 }
 
-function inferActions(obs, events) {
+function inferActions(obs, events, context) {
   const actions = [];
   for (const a of obs.actions || []) actions.push(action(a));
   for (const ev of events || []) {
-    if (!ACTION_TYPES.has(ev.type)) continue;
+    if (!ACTION_TYPES.has(ev.type) || isAuthEvent(ev, context)) continue;
     const raw = ev.rawEvidence || {};
-    actions.push(action({ id: raw.name || raw.id || raw.label || ev.selector, label: raw.label || raw.text || ev.selector, selectorHint: ev.selector || firstSelector(raw), selectorCandidates: raw.selectorCandidates, selectorConfidence: raw.selectorConfidence, manualOnly: ev.type !== 'action_detected', dangerous: ev.type !== 'action_detected', tabId: ev.pageId, sourceEventId: ev.id }));
+    const label = raw.label || raw.text || ev.selector;
+    if (context.hasSharedAuth && AUTH_ACTION.test(String(label || '').trim()) && isLikelyAuthUrl(ev.pageUrl)) continue;
+    actions.push(action({ id: raw.name || raw.id || raw.label || ev.selector, label, selectorHint: ev.selector || firstSelector(raw), selectorCandidates: raw.selectorCandidates, selectorConfidence: raw.selectorConfidence, manualOnly: ev.type !== 'action_detected', dangerous: ev.type !== 'action_detected', tabId: tabIdForEvent(ev, context), sourceEventId: ev.id }));
   }
   return dedupe(actions);
 }
@@ -307,18 +322,19 @@ function inferCheckpoints(obs, actions, events) {
   return dedupe(cps);
 }
 
-function inferOutputs(obs, events) {
-  const outs = asArray(obs.capturedOutputs).map(o => output(o));
+function inferOutputs(obs, events, context) {
+  const outs = asArray(obs.capturedOutputs).map(o => output({ ...o, declared: true }));
   for (const ev of events || []) {
-    if (!OUTPUT_TYPES.has(ev.type)) continue;
+    if (ev.type !== 'output_captured') continue;
     const raw = ev.rawEvidence || {};
-    outs.push(output({ id: raw.outputId || raw.label || ev.selector, label: raw.label || raw.outputId || 'Captured output', selector: ev.selector || firstSelector(raw), selectorCandidates: raw.selectorCandidates, selectorConfidence: raw.selectorConfidence, example: raw.text || raw.textPreview, captureAfter: raw.triggeredBySelector, tabId: ev.pageId, sourceEventId: ev.id }));
+    if (isEphemeralUrl(ev.pageUrl)) continue;
+    outs.push(output({ id: raw.outputId || raw.label || ev.selector, label: raw.label || raw.outputId || 'Captured output', selector: ev.selector || firstSelector(raw), selectorCandidates: raw.selectorCandidates, selectorConfidence: raw.selectorConfidence, example: raw.text || raw.textPreview, captureAfter: raw.triggeredBySelector, tabId: tabIdForEvent(ev, context), sourceEventId: ev.id }));
   }
   return dedupe(outs);
 }
 
-function inferArtifactRules(events) {
-  return events.filter(ev => DOWNLOAD_TYPES.has(ev.type)).map((ev, i) => clean({ id: safe(ev.rawEvidence?.suggestedFilename || ev.id || `artifact${i + 1}`), kind: ev.type, pageId: ev.pageId, sourceEventId: ev.id, suggestedFilename: ev.rawEvidence?.suggestedFilename, savedPath: ev.rawEvidence?.savedPath, url: ev.rawEvidence?.url, error: ev.rawEvidence?.error }));
+function inferArtifactRules(events, context) {
+  return events.filter(ev => DOWNLOAD_TYPES.has(ev.type)).map((ev, i) => clean({ id: safe(ev.rawEvidence?.suggestedFilename || ev.id || `artifact${i + 1}`), kind: ev.type, pageId: tabIdForEvent(ev, context) || ev.pageId, sourceEventId: ev.id, suggestedFilename: ev.rawEvidence?.suggestedFilename, savedPath: ev.rawEvidence?.savedPath, url: ev.rawEvidence?.url, error: ev.rawEvidence?.error }));
 }
 
 function buildSteps({ tabs, fields, uploads, actions, checkpoints, outputs, artifactRules }) {
@@ -373,16 +389,16 @@ function buildSafetyPolicy(raw, actions, checkpoints) {
 }
 
 function inferAuth(raw, tabs) {
-  return asArray(raw.recordingSetup?.tabs).filter(t => t.requiresAuth || t.siteId).map(t => clean({ tabId: tabs.find(tab => tab.url === t.url)?.id, siteId: t.siteId || safe(t.title || t.url || 'site'), siteName: t.title || t.siteId, url: t.url, authCheckUrl: t.authCheckUrl || t.url, mode: t.requiresAuth ? 'human_required_if_not_authenticated' : 'optional' }));
+  return asArray(raw.recordingSetup?.tabs).filter(t => t.requiresAuth || t.siteId).map(t => clean({ tabId: tabs.find(tab => tab.url === t.url)?.id || t.id, siteId: t.siteId || safe(t.title || t.url || 'site'), siteName: t.title || t.siteId, url: t.url, authCheckUrl: t.authCheckUrl || t.url, authProfileId: t.authProfileId || raw.recordingSetup?.authProfileId || null, mode: t.requiresAuth ? 'human_required_if_not_authenticated' : 'optional' }));
 }
 
-function buildNavigationGraph(tabs, events) {
+function buildNavigationGraph(tabs, events, context) {
   const nodes = tabs.map(t => clean({ id: t.id, url: t.url, title: t.title, pageId: t.pageId }));
   const edges = [];
   let prev = null;
   for (const ev of events || []) {
-    if (!PAGE_TYPES.has(ev.type)) continue;
-    const current = tabs.find(t => t.pageId === ev.pageId || t.url === ev.pageUrl)?.id || ev.pageId;
+    if (!PAGE_TYPES.has(ev.type) || isEphemeralUrl(ev.pageUrl)) continue;
+    const current = tabs.find(t => t.pageId === ev.pageId || t.url === ev.pageUrl)?.id || tabIdForEvent(ev, context) || ev.pageId;
     if (prev && current && prev !== current) edges.push({ from: prev, to: current, event: ev.type, eventId: ev.id });
     if (current) prev = current;
   }
@@ -393,7 +409,7 @@ function role(input, kind) {
   const id = safe(toCamel(input.id || input.name || input.label || input.field || input.selectorHint || input.selector || kind));
   const selectorCandidates = asArray(input.selectorCandidates);
   const selector = input.selector || input.selectorHint || firstSelector(input);
-  return clean({ id, label: input.label || input.name || human(id), kind, inputType: normType(input.inputType || input.type || input.kind), scope: kind === 'asset' ? 'asset' : input.scope || 'global', selector, fallbackSelectors: selectorCandidates.map(c => c.selector).filter(s => s && s !== selector).slice(0, 4), selectorCandidates, selectorConfidence: input.selectorConfidence || selectorCandidates[0]?.confidence || (selector ? 'medium' : 'low'), exampleValue: input.exampleValue ?? input.example ?? input.value, required: input.required !== false, tabId: input.tabId || input.pageId, sourceEventId: input.sourceEventId, accept: input.accept, multiple: !!input.multiple });
+  return clean({ id, label: input.label || input.name || human(id), kind, inputType: normType(input.inputType || input.type || input.kind), scope: kind === 'asset' ? 'asset' : input.scope || 'global', selector, fallbackSelectors: selectorCandidates.map(c => c.selector).filter(s => s && s !== selector).slice(0, 4), selectorCandidates, selectorConfidence: input.selectorConfidence || selectorCandidates[0]?.confidence || (selector ? 'medium' : 'low'), exampleValue: input.exampleValue ?? input.example ?? input.value, required: input.required !== false, tabId: input.tabId || input.pageId, sourceEventId: input.sourceEventId, accept: input.accept, multiple: !!input.multiple, source: input.source, attribute: input.attribute, storesTo: input.storesTo, captureAfter: input.captureAfter });
 }
 
 function action(input) {
@@ -424,8 +440,72 @@ function selectorEntry(item, type = item.inputType || 'text') {
   return clean({ selector: item.selector, fallbackSelectors: item.fallbackSelectors, type, source: item.id, required: item.required !== false, selectorConfidence: item.selectorConfidence, sourceEventId: item.sourceEventId });
 }
 
+function buildRunPlan({ obs, tabs, fields, uploads, actions, outputs, checkpoints, artifactRules, events, context }) {
+  const lines = [
+    `# Run Plan: ${obs.title || obs.workflowId}`,
+    '',
+    `**Workflow ID:** \`${obs.workflowId}\``,
+    `**Observed events:** ${events.length}`,
+    context.hasSharedAuth ? '**Auth:** shared profile detected; login credential fields are treated as auth-only and not replay payload.' : null,
+    '',
+    '## Tabs',
+    ...tabs.map(t => `- ${t.id}: ${t.url}`),
+    '',
+    '## Inputs',
+    ...(fields.length ? fields.map(f => `- ${f.id}`) : ['- none']),
+    '',
+    '## Files',
+    ...(uploads.length ? uploads.map(u => `- ${u.id}`) : ['- none']),
+    '',
+    '## Actions',
+    ...(actions.length ? actions.map(a => `- ${a.id}: ${a.label || a.selector}`) : ['- none']),
+    '',
+    '## Outputs',
+    ...(outputs.length ? outputs.map(o => `- ${o.id}`) : ['- none']),
+    '',
+    '## Checkpoints',
+    ...(checkpoints.length ? checkpoints.map(c => `- ${c.id}: ${c.label}`) : ['- none']),
+    '',
+    artifactRules.length ? '## Artifacts' : null,
+    ...artifactRules.map(a => `- ${a.id}: ${a.kind}`),
+  ];
+  return lines.filter(Boolean).join('\n');
+}
+
+function tabIdForEvent(ev, context) {
+  const url = ev.pageUrl || ev.rawEvidence?.url || '';
+  const host = hostOf(url);
+  if (host) {
+    const exact = context.tabHosts.find(t => t.host === host || host.endsWith(`.${t.host}`) || t.host.endsWith(`.${host}`));
+    if (exact) return exact.id;
+    const byUrl = context.tabHosts.find(t => url.startsWith(t.url));
+    if (byUrl) return byUrl.id;
+  }
+  return ev.pageId || null;
+}
+
+function isAuthEvent(ev, context) {
+  if (!context.hasSharedAuth) return false;
+  const raw = ev.rawEvidence || {};
+  return isLikelyAuthUrl(ev.pageUrl) || isAuthFieldLike({ id: raw.id, name: raw.name, label: raw.label, inputType: raw.inputType, selector: ev.selector }, context);
+}
+
+function isAuthFieldLike(input = {}, context = {}) {
+  if (!context.hasSharedAuth) return false;
+  const id = String(input.id || input.name || input.label || '').trim();
+  const selector = String(input.selector || input.selectorHint || '').trim();
+  const type = String(input.inputType || input.type || '').toLowerCase();
+  return type === 'password' || AUTH_FIELD.test(id) || AUTH_FIELD.test(selector.replace(/[#.\[\]="']/g, ' '));
+}
+
+function isLikelyAuthUrl(url = '') { return AUTH_URL.test(String(url || '')); }
+function isPlaceholderUrl(url = '') { const value = String(url || '').trim(); return !value || /PASTE_|YOUR_|_HERE/i.test(value); }
+function isEphemeralUrl(url = '') { const value = String(url || '').trim(); if (!value) return true; if (isPlaceholderUrl(value)) return true; if (value === 'about:blank') return true; if (value.length > 700) return true; return /SAMLRequest=|RelayState=|frontdoor\.jsp|contentDoor|fromLoginToken=|OKTA_INVALID_SESSION_REPOST|\/saml\/authn-request|\/login\/sso_iwa|sid=/i.test(value); }
+function hostOf(url = '') { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } }
 function firstSelector(input = {}) { return asArray(input.selectorCandidates || input.rawEvidence?.selectorCandidates)[0]?.selector || null; }
 function asArray(v) { return Array.isArray(v) ? v : v ? [v] : []; }
+function arr(v) { return Array.isArray(v) ? v : []; }
+function obj(v) { return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; }
 function dedupe(items) { const map = new Map(); for (const item of items) if (item?.id) map.set(item.id, { ...(map.get(item.id) || {}), ...item }); return [...map.values()]; }
 function normType(t = 'text') { const x = String(t || 'text').toLowerCase(); if (x.includes('file') || x.includes('upload') || x === 'asset') return 'file'; if (x.includes('select')) return 'select'; if (x.includes('checkbox')) return 'checkbox'; return x || 'text'; }
 function exampleFor(item) { if (item.kind === 'asset' || item.inputType === 'file') return `./examples/${item.id}`; if (/date/i.test(item.id)) return '2099-01-01'; return `Example ${item.label || item.id}`; }
