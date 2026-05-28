@@ -6,7 +6,7 @@ import { validatePayload, evaluateAssertions } from './schema-validator.mjs';
 import { checkSafetyGates } from './safety-gates.mjs';
 import { updateRun, getRun } from './run-registry.mjs';
 import { buildRunResult } from './run-result.mjs';
-import { runReplay } from './replay-executor.mjs';
+import { runReplay } from './replay-executor-hardened.mjs';
 
 export async function executeRun(args) {
   const { runId, workflowVersion, payload = {}, mode = 'preview', approvalToken, runRoot } = args;
