@@ -2,6 +2,7 @@ import { join } from 'path';
 import { workflowDir, workflowRunDir, ensureDir, exists, readJson, writeJson, writeText } from './paths.mjs';
 import { defaultSafetyPolicy } from './safety.mjs';
 import { generateRunReview } from './run-review.mjs';
+import { emitDone } from './signals.mjs';
 export { saveRuntimeVars, loadRuntimeVars, resolveTemplate, tryResolveTemplate,
          extractTemplateVars, hasTemplateVars, validateTemplateVars,
          captureVariables, computeDerived,
@@ -115,7 +116,7 @@ export function recordError(errors, fieldName, errorOrMessage, selector = '') {
 // Write all run artifacts and print a summary to stdout.
 // Pass workflowId and startUrl to enable run-review.md generation.
 // runtimeVars is an optional object of captured/derived variables from this run.
-export function finalizeRun(runDir, { logger, filled = [], skipped = [], errors = [], workflowId = '', startUrl = '', dryRun = true, runtimeVars = null } = {}) {
+export function finalizeRun(runDir, { logger, filled = [], skipped = [], errors = [], workflowId = '', startUrl = '', dryRun = true, runtimeVars = null, status = null, runId = null, callbackUrl = null } = {}) {
   writeRunArtifact(runDir, 'filled-fields.json', filled);
   writeRunArtifact(runDir, 'skipped-fields.json', skipped);
   writeRunArtifact(runDir, 'errors.json', errors);
@@ -142,6 +143,21 @@ export function finalizeRun(runDir, { logger, filled = [], skipped = [], errors 
     for (const e of errors) console.log(`    [${e.field}] ${e.error}`);
   }
   console.log('\n  run-review.md written — open it to see what happened and what to fix.');
+
+  // Push a structured "done" signal to the terminal and any calling app so the
+  // end of the run is unmistakable. Best-effort: the terminal line is written
+  // synchronously inside emitDone; the optional webhook is awaited by callers
+  // that await finalizeRun().
+  const resolvedStatus = status || (errors.length ? 'completed_with_errors' : (dryRun ? 'dry_run_passed' : 'live_run_completed'));
+  return emitDone({
+    status: resolvedStatus,
+    workflowId,
+    runId,
+    filled: filled.length,
+    skipped: skipped.length,
+    errors: errors.length,
+    artifactsDir: runDir,
+  }, { callbackUrl });
 }
 
 // Resolve a dot-path source string against a manifest object.
