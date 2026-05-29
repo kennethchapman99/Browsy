@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import fs from 'fs';
-import { join, resolve } from 'path';
+import { join, resolve, dirname } from 'path';
 import { parseArgs, requireArg, boolArg } from '../core/args.mjs';
 import {
   REPO_ROOT, WORKFLOWS_DIR, OUTPUT_DIR,
@@ -751,6 +751,7 @@ import {
   filterCapturedByTiming, isFatalCaptureTiming
 } from '../../src/core/workflow-runtime.mjs';
 import { isDangerousText, isManualOnly } from '../../src/core/safety.mjs';
+import { emitNeedsInput, clearBrowserBanner } from '../../src/core/signals.mjs';
 import { PlaywrightAdapter } from '../../src/adapters/playwright-adapter.mjs';
 
 const WORKFLOW_ID = '${id}';
@@ -990,12 +991,22 @@ try {
   logger.log('info', 'Fill phase complete. Browser paused for manual review.');
 
   if (!noPause && (dryRun || policy.pause_at_end_default)) {
+    // Make the hand-off obvious: paint the live browser window and push a
+    // "needs input" signal to the terminal / calling app, then wait for the
+    // operator to finish and close the window.
+    await emitNeedsInput({
+      reason: 'Review the browser and complete any manual-only actions, then close the window to finish.',
+      workflowId: WORKFLOW_ID,
+      suggestedAction: 'Close the browser window when manual steps are complete.',
+      page: adapter.page,
+    });
     console.log('');
     console.log('--- MANUAL CHECKPOINT ---');
     console.log('Review the browser. Complete any manual-only actions.');
     console.log('Close the browser window to end the run.');
     await adapter.waitForClose();
   } else {
+    await clearBrowserBanner(adapter.page).catch(() => {});
     await adapter.close();
   }
 
@@ -1498,6 +1509,7 @@ function promoteWorkflow() {
 
 async function workflowRun() {
   const { runWorkflowPackage } = await import('../core/workflow-run.mjs');
+  const { emitNeedsInput, emitDone } = await import('../core/signals.mjs');
 
   const packagePath = args.package;
   if (!packagePath) {
@@ -1535,6 +1547,28 @@ async function workflowRun() {
     for (const r of outcome.result.client_action_requests) {
       console.error(`client_action_request[${r.severity}] ${r.type}: ${r.reason}`);
     }
+  }
+
+  // Push a unified signal so the terminal / calling app knows, at a glance,
+  // whether Browsy is waiting on a human or has finished.
+  const blockingRequests = (outcome.result?.client_action_requests || []).filter(r => r.severity === 'blocking');
+  if (outcome.status === 'live_run_gated' || outcome.status === 'blocked' || blockingRequests.length) {
+    const primary = blockingRequests[0] || {};
+    await emitNeedsInput({
+      reason: primary.reason || `Run ${outcome.status} — human action required.`,
+      workflowId: outcome.result?.workflow_id || args.workflow || null,
+      runId: outcome.result?.run_id || null,
+      suggestedAction: primary.suggested_action || null,
+      actionRequests: outcome.result?.client_action_requests || null,
+    });
+  } else {
+    await emitDone({
+      status: outcome.status,
+      workflowId: outcome.result?.workflow_id || args.workflow || null,
+      runId: outcome.result?.run_id || null,
+      artifactsDir: outcome.resultPath ? dirname(outcome.resultPath) : null,
+      capturedOutputs: outcome.result?.captured_outputs || null,
+    });
   }
 
   // Exit code policy:

@@ -259,6 +259,32 @@ npm run run -- --workflow my-workflow --manifest workflows/my-workflow/manifest.
 
 Live runs still block final actions unless explicitly and safely approved.
 
+### Input & completion signals
+
+Browsy makes it unmistakable when it needs a real human and when it is done.
+Every run emits a signal over up to three channels (see `src/core/signals.mjs`):
+
+- **Terminal** — a boxed banner plus a single greppable, machine-readable line:
+  - `⏸  BROWSY NEEDS YOU` (on stderr) when a human must act — e.g. a manual
+    checkpoint, login, captcha, or final-action gate.
+  - `✅  BROWSY DONE` (on stdout) when the run finishes, with status and counts.
+  - A calling app can parse stdout/stderr for the `[BROWSY_SIGNAL] {…json…}`
+    line. The JSON includes `kind` (`needs_input` | `done`), `reason`,
+    `blockedActions`, `status`, `workflowId`, `runId`, and artifact info.
+- **Calling app (webhook)** — set `BROWSY_CALLBACK_URL` (or pass `callbackUrl`)
+  and Browsy POSTs the same JSON payload to it. Best-effort: a failed or slow
+  webhook never breaks a run.
+- **Browser** — when a headed run pauses for a human, Browsy paints a banner
+  across the top of the live page so the operator sees *"Browsy needs you"*
+  instead of a silent, idle window. The window closes on its own when the run
+  completes cleanly.
+
+```bash
+# Push completion / needs-input events to a calling app
+BROWSY_CALLBACK_URL=https://my-app.example.com/browsy-hook \
+  npm run workflow:run -- --package path/to/package.json
+```
+
 ### Smoke and acceptance tests
 
 ```bash
@@ -324,6 +350,7 @@ The agent should report exact files, commands, test results, skipped fields, fai
 | `src/core/workflow-runtime.mjs` | Shared run primitives |
 | `src/core/field-map-candidates.mjs` | Selector candidate generator |
 | `src/core/safety.mjs` | Dangerous action detection |
+| `src/core/signals.mjs` | "Needs input" / "done" signals (terminal, webhook, in-browser banner) |
 | `src/core/discovery.mjs` | Playwright DOM inventory |
 | `src/core/playwright-executor.mjs` | Safe Playwright execution |
 | `docs/atlas-codex-observation.md` | Observation workflow guide |

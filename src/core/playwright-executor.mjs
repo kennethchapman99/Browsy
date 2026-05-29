@@ -15,6 +15,7 @@ import path from 'path';
 import fs from 'fs';
 import { pathToFileURL } from 'url';
 import { safeClick, defaultSafetyPolicy } from './safety.mjs';
+import { emitNeedsInput, emitDone } from './signals.mjs';
 
 // Legacy testid map — used only as fallback when data-browsy-item-field is absent.
 const ITEM_TESTID = {
@@ -162,6 +163,10 @@ export async function executeRunPlanWithPlaywright({
   safetyPolicy,
   fieldMap,
   downloadsDir = null,
+  workflowId = null,
+  runId = null,
+  callbackUrl = null,
+  signals = true,
 }) {
   const policy          = safetyPolicy ?? defaultSafetyPolicy();
   const executedSteps   = [];
@@ -328,6 +333,18 @@ export async function executeRunPlanWithPlaywright({
       // ── Human checkpoint — always stop here ──────────────────────────────────
       } else if (step.type === 'human_checkpoint') {
         checkpoint = step;
+        // Make the hand-off to a human unmistakable: paint the live page and
+        // push a "needs input" signal to the terminal / calling app.
+        if (signals) {
+          await emitNeedsInput({
+            reason: step.reason || 'Human review required before the final action.',
+            workflowId,
+            runId,
+            blockedActions: step.blocked || [],
+            suggestedAction: 'Review the browser, complete any manual-only actions, then approve the final action.',
+            page,
+          }, { callbackUrl });
+        }
         break;
 
       } else {
@@ -336,6 +353,22 @@ export async function executeRunPlanWithPlaywright({
     }
 
     finalState = await extractFinalState(page);
+
+    // Signal completion before tearing down. When we stopped at a human
+    // checkpoint the run is "waiting on a human", not done — that case already
+    // emitted a needs_input signal above, so only emit done when we ran clean.
+    if (signals && !checkpoint) {
+      await emitDone({
+        status: 'completed',
+        workflowId,
+        runId,
+        filled: executedSteps.length,
+        skipped: skippedSteps.length,
+        errors: 0,
+        capturedOutputs,
+        page,
+      }, { callbackUrl });
+    }
 
     if (trace) {
       const traceDir = path.dirname(fixturePath);
