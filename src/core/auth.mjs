@@ -207,6 +207,26 @@ export function buildBlockedAuthRequests(config = {}) {
   }));
 }
 
+async function launchPersistentChrome(userDataDir, { headed = true } = {}) {
+  const preferred = String(process.env.BROWSY_RECORDING_CHANNEL ?? 'chrome').trim();
+  const tryChannels = preferred && preferred !== 'chromium' && preferred !== 'bundled'
+    ? [preferred, null]
+    : [null];
+  let lastError = null;
+  for (const channel of tryChannels) {
+    try {
+      return await chromium.launchPersistentContext(userDataDir, {
+        headless: !headed,
+        acceptDownloads: true,
+        ...(channel ? { channel } : {}),
+      });
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('failed to launch persistent Chrome profile');
+}
+
 export async function launchBrowserWithPersistentProfile({
   siteId,
   url,
@@ -218,15 +238,12 @@ export async function launchBrowserWithPersistentProfile({
   const resolvedSiteId = safeId(siteId);
   const paths = authProfilePaths(resolvedSiteId);
   ensureAuthProfile(resolvedSiteId, { siteName, baseUrl, authCheckUrl, source: 'persistent_profile' });
-  const context = await chromium.launchPersistentContext(paths.userDataDir, {
-    headless: !headed,
-    ignoreDefaultArgs: ['--enable-automation'],
-    args: ['--disable-blink-features=AutomationControlled', '--disable-infobars'],
-    acceptDownloads: true,
-  });
-  await context.addInitScript(() => {
-    Object.defineProperty(navigator, 'webdriver', { get: () => false });
-  });
+  // Use a real installed Chrome channel and no anti-detection flags. Sites like
+  // Google reject sign-in from a bundled Chromium running with automation flags
+  // ("this browser or app may not be secure"); a clean real-Chrome profile is the
+  // supported way to let a human sign in once. Falls back to bundled Chromium only
+  // if the channel is unavailable.
+  const context = await launchPersistentChrome(paths.userDataDir, { headed });
   const page = context.pages()[0] || await context.newPage();
   if (url) await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   return { context, page, browser: context.browser() };

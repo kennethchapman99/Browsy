@@ -23,6 +23,8 @@ import {
   startPlaywrightRecording,
   stopPlaywrightRecording,
   getActivePlaywrightRecording,
+  openAuthSetupProfile,
+  runAuthPreflight,
 } from '../recording/playwright-recording-runtime.mjs';
 
 export const DEFAULT_PORT = 3001;
@@ -108,26 +110,56 @@ async function startRecording(recordingSessionId, body) {
   validateRecordingSessionForLaunch(recordingSessionId);
   const session = getRecordingSession(recordingSessionId);
   if (!session) throw new Error('recording session not found');
+
+  const tabs = session.recordingSetup?.tabs || [];
+  console.log('[browsy:recording] /start received', {
+    recordingSessionId,
+    appId: session.appId,
+    workflowId: session.workflowId,
+    tabCount: tabs.length,
+    targetUrls: tabs.map(t => t.url),
+  });
+
+  if (!tabs.length) {
+    return { ok: false, launchFailed: true, error: 'recording session has no tabs configured', recording: null, launch: null };
+  }
+
   if (body.mode === 'manual' || body.playwright === false) {
     const recording = beginRecordingSession(recordingSessionId, body);
-    return { recording, launch: recording.launch, active: null };
+    return { ok: true, recording, launch: recording.launch, active: null };
   }
   try {
     const launch = await startPlaywrightRecording({ recordingSessionId, session, options: body });
     const recording = beginRecordingSession(recordingSessionId, { launch });
-    return { recording, launch, active: getActivePlaywrightRecording(recordingSessionId) };
+    return { ok: true, recording, launch, active: getActivePlaywrightRecording(recordingSessionId) };
   } catch (err) {
+    // Verification failures (about:blank tabs, nav errors) are a hard launch
+    // failure — do NOT mask as a successful manual-mode launch.
+    if (err.launchVerification) {
+      const failedLaunch = {
+        createdAt: new Date().toISOString(),
+        mode: 'real_playwright_recorder',
+        launchFailed: true,
+        launchError: err.message,
+        verification: err.launchVerification,
+        tabs,
+        auth: session.auth || [],
+      };
+      return { ok: false, launchFailed: true, error: err.message, verification: err.launchVerification, launch: failedLaunch };
+    }
+    // Environment/browser unavailable: fall back to manual mode so operator can
+    // still import via the wizard URL.
     const fallbackLaunch = {
       createdAt: new Date().toISOString(),
       mode: 'manual_playwright_recorder',
       recorderUrl: session.recorderUrl,
-      tabs: session.recordingSetup?.tabs || [],
+      tabs,
       auth: session.auth || [],
       launchError: err.message,
       instructions: ['Playwright launch failed; use the manual recorder URL and stop/import through this session.'],
     };
     const recording = beginRecordingSession(recordingSessionId, { launch: fallbackLaunch });
-    return { recording, launch: fallbackLaunch, active: null };
+    return { ok: true, recording, launch: fallbackLaunch, active: null };
   }
 }
 
@@ -153,6 +185,43 @@ export function createServer({ port = DEFAULT_PORT } = {}) {
         return send(res, 200, { ok: true, recordings: listRecordingSessions() });
       }
 
+      if (method === 'POST' && url === '/api/auth-profiles/prepare') {
+        const body = await json(req);
+        if (!body.targetUrl) return send(res, 400, { ok: false, error: 'targetUrl is required' });
+        try {
+          const profile = await openAuthSetupProfile({
+            appId: body.appId || null,
+            workflowId: body.workflowId || null,
+            authProfileId: body.authProfileId || null,
+            targetUrl: body.targetUrl,
+            options: body.options || {},
+          });
+          return send(res, 200, { ok: true, profile });
+        } catch (err) {
+          return send(res, 502, { ok: false, error: err.message });
+        }
+      }
+
+      if (method === 'POST' && url === '/api/auth-profiles/preflight') {
+        const body = await json(req);
+        if (!body.targetUrl) return send(res, 400, { ok: false, error: 'targetUrl is required' });
+        try {
+          const preflight = await runAuthPreflight({
+            appId: body.appId || null,
+            workflowId: body.workflowId || null,
+            authProfileId: body.authProfileId || null,
+            targetUrl: body.targetUrl,
+            rules: Array.isArray(body.rules) ? body.rules : undefined,
+            options: body.options || {},
+          });
+          // ok=true means authenticated; ok=false is a *successful* preflight that
+          // detected an unauthenticated state — both return HTTP 200 with the verdict.
+          return send(res, 200, { ok: true, preflight });
+        } catch (err) {
+          return send(res, 502, { ok: false, error: err.message });
+        }
+      }
+
       if (method === 'POST' && url === '/api/recordings/start') {
         const body = await json(req);
         const session = startRecordingSession(body, { baseUrl: baseUrl(req, port) });
@@ -168,6 +237,7 @@ export function createServer({ port = DEFAULT_PORT } = {}) {
       p = route('/api/recordings/:recordingSessionId/start', url);
       if (p && method === 'POST') {
         const result = await startRecording(p.recordingSessionId, await json(req));
+        if (!result.ok) return send(res, 502, { ok: false, ...result });
         return send(res, 200, { ok: true, ...result });
       }
 

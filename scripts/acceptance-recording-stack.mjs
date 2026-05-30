@@ -7,6 +7,8 @@ const checks = [
   'scripts/acceptance-record-import-contract-run.mjs',
   'scripts/acceptance-recording-session-ui.mjs',
   'scripts/acceptance-real-playwright-recording.mjs',
+  'scripts/acceptance-recording-persistent-profile.mjs',
+  'scripts/acceptance-recording-launch-verification.mjs',
 ];
 
 for (const script of checks) {
