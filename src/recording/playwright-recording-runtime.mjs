@@ -174,7 +174,7 @@ export async function startPlaywrightRecording({ recordingSessionId, session, op
 // target URL so a human can sign in once. No recording, no app-specific logic —
 // the profile (userDataDir + storageState) is reused by later recordings/replays.
 export async function openAuthSetupProfile({ appId, workflowId, authProfileId, targetUrl, options = {} } = {}) {
-  if (!targetUrl) throw new Error('targetUrl is required for auth setup');
+  const normalizedTargetUrl = normalizeTargetUrl(targetUrl, 'auth setup');
   const session = { appId, workflowId, recordingSetup: { authProfileId, tabs: [{ siteId: authProfileId, authProfileId }] } };
   const authProfile = resolveAuthProfile(session, { authProfileId });
   const headless = options.headless === true;
@@ -182,11 +182,42 @@ export async function openAuthSetupProfile({ appId, workflowId, authProfileId, t
   const { context, channel } = await launchBrowserContext({
     headless, slowMo, authProfile, usePersistent: true, contextOptions: { acceptDownloads: true },
   });
-  const page = context.pages().find(p => isBlankUrl(p.url())) || await context.newPage();
+  const seededPages = context.pages();
+  const page = seededPages.find(p => isBlankUrl(p.url())) || await context.newPage();
+  for (const extra of seededPages.filter(p => p !== page && isBlankUrl(p.url()))) {
+    try { await extra.close(); } catch {}
+  }
+
+  let finalUrl = safePageUrl(page);
+  let title = '';
+  let navError = null;
   try {
-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: Number(options.navigationTimeoutMs || 120000) });
-  } catch {}
+    await page.goto(normalizedTargetUrl, { waitUntil: 'domcontentloaded', timeout: Number(options.navigationTimeoutMs || 120000) });
+    finalUrl = safePageUrl(page);
+    title = await safeTitle(page);
+  } catch (err) {
+    navError = err.message;
+    finalUrl = safePageUrl(page);
+  }
+
   ensureDir(authProfile.userDataDir);
+  const openedTabs = [{ id: 'authSetup', requestedUrl: normalizedTargetUrl, finalUrl, title, error: navError }];
+  console.log('[browsy:auth-setup] navigation result', {
+    appId: authProfile.appId,
+    workflowId,
+    authProfileId: authProfile.authProfileId,
+    targetUrl: normalizedTargetUrl,
+    finalUrl,
+    navError,
+    channel,
+  });
+
+  if (navError || isBlankUrl(finalUrl)) {
+    try { await context.close(); } catch {}
+    const details = navError ? `navigation error: ${navError}` : `final URL was ${finalUrl || '(empty)'}`;
+    throw new Error(`Auth setup failed to open ${normalizedTargetUrl}; ${details}.`);
+  }
+
   // In headless mode there is no interactive user to close the window; close
   // immediately so the process (and any test server) can drain cleanly.
   if (headless) {
@@ -198,7 +229,9 @@ export async function openAuthSetupProfile({ appId, workflowId, authProfileId, t
     authProfileId: authProfile.authProfileId,
     userDataDir: authProfile.userDataDir,
     storageStatePath: authProfile.storageStatePath,
-    targetUrl,
+    targetUrl: normalizedTargetUrl,
+    finalUrl,
+    openedTabs,
     instructions: [
       'Sign in to the target site in the opened Chrome window.',
       'Close the window when done — the session is saved to the persistent profile.',
@@ -213,7 +246,7 @@ export async function openAuthSetupProfile({ appId, workflowId, authProfileId, t
 // is always closed before returning. We never return or log cookies, tokens, or
 // page body text — only the final URL, title, and the generic verdict.
 export async function runAuthPreflight({ appId, workflowId, authProfileId, targetUrl, rules, options = {} } = {}) {
-  if (!targetUrl) throw new Error('targetUrl is required for auth preflight');
+  const normalizedTargetUrl = normalizeTargetUrl(targetUrl, 'auth preflight');
   const session = { appId, workflowId, recordingSetup: { authProfileId, tabs: [{ siteId: authProfileId, authProfileId }] } };
   const authProfile = resolveAuthProfile(session, { authProfileId });
   const headless = options.headless !== false;
@@ -233,7 +266,7 @@ export async function runAuthPreflight({ appId, workflowId, authProfileId, targe
     channel = launched.channel;
     const page = context.pages().find(p => isBlankUrl(p.url())) || await context.newPage();
     try {
-      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: Number(options.navigationTimeoutMs || 60000) });
+      await page.goto(normalizedTargetUrl, { waitUntil: 'domcontentloaded', timeout: Number(options.navigationTimeoutMs || 60000) });
     } catch (err) {
       navError = err.message;
     }
@@ -244,12 +277,12 @@ export async function runAuthPreflight({ appId, workflowId, authProfileId, targe
     try { await context?.close(); } catch {}
   }
 
-  const verdict = evaluateAuthPreflight({ targetUrl, finalUrl, title, bodyText, rules });
+  const verdict = evaluateAuthPreflight({ targetUrl: normalizedTargetUrl, finalUrl, title, bodyText, rules });
   ensureDir(authProfile.userDataDir);
   console.log('[browsy:auth-preflight] result', {
     appId: authProfile.appId,
     authProfileId: authProfile.authProfileId,
-    targetUrl,
+    targetUrl: normalizedTargetUrl,
     finalUrl,
     ok: verdict.ok,
     code: verdict.code,
@@ -263,7 +296,7 @@ export async function runAuthPreflight({ appId, workflowId, authProfileId, targe
     appId: authProfile.appId,
     userDataDir: authProfile.userDataDir,
     storageStatePath: authProfile.storageStatePath,
-    targetUrl,
+    targetUrl: normalizedTargetUrl,
     finalUrl,
     title,
     matchedRule: verdict.matchedRule,
@@ -299,6 +332,22 @@ async function launchBrowserContext({ headless, slowMo, authProfile, usePersiste
     }
   }
   throw lastError || new Error('failed to launch browser context');
+}
+
+function normalizeTargetUrl(value, purpose = 'navigation') {
+  const raw = String(value || '').trim();
+  if (!raw) throw new Error(`targetUrl is required for ${purpose}`);
+  if (isBlankUrl(raw)) throw new Error(`targetUrl for ${purpose} cannot be ${raw}`);
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error(`targetUrl for ${purpose} must be a valid URL: ${raw}`);
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`targetUrl for ${purpose} must use http or https: ${raw}`);
+  }
+  return parsed.toString();
 }
 
 function isBlankUrl(url) {
