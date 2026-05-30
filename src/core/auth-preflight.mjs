@@ -1,6 +1,6 @@
 // Generic auth-preflight rule evaluation.
 //
-// Browsy owns the browser; the *app* (e.g. Pancake Robot) owns which URLs/text
+// Browsy owns the browser; the embedding app owns which URLs/text
 // mean "not authenticated" for a given workflow. The app passes generic rules in
 // the recording setup / preflight request; this module evaluates observed page
 // facts (final URL, title, body text) against those rules. No site-specific or
