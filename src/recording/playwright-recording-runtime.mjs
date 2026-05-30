@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { chromium } from 'playwright';
 import { OUTPUT_DIR, ensureDir, exists, readJson, writeJson } from '../core/paths.mjs';
+import { evaluateAuthPreflight } from '../core/auth-preflight.mjs';
 
 const activeRecordings = new Map();
 
@@ -30,6 +31,15 @@ export async function startPlaywrightRecording({ recordingSessionId, session, op
   const tabs = Array.isArray(session?.recordingSetup?.tabs) ? session.recordingSetup.tabs : [];
   if (!tabs.length) throw new Error('recording session has no tabs to launch');
 
+  const expectedUrls = tabs.map(t => t.url);
+  console.log('[browsy:recording] launch received', {
+    recordingSessionId,
+    appId: session?.appId,
+    workflowId: session?.workflowId,
+    tabCount: tabs.length,
+    targetUrls: expectedUrls,
+  });
+
   const startedAt = new Date().toISOString();
   const headless = options.headless === true || process.env.BROWSY_RECORDING_HEADLESS === 'true' || process.env.BROWSY_RECORDING_HEADLESS === '1';
   const slowMo = Number(options.slowMo || process.env.BROWSY_RECORDING_SLOWMO || 0) || 0;
@@ -39,15 +49,8 @@ export async function startPlaywrightRecording({ recordingSessionId, session, op
     contextOptions.storageState = authProfile.storageStatePath;
   }
 
-  let browser = null;
-  let context = null;
-  if (options.usePersistentProfile === true || process.env.BROWSY_RECORDING_PERSISTENT_PROFILE === 'true') {
-    ensureDir(authProfile.userDataDir);
-    context = await chromium.launchPersistentContext(authProfile.userDataDir, { headless, slowMo, acceptDownloads: true });
-  } else {
-    browser = await chromium.launch({ headless, slowMo });
-    context = await browser.newContext(contextOptions);
-  }
+  const usePersistent = options.usePersistentProfile === true || process.env.BROWSY_RECORDING_PERSISTENT_PROFILE === 'true';
+  const { browser, context, channel } = await launchBrowserContext({ headless, slowMo, authProfile, usePersistent, contextOptions });
 
   const events = [];
   const pages = [];
@@ -61,31 +64,91 @@ export async function startPlaywrightRecording({ recordingSessionId, session, op
   await context.exposeFunction('__browsyRecordEvent', append);
   await context.addInitScript({ content: recorderInitScript(recordingSessionId) });
   context.on('page', page => {
+    if (page.__browsyTracked) return;
     pages.push(page);
     attachPageHandlers({ recordingSessionId, page, append });
     append({ type: 'popup_opened', pageUrl: page.url(), rawEvidence: { opener: 'context_page_event' } });
   });
 
+  // A persistent context opens with one default about:blank page. Reuse it for the
+  // first tab instead of leaving it open and adding a fresh page (which left a
+  // stray blank tab behind). Any *extra* pre-existing blank pages are closed.
+  const seededPages = context.pages();
+  const reusablePages = seededPages.filter(p => isBlankUrl(p.url()));
+  for (const extra of reusablePages.slice(1)) { try { await extra.close(); } catch {} }
+  let nextReusable = reusablePages[0] || null;
+
+  const openedTabs = [];
+  const tabPageRefs = [];
   for (const tab of tabs) {
-    const page = await context.newPage();
+    const page = nextReusable || await context.newPage();
+    nextReusable = null;
+    page.__browsyTracked = true;
+    tabPageRefs.push(page);
     if (!pages.includes(page)) pages.push(page);
     attachPageHandlers({ recordingSessionId, page, append, tab });
     append({ type: 'page_opened', pageId: tab.id, pageUrl: tab.url, rawEvidence: { tab, authProfile } });
+    const opened = { id: tab.id, requestedUrl: tab.url, finalUrl: null, title: '', authBlocked: false, blockedReason: null };
     try {
       await page.goto(tab.url, { waitUntil: 'domcontentloaded', timeout: Number(options.navigationTimeoutMs || 60000) });
-      append({ type: 'page_seen', pageId: tab.id, pageUrl: page.url(), rawEvidence: { title: await safeTitle(page), url: page.url(), tab } });
+      opened.finalUrl = page.url();
+      opened.title = await safeTitle(page);
+      const block = await detectAuthBlock(page);
+      if (block.blocked) { opened.authBlocked = true; opened.blockedReason = block.reason; }
+      append({ type: 'page_seen', pageId: tab.id, pageUrl: page.url(), rawEvidence: { title: opened.title, url: page.url(), tab, authBlocked: opened.authBlocked } });
       await capturePageScreenshot({ recordingSessionId, page, pageId: tab.id, reason: 'page_seen' });
     } catch (err) {
+      opened.finalUrl = safePageUrl(page);
+      opened.error = err.message;
       append({ type: 'page_navigation_failed', pageId: tab.id, pageUrl: tab.url, rawEvidence: { tab, error: err.message } });
     }
+    openedTabs.push(opened);
   }
 
+  // Close any extra blank pages not belonging to the tab set (e.g. restored session
+  // pages, or blank popups opened before navigation ran).
+  const tabPageSet = new Set(tabPageRefs);
+  for (const p of context.pages()) {
+    if (!tabPageSet.has(p) && isBlankUrl(p.url())) { try { await p.close(); } catch {} }
+  }
+
+  const actualUrls = openedTabs.map(t => t.finalUrl);
+  const verification = buildTabVerification({ tabs, openedTabs });
+
+  console.log('[browsy:recording] navigation result', {
+    recordingSessionId,
+    expectedUrls,
+    actualUrls,
+    verificationOk: verification.ok,
+    blankTabs: verification.blankTabs,
+    navErrors: verification.navErrors,
+  });
+
+  if (!verification.ok) {
+    writeRuntimeStatus(recordingSessionId, { status: 'launch_failed', verification, active: false });
+    try { await context.close(); } catch {}
+    try { await browser?.close(); } catch {}
+    const err = new Error(
+      `Recorder launch failed: ${verification.summary}. ` +
+      `Expected [${expectedUrls.join(', ')}] but got [${actualUrls.join(', ')}].`
+    );
+    err.launchVerification = verification;
+    throw err;
+  }
+
+  const authBlockedTab = openedTabs.find(tab => tab.authBlocked);
   const launch = {
     createdAt: startedAt,
     mode: 'real_playwright_recorder',
     headless,
+    channel,
+    persistentProfile: usePersistent,
     pageCount: pages.length,
     tabs,
+    openedTabs,
+    verification,
+    authBlocked: Boolean(authBlockedTab),
+    authBlockedReason: authBlockedTab?.blockedReason || null,
     auth: session?.auth || [],
     authProfile,
     eventSink: `output/recordings/${recordingSessionId}/events.json`,
@@ -94,6 +157,7 @@ export async function startPlaywrightRecording({ recordingSessionId, session, op
     instructions: [
       'Use the opened Playwright browser window to perform the workflow once.',
       'For SSO flows, put the identity provider tab first and set recordingSetup.authProfileId/authGroupId to a shared value.',
+      'If a target site blocks automated sign-in, run the auth setup flow to log in once with the persistent profile, then re-record.',
       'Browsy records generic page, input, click, file, download, navigation, candidate output, and screenshot evidence.',
       'Auth storageState is reused and saved when a siteId/auth profile is available.',
       'Stop/import the recording through the recording session page or API.',
@@ -104,6 +168,167 @@ export async function startPlaywrightRecording({ recordingSessionId, session, op
   activeRecordings.set(recordingSessionId, { browser, context, pages, tabs, events, startedAt, launch, authProfile });
   writeRuntimeStatus(recordingSessionId, { status: 'recording', launch, active: true });
   return launch;
+}
+
+// Generic auth setup: open the named persistent Chrome profile straight to a
+// target URL so a human can sign in once. No recording, no app-specific logic —
+// the profile (userDataDir + storageState) is reused by later recordings/replays.
+export async function openAuthSetupProfile({ appId, workflowId, authProfileId, targetUrl, options = {} } = {}) {
+  if (!targetUrl) throw new Error('targetUrl is required for auth setup');
+  const session = { appId, workflowId, recordingSetup: { authProfileId, tabs: [{ siteId: authProfileId, authProfileId }] } };
+  const authProfile = resolveAuthProfile(session, { authProfileId });
+  const headless = options.headless === true;
+  const slowMo = Number(options.slowMo || 0) || 0;
+  const { context, channel } = await launchBrowserContext({
+    headless, slowMo, authProfile, usePersistent: true, contextOptions: { acceptDownloads: true },
+  });
+  const page = context.pages().find(p => isBlankUrl(p.url())) || await context.newPage();
+  try {
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: Number(options.navigationTimeoutMs || 120000) });
+  } catch {}
+  ensureDir(authProfile.userDataDir);
+  // In headless mode there is no interactive user to close the window; close
+  // immediately so the process (and any test server) can drain cleanly.
+  if (headless) {
+    try { await context.close(); } catch {}
+  }
+  return {
+    mode: 'auth_setup',
+    channel,
+    authProfileId: authProfile.authProfileId,
+    userDataDir: authProfile.userDataDir,
+    storageStatePath: authProfile.storageStatePath,
+    targetUrl,
+    instructions: [
+      'Sign in to the target site in the opened Chrome window.',
+      'Close the window when done — the session is saved to the persistent profile.',
+      'Then start/relaunch the recording; it will reuse this authenticated profile.',
+    ],
+  };
+}
+
+// Generic auth preflight: open the named persistent Chrome profile to the target
+// URL (default headless), observe the final URL/title/body, and evaluate generic
+// app-provided rules to decide whether the profile is authenticated. The context
+// is always closed before returning. We never return or log cookies, tokens, or
+// page body text — only the final URL, title, and the generic verdict.
+export async function runAuthPreflight({ appId, workflowId, authProfileId, targetUrl, rules, options = {} } = {}) {
+  if (!targetUrl) throw new Error('targetUrl is required for auth preflight');
+  const session = { appId, workflowId, recordingSetup: { authProfileId, tabs: [{ siteId: authProfileId, authProfileId }] } };
+  const authProfile = resolveAuthProfile(session, { authProfileId });
+  const headless = options.headless !== false;
+  const slowMo = Number(options.slowMo || 0) || 0;
+
+  let context = null;
+  let channel = 'chromium';
+  let finalUrl = null;
+  let title = '';
+  let bodyText = '';
+  let navError = null;
+  try {
+    const launched = await launchBrowserContext({
+      headless, slowMo, authProfile, usePersistent: true, contextOptions: { acceptDownloads: true },
+    });
+    context = launched.context;
+    channel = launched.channel;
+    const page = context.pages().find(p => isBlankUrl(p.url())) || await context.newPage();
+    try {
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: Number(options.navigationTimeoutMs || 60000) });
+    } catch (err) {
+      navError = err.message;
+    }
+    finalUrl = safePageUrl(page);
+    title = await safeTitle(page);
+    bodyText = await page.evaluate(() => (document.body?.innerText || '').slice(0, 4000)).catch(() => '');
+  } finally {
+    try { await context?.close(); } catch {}
+  }
+
+  const verdict = evaluateAuthPreflight({ targetUrl, finalUrl, title, bodyText, rules });
+  ensureDir(authProfile.userDataDir);
+  console.log('[browsy:auth-preflight] result', {
+    appId: authProfile.appId,
+    authProfileId: authProfile.authProfileId,
+    targetUrl,
+    finalUrl,
+    ok: verdict.ok,
+    code: verdict.code,
+  });
+  return {
+    mode: 'auth_preflight',
+    channel,
+    ok: verdict.ok,
+    code: verdict.code,
+    authProfileId: authProfile.authProfileId,
+    appId: authProfile.appId,
+    userDataDir: authProfile.userDataDir,
+    storageStatePath: authProfile.storageStatePath,
+    targetUrl,
+    finalUrl,
+    title,
+    matchedRule: verdict.matchedRule,
+    navError,
+    message: verdict.message,
+  };
+}
+
+// Launch a browser context, preferring a real installed Chrome channel (so sites
+// that fingerprint bundled/automation Chromium for SSO are less likely to block
+// sign-in). Falls back to bundled Chromium if the channel is unavailable.
+async function launchBrowserContext({ headless, slowMo, authProfile, usePersistent, contextOptions }) {
+  const preferred = String(process.env.BROWSY_RECORDING_CHANNEL ?? 'chrome').trim();
+  const tryChannels = preferred && preferred !== 'chromium' && preferred !== 'bundled'
+    ? [preferred, null]
+    : [null];
+
+  let lastError = null;
+  for (const channel of tryChannels) {
+    try {
+      if (usePersistent) {
+        ensureDir(authProfile.userDataDir);
+        const context = await chromium.launchPersistentContext(authProfile.userDataDir, {
+          headless, slowMo, acceptDownloads: true, ...(channel ? { channel } : {}),
+        });
+        return { browser: null, context, channel: channel || 'chromium' };
+      }
+      const browser = await chromium.launch({ headless, slowMo, ...(channel ? { channel } : {}) });
+      const context = await browser.newContext(contextOptions);
+      return { browser, context, channel: channel || 'chromium' };
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('failed to launch browser context');
+}
+
+function isBlankUrl(url) {
+  const u = String(url || '').trim();
+  return u === '' || u === 'about:blank' || u.startsWith('chrome://newtab');
+}
+
+function safePageUrl(page) {
+  try { return page.url(); } catch { return null; }
+}
+
+// Detect the common "automation browser blocked from sign-in" state (Google's
+// "This browser or app may not be secure"). Returns a generic verdict so the
+// recorder can report auth-blocked without any provider-specific automation.
+async function detectAuthBlock(page) {
+  try {
+    const url = page.url();
+    const text = await page.evaluate(() => (document.body?.innerText || '').slice(0, 4000)).catch(() => '');
+    const insecure = /this browser or app may not be secure/i.test(text)
+      || /couldn[’']?t sign you in/i.test(text);
+    if (insecure) {
+      return { blocked: true, reason: 'Google blocked sign-in in the automation browser ("this browser or app may not be secure").' };
+    }
+    if (/accounts\.google\.com/i.test(url) && /sign in|log in/i.test(text)) {
+      return { blocked: true, reason: 'Target redirected to Google sign-in; the persistent profile is not authenticated yet.' };
+    }
+    return { blocked: false, reason: null };
+  } catch {
+    return { blocked: false, reason: null };
+  }
 }
 
 export async function stopPlaywrightRecording(recordingSessionId) {
@@ -205,9 +430,47 @@ function recorderInitScript(recordingSessionId) {
   })();`;
 }
 
+// Verify that every requested tab navigated away from about:blank. Auth-blocked
+// tabs are counted as navigated (they landed somewhere, just not the target). Nav
+// errors (page.goto threw) leave finalUrl null-ish; those are failures.
+function buildTabVerification({ tabs, openedTabs }) {
+  if (openedTabs.length !== tabs.length) {
+    return {
+      ok: false,
+      expectedCount: tabs.length,
+      openedCount: openedTabs.length,
+      expectedUrls: tabs.map(t => t.url),
+      actualUrls: openedTabs.map(t => t.finalUrl),
+      blankTabs: [],
+      navErrors: [],
+      summary: `Expected ${tabs.length} tab(s) but got ${openedTabs.length}.`,
+    };
+  }
+  const blankTabs = openedTabs
+    .filter(t => isBlankUrl(t.finalUrl) && !isBlankUrl(t.requestedUrl))
+    .map(t => ({ id: t.id, requestedUrl: t.requestedUrl, finalUrl: t.finalUrl }));
+  const navErrors = openedTabs
+    .filter(t => t.error)
+    .map(t => ({ id: t.id, requestedUrl: t.requestedUrl, error: t.error }));
+  const ok = blankTabs.length === 0 && navErrors.length === 0;
+  const parts = [];
+  if (blankTabs.length) parts.push(`${blankTabs.length} tab(s) still on about:blank (${blankTabs.map(t => t.id).join(', ')})`);
+  if (navErrors.length) parts.push(`${navErrors.length} navigation error(s) (${navErrors.map(t => t.id).join(', ')})`);
+  return {
+    ok,
+    expectedCount: tabs.length,
+    openedCount: openedTabs.length,
+    expectedUrls: tabs.map(t => t.url),
+    actualUrls: openedTabs.map(t => t.finalUrl),
+    blankTabs,
+    navErrors,
+    summary: ok ? 'All tabs navigated successfully.' : parts.join('; '),
+  };
+}
+
 function appendEventsToDisk(recordingSessionId, events = []) { const dir = recordingDir(recordingSessionId); ensureDir(dir); const eventsPath = path.join(dir, 'events.json'); const existing = exists(eventsPath) ? readJson(eventsPath) : []; const merged = [...(Array.isArray(existing) ? existing : []), ...events]; writeJson(eventsPath, merged); const sessionPath = path.join(dir, 'session.json'); if (exists(sessionPath)) { const session = readJson(sessionPath); writeJson(sessionPath, { ...session, events: merged, updatedAt: new Date().toISOString() }); } }
 async function capturePageScreenshot({ recordingSessionId, page, pageId = 'page', reason = 'capture' }) { try { const dir = path.join(recordingDir(recordingSessionId), 'screenshots'); ensureDir(dir); const name = `${safeSegment(pageId)}-${safeSegment(reason)}-${Date.now()}.png`; const filePath = path.join(dir, name); await page.screenshot({ path: filePath, fullPage: true }); return { name, path: filePath, pageUrl: page.url(), reason }; } catch { return null; } }
-function resolveAuthProfile(session, options = {}) { const setup = session?.recordingSetup || {}; const tabs = Array.isArray(setup.tabs) ? setup.tabs : []; const firstAuth = Array.isArray(session?.auth) ? session.auth[0] : null; const firstSiteTab = tabs.find(t => t.siteId); const firstProfileTab = tabs.find(t => t.authProfileId || t.authGroupId || t.ssoProfileId); const explicit = options.authProfileId || options.authGroupId || options.ssoProfileId || setup.authProfileId || setup.authGroupId || setup.ssoProfileId || firstProfileTab?.authProfileId || firstProfileTab?.authGroupId || firstProfileTab?.ssoProfileId; const authProfileId = safeSegment(explicit || firstAuth?.siteId || firstSiteTab?.siteId || session?.appId || 'default'); const dir = path.join(OUTPUT_DIR, 'auth-profiles', authProfileId); return { authProfileId, userDataDir: path.join(dir, 'user-data'), storageStatePath: path.join(dir, 'storageState.json') }; }
+function resolveAuthProfile(session, options = {}) { const setup = session?.recordingSetup || {}; const tabs = Array.isArray(setup.tabs) ? setup.tabs : []; const firstAuth = Array.isArray(session?.auth) ? session.auth[0] : null; const firstSiteTab = tabs.find(t => t.siteId); const firstProfileTab = tabs.find(t => t.authProfileId || t.authGroupId || t.ssoProfileId); const explicit = options.authProfileId || options.authGroupId || options.ssoProfileId || setup.authProfileId || setup.authGroupId || setup.ssoProfileId || firstProfileTab?.authProfileId || firstProfileTab?.authGroupId || firstProfileTab?.ssoProfileId; const authProfileId = safeSegment(explicit || firstAuth?.siteId || firstSiteTab?.siteId || session?.appId || 'default'); const appSegment = safeSegment(session?.appId || 'default'); const dir = path.join(OUTPUT_DIR, 'auth-profiles', appSegment, authProfileId); return { authProfileId, appId: appSegment, userDataDir: path.join(dir, 'user-data'), storageStatePath: path.join(dir, 'storageState.json') }; }
 function writeRuntimeStatus(recordingSessionId, status) { const dir = recordingDir(recordingSessionId); ensureDir(dir); writeJson(path.join(dir, 'runtime-status.json'), { recordingSessionId, updatedAt: new Date().toISOString(), ...status }); }
 function countEventsOnDisk(recordingSessionId) { const p = path.join(recordingDir(recordingSessionId), 'events.json'); if (!exists(p)) return 0; const events = readJson(p); return Array.isArray(events) ? events.length : 0; }
 function normalizeEvent(recordingSessionId, event = {}) { return { id: event.id || `${event.type || 'event'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, recordingSessionId, timestamp: event.timestamp || new Date().toISOString(), source: event.source || 'playwrightRecorder', pageUrl: event.pageUrl || null, pageTitle: event.pageTitle || null, selector: event.selector || null, rawEvidence: event.rawEvidence || {}, ...event }; }

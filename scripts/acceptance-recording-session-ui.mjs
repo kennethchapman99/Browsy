@@ -4,6 +4,7 @@
 // start/stop/import/contract without app/site-specific code.
 
 import fs from 'fs';
+import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
@@ -13,7 +14,9 @@ import { createServer } from '../src/api/generic-server.mjs';
 const __filename = fileURLToPath(import.meta.url);
 const REPO_ROOT = path.resolve(path.dirname(__filename), '..');
 const PORT = 14001 + Math.floor(Math.random() * 1000);
+const CONTENT_PORT = PORT + 500;
 const BASE = `http://localhost:${PORT}`;
+const CONTENT = `http://localhost:${CONTENT_PORT}`;
 const TS = Date.now();
 const APP_ID = `ui-app-${TS}`;
 const WORKFLOW_ID = `ui-workflow-${TS}`;
@@ -22,6 +25,7 @@ let passed = 0;
 let failed = 0;
 const failures = [];
 let server = null;
+let contentServer = null;
 let browser = null;
 let recordingSessionId = null;
 
@@ -62,11 +66,11 @@ const setupPayload = {
   appName: 'UI Generic App',
   workflowId: WORKFLOW_ID,
   workflowName: 'UI Generic Workflow',
-  recorderUrl: 'http://localhost:3333/?mode=record',
+  recorderUrl: `${CONTENT}/?mode=record`,
   recordingSetup: {
     tabs: [
-      { id: 'sourceApp', title: 'Source App', url: 'http://localhost:3333/source' },
-      { id: 'targetSite', title: 'Target Site', url: 'https://example.com/form', siteId: 'target-site', requiresAuth: true, authCheckUrl: 'https://example.com/account' },
+      { id: 'sourceApp', title: 'Source App', url: `${CONTENT}/source` },
+      { id: 'targetSite', title: 'Target Site', url: `${CONTENT}/form`, siteId: 'target-site', requiresAuth: false },
     ],
   },
   payloadSchema: {
@@ -95,12 +99,12 @@ const observation = {
   goal: 'Generic UI bridge workflow.',
   recordingSetup: setupPayload.recordingSetup,
   pages: [
-    { id: 'sourceApp', purpose: 'Source App', url: 'http://localhost:3333/source' },
-    { id: 'targetSite', purpose: 'Target Site', url: 'https://example.com/form' },
+    { id: 'sourceApp', purpose: 'Source App', url: `${CONTENT}/source` },
+    { id: 'targetSite', purpose: 'Target Site', url: `${CONTENT}/form` },
   ],
   sessionEvents: [
-    event('page_seen', { pageId: 'sourceApp', pageUrl: 'http://localhost:3333/source', pageTitle: 'Source App' }),
-    event('page_seen', { pageId: 'targetSite', pageUrl: 'https://example.com/form', pageTitle: 'Target Site' }),
+    event('page_seen', { pageId: 'sourceApp', pageUrl: `${CONTENT}/source`, pageTitle: 'Source App' }),
+    event('page_seen', { pageId: 'targetSite', pageUrl: `${CONTENT}/form`, pageTitle: 'Target Site' }),
     event('field_detected', {
       pageId: 'targetSite',
       selector: '#recordId',
@@ -148,9 +152,18 @@ const observation = {
   ],
 };
 
+function startContentServer() {
+  const s = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end('<html><body><h1>Content page</h1></body></html>');
+  });
+  return new Promise(resolve => s.listen(CONTENT_PORT, () => resolve(s)));
+}
+
 try {
   server = createServer({ port: PORT });
   await new Promise(resolve => server.listen(PORT, resolve));
+  contentServer = await startContentServer();
 
   const started = await api('POST', '/api/recordings/start', setupPayload);
   assert('start API creates session', started.res.status === 201 && started.json.ok === true, JSON.stringify(started.json));
@@ -208,6 +221,7 @@ try {
   }
 } finally {
   if (browser) await browser.close();
+  if (contentServer) await new Promise(resolve => contentServer.close(resolve));
   if (server) await new Promise(resolve => server.close(resolve));
   if (recordingSessionId) fs.rmSync(path.join(REPO_ROOT, 'output', 'recordings', recordingSessionId), { recursive: true, force: true });
   fs.rmSync(path.join(REPO_ROOT, 'workflows', WORKFLOW_ID), { recursive: true, force: true });

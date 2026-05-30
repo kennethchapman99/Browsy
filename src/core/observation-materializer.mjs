@@ -327,7 +327,7 @@ function inferOutputs(obs, events, context) {
   for (const ev of events || []) {
     if (ev.type !== 'output_captured') continue;
     const raw = ev.rawEvidence || {};
-    if (isEphemeralUrl(ev.pageUrl)) continue;
+    if (ev.pageUrl && isEphemeralUrl(ev.pageUrl)) continue;
     outs.push(output({ id: raw.outputId || raw.label || ev.selector, label: raw.label || raw.outputId || 'Captured output', selector: ev.selector || firstSelector(raw), selectorCandidates: raw.selectorCandidates, selectorConfidence: raw.selectorConfidence, example: raw.text || raw.textPreview, captureAfter: raw.triggeredBySelector, tabId: tabIdForEvent(ev, context), sourceEventId: ev.id }));
   }
   return dedupe(outs);

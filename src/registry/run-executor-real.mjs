@@ -34,7 +34,9 @@ export async function executeRun(args) {
 
   let engineResult;
   try {
-    engineResult = mode === 'dry_run' || workflowVersion.replaySettings?.disableRealReplay === true
+    engineResult = mode === 'dry_run'
+      || workflowVersion.replaySettings?.disableRealReplay === true
+      || (mode !== 'live' && workflowVersion.replaySettings?.defaultMode === 'dry_run')
       ? dryRunResult({ runId, workflowVersion })
       : await runReplay({ runId, workflowVersion, payload, mode, options: getRun(runId)?.options || {}, runDir: registryRunDir });
   } catch (err) {
