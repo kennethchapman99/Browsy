@@ -4,6 +4,7 @@ import { defaultSafetyPolicy } from './safety.mjs';
 import { generateRunReview } from './run-review.mjs';
 export { saveRuntimeVars, loadRuntimeVars, resolveTemplate, tryResolveTemplate,
          extractTemplateVars, hasTemplateVars, validateTemplateVars,
+         getRuntimeValue, flattenRuntimeVars,
          captureVariables, computeDerived,
          filterCapturedByTiming, isFatalCaptureTiming } from './runtime-vars.mjs';
 

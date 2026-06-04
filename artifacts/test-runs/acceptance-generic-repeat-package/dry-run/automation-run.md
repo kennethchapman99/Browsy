@@ -1,6 +1,6 @@
 # Browsy Automation Run Report
 
-Generated: 2026-05-27T14:58:14.136Z
+Generated: 2026-06-04T13:24:32.409Z
 Mode: dry-run
 Status: OK
 

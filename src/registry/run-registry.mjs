@@ -28,6 +28,7 @@ export function createRun({
   options = {},
   sessionProfileId = null,
   callerId = null,
+  correlationId = null,
   callbackUrl = null,
 }) {
   const runId = generateRunId(workflowObjectId);
@@ -45,6 +46,7 @@ export function createRun({
     options,
     sessionProfileId,
     callerId,
+    correlationId,
     callbackUrl: callbackUrl || options.callbackUrl || null,
     status: 'running',
     processStatus: 'running',
@@ -63,6 +65,9 @@ export function createRun({
 
   ensureDir(runDir(runId));
   writeJson(runFilePath(runId), record);
+  // Single chokepoint for all runs: tie the Browsy runId to the caller's
+  // correlationId so logs from both systems can be grepped by one id.
+  console.log(`[browsy:run] created runId=${runId} correlationId=${correlationId || '-'} caller=${callerId || '-'} workflow=${workflowObjectId} mode=${mode}`);
   return record;
 }
 

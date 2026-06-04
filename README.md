@@ -241,6 +241,9 @@ In the wizard's Step 4 recording panel:
 Browsy opens the declared tabs already authenticated and records only the
 business workflow steps.
 
+For the Pancake Robot + DistroKid live validation path, use
+[`docs/pancake-distrokid-recording-validation.md`](docs/pancake-distrokid-recording-validation.md).
+
 ### Discover a page DOM
 
 ```bash

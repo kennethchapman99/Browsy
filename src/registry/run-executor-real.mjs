@@ -7,6 +7,7 @@ import { checkSafetyGates } from './safety-gates.mjs';
 import { updateRun, getRun } from './run-registry.mjs';
 import { buildRunResult } from './run-result.mjs';
 import { runReplay } from './replay-executor-hardened.mjs';
+import { executeRunPlanRun } from './run-plan-executor-adapter.mjs';
 
 export async function executeRun(args) {
   const { runId, workflowVersion, payload = {}, mode = 'preview', approvalToken, runRoot } = args;
@@ -34,11 +35,27 @@ export async function executeRun(args) {
 
   let engineResult;
   try {
-    engineResult = mode === 'dry_run'
+    const hasReplayMaterial = Array.isArray(workflowVersion.recordedSteps) && workflowVersion.recordedSteps.length > 0;
+    const hasReplayStrategy = !!workflowVersion.replaySettings?.strategy;
+    const isDryRun = mode === 'dry_run'
+      || mode === 'preview'
       || workflowVersion.replaySettings?.disableRealReplay === true
       || (mode !== 'live' && workflowVersion.replaySettings?.defaultMode === 'dry_run')
-      ? dryRunResult({ runId, workflowVersion })
-      : await runReplay({ runId, workflowVersion, payload, mode, options: getRun(runId)?.options || {}, runDir: registryRunDir });
+      || (!hasReplayMaterial && !hasReplayStrategy);
+    if (isDryRun) {
+      engineResult = dryRunResult({ runId, workflowVersion });
+    } else if (workflowVersion.replaySettings?.strategy === 'run-plan') {
+      engineResult = await executeRunPlanRun({
+        runId,
+        workflowVersion,
+        payload,
+        mode,
+        options: getRun(runId)?.options || {},
+        runDir: registryRunDir,
+      });
+    } else {
+      engineResult = await runReplay({ runId, workflowVersion, payload, mode, options: getRun(runId)?.options || {}, runDir: registryRunDir });
+    }
   } catch (err) {
     return finishRun(runId, { status: 'failed', processStatus: 'failed', workflowOutcome: 'failed', completedAt: now(), validationErrors: [`execution error: ${err.message}`] });
   }

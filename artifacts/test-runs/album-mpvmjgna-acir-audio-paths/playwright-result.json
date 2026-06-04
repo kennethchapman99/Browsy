@@ -1,0 +1,110 @@
+{
+  "ok": true,
+  "workflow_id": "distrokid-album-submit",
+  "run_id": "album-mpvmjgna-acir-audio-paths",
+  "source_system": "playwright_replay",
+  "entity_type": "pancake-robot",
+  "entity_id": "album-mpvmjgna-acir-audio-paths",
+  "mode": "preview",
+  "status": "replay_passed",
+  "completedSteps": [
+    {
+      "id": "open_album",
+      "type": "navigate",
+      "status": "completed",
+      "tabId": "distrokidUpload",
+      "url": "http://localhost:23016/release/Still%20Water%20Running"
+    },
+    {
+      "id": "upload_track_1",
+      "type": "uploadFile",
+      "status": "completed",
+      "tabId": "distrokidUpload"
+    },
+    {
+      "id": "upload_track_2",
+      "type": "uploadFile",
+      "status": "completed",
+      "tabId": "distrokidUpload"
+    },
+    {
+      "id": "upload_track_3",
+      "type": "uploadFile",
+      "status": "completed",
+      "tabId": "distrokidUpload"
+    }
+  ],
+  "skippedSteps": [
+    {
+      "id": "checkpoint",
+      "type": "approve",
+      "status": "checkpoint"
+    }
+  ],
+  "uploaded_files": [
+    {
+      "role": "tracks[0].audioPath",
+      "selector": "#track-audio-1",
+      "path": "/Users/kchapman/PancakeRobot/output/songs/SONG_MPVMJGNA_ACIR_T01/audio/warm-front.mp3",
+      "status": "uploaded"
+    },
+    {
+      "role": "tracks[1].audioPath",
+      "selector": "#track-audio-2",
+      "path": "/Users/kchapman/PancakeRobot/output/songs/SONG_MPVMJGNA_ACIR_T02/audio/august-equation.mp3",
+      "status": "uploaded"
+    },
+    {
+      "role": "tracks[2].audioPath",
+      "selector": "#track-audio-3",
+      "path": "/Users/kchapman/PancakeRobot/output/songs/SONG_MPVMJGNA_ACIR_T03/audio/good-problem.mp3",
+      "status": "uploaded"
+    }
+  ],
+  "captured_outputs": {},
+  "manual_checkpoints": [
+    {
+      "type": "materialized_checkpoint",
+      "checkpointId": "checkpoint",
+      "label": "Stop before final submit",
+      "reason": "approval required"
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "1-open_album-1780521384168.png",
+      "path": "/Users/kchapman/browsy/artifacts/test-runs/album-mpvmjgna-acir-audio-paths/screenshots/1-open_album-1780521384168.png",
+      "pageUrl": "http://localhost:23016/release/Still%20Water%20Running"
+    },
+    {
+      "name": "final-distrokidUpload-1780521384552.png",
+      "path": "/Users/kchapman/browsy/artifacts/test-runs/album-mpvmjgna-acir-audio-paths/screenshots/final-distrokidUpload-1780521384552.png",
+      "pageUrl": "http://localhost:23016/release/Still%20Water%20Running"
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "1-open_album-1780521384168.png",
+      "path": "/Users/kchapman/browsy/artifacts/test-runs/album-mpvmjgna-acir-audio-paths/screenshots/1-open_album-1780521384168.png",
+      "pageUrl": "http://localhost:23016/release/Still%20Water%20Running",
+      "type": "screenshot"
+    },
+    {
+      "name": "final-distrokidUpload-1780521384552.png",
+      "path": "/Users/kchapman/browsy/artifacts/test-runs/album-mpvmjgna-acir-audio-paths/screenshots/final-distrokidUpload-1780521384552.png",
+      "pageUrl": "http://localhost:23016/release/Still%20Water%20Running",
+      "type": "screenshot"
+    }
+  ],
+  "artifact_paths": [
+    "/Users/kchapman/browsy/artifacts/test-runs/album-mpvmjgna-acir-audio-paths/screenshots/1-open_album-1780521384168.png",
+    "/Users/kchapman/browsy/artifacts/test-runs/album-mpvmjgna-acir-audio-paths/screenshots/final-distrokidUpload-1780521384552.png"
+  ],
+  "authProfile": {
+    "authProfileId": "pancake-robot",
+    "userDataDir": "/Users/kchapman/browsy/output/auth-profiles/pancake-robot/user-data",
+    "storageStatePath": "/Users/kchapman/browsy/output/auth-profiles/pancake-robot/storageState.json"
+  },
+  "return_contract_version": "automation-result-v1",
+  "generated_at": "2026-06-03T21:16:24.571Z"
+}

@@ -1,0 +1,66 @@
+{
+  "type": "object",
+  "required": [
+    "releaseId",
+    "album",
+    "tracks"
+  ],
+  "properties": {
+    "releaseId": {
+      "type": "string"
+    },
+    "albumId": {
+      "type": "string"
+    },
+    "album": {
+      "type": "object",
+      "required": [
+        "title",
+        "artistName",
+        "releaseDate",
+        "coverArtPath"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "releaseId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "artistName": {
+          "type": "string"
+        },
+        "releaseDate": {
+          "type": "string"
+        },
+        "coverArtPath": {
+          "type": "string"
+        }
+      }
+    },
+    "tracks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "title",
+          "audioPath"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "audioPath": {
+            "type": "string"
+          },
+          "explicit": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}

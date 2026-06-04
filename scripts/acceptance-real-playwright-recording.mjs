@@ -7,11 +7,14 @@ import { createServer } from '../src/api/generic-server.mjs';
 const __filename = fileURLToPath(import.meta.url);
 const REPO_ROOT = path.resolve(path.dirname(__filename), '..');
 const PORT = 15001 + Math.floor(Math.random() * 1000);
+const CONTENT_PORT = PORT + 1;
 const BASE = `http://localhost:${PORT}`;
+const CONTENT = `http://localhost:${CONTENT_PORT}`;
 const TS = Date.now();
 const APP_ID = `real-recorder-${TS}`;
 const WORKFLOW_ID = `real-playwright-${TS}`;
 let server = null;
+let contentServer = null;
 let recordingSessionId = null;
 let passed = 0;
 let failed = 0;
@@ -40,6 +43,8 @@ async function waitForEvents() {
 }
 
 try {
+  contentServer = createServer({ port: CONTENT_PORT });
+  await new Promise(resolve => contentServer.listen(CONTENT_PORT, resolve));
   server = createServer({ port: PORT });
   await new Promise(resolve => server.listen(PORT, resolve));
   const created = await api('POST', '/api/recordings/start', {
@@ -47,7 +52,8 @@ try {
     appName: 'Real Recorder Smoke App',
     workflowId: WORKFLOW_ID,
     workflowName: 'Real Playwright Smoke',
-    recordingSetup: { tabs: [{ id: 'blank', title: 'Blank Page', url: 'about:blank' }] },
+    targetUrl: `${CONTENT}/fixtures/observation-test-form/page-1.html`,
+    recordingSetup: { tabs: [{ id: 'fixture', title: 'Fixture Page', url: `${CONTENT}/fixtures/observation-test-form/page-1.html` }] },
     payloadSchema: { type: 'object', properties: {}, required: [] },
     expectedOutputs: [{ id: 'confirmationId', label: 'Confirmation ID' }],
   });
@@ -70,6 +76,7 @@ try {
 } finally {
   if (recordingSessionId) fs.rmSync(path.join(REPO_ROOT, 'output', 'recordings', recordingSessionId), { recursive: true, force: true });
   if (server) await new Promise(resolve => server.close(resolve));
+  if (contentServer) await new Promise(resolve => contentServer.close(resolve));
 }
 console.log(`Summary: ${passed} passed, ${failed} failed`);
 if (failed > 0) { console.error('Failures:'); for (const f of failures) console.error('  - ' + f); process.exit(1); }

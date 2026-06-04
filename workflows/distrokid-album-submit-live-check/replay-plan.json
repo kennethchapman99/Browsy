@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "browsy.replay-plan.v1",
+  "workflowId": "distrokid-album-submit-live-check",
+  "generatedAt": "2026-06-02T18:56:18.029Z",
+  "tabs": [
+    {
+      "id": "distrokidUpload",
+      "title": "DistroKid Upload",
+      "url": "https://distrokid.com/new/",
+      "order": 1,
+      "siteId": "distrokid",
+      "requiresAuth": true,
+      "authCheckUrl": "https://distrokid.com/new/",
+      "source": "recording_setup"
+    }
+  ],
+  "navigationGraph": {
+    "nodes": [
+      {
+        "id": "distrokidUpload",
+        "url": "https://distrokid.com/new/",
+        "title": "DistroKid Upload"
+      }
+    ]
+  },
+  "bindings": {
+    "variables": {},
+    "files": {},
+    "outputs": {}
+  },
+  "checkpoints": [
+    {
+      "id": "beforeFinalSubmit",
+      "label": "Stop before final submit"
+    }
+  ],
+  "replaySettings": {
+    "defaultMode": "dry_run",
+    "stopBeforeFinalAction": true,
+    "requireVerifiedSelectorsForLive": true,
+    "retry": {
+      "attempts": 2,
+      "backoffMs": 500
+    },
+    "timing": {
+      "afterNavigationMs": 500,
+      "afterActionMs": 250
+    }
+  }
+}

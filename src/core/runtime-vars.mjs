@@ -34,14 +34,100 @@ export function isFatalCaptureTiming(timing) {
   return t === 'initial_navigation' || !CAPTURE_TIMING_MODES.has(t);
 }
 
-// Resolve {{varName}} tokens in a template string.
+export function getRuntimeValue(vars = {}, path = '') {
+  vars = normalizeReleasePayload(vars);
+  const raw = String(path || '').trim().replace(/^payload\./, '');
+  if (!raw) return undefined;
+  if (Object.prototype.hasOwnProperty.call(vars, raw)) return vars[raw];
+  if (raw.endsWith('.length')) {
+    const base = getRuntimeValue(vars, raw.slice(0, -'.length'.length));
+    return Array.isArray(base) || typeof base === 'string' ? base.length : undefined;
+  }
+  const parts = raw.split('.').filter(Boolean);
+  let cur = vars;
+  for (let part of parts) {
+    if (cur === undefined || cur === null) return undefined;
+    const indexed = part.match(/^(.+)\[(\d+)\]$/);
+    if (indexed) {
+      cur = cur[indexed[1]];
+      if (!Array.isArray(cur)) return undefined;
+      cur = cur[Number(indexed[2])];
+      continue;
+    }
+    if (part.endsWith('[]')) part = part.slice(0, -2);
+    cur = cur[part];
+    if (Array.isArray(cur) && part !== parts[parts.length - 1]) cur = cur[0];
+  }
+  return cur;
+}
+
+export function flattenRuntimeVars(value, prefix = '', out = {}) {
+  if (!prefix) value = normalizeReleasePayload(value);
+  if (prefix) out[prefix] = value;
+  if (!value || typeof value !== 'object') return out;
+  if (Array.isArray(value)) {
+    if (prefix) out[`${prefix}.length`] = value.length;
+    if (value[0] && typeof value[0] === 'object') flattenRuntimeVars(value[0], prefix ? `${prefix}[]` : 'items[]', out);
+    return out;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    const next = prefix ? `${prefix}.${key}` : key;
+    flattenRuntimeVars(child, next, out);
+  }
+  return out;
+}
+
+export function releaseIdFromPayload(payload = {}) {
+  if (!payload || typeof payload !== 'object') return undefined;
+  return payload.releaseId || payload.albumId || payload.album?.releaseId || payload.album?.id;
+}
+
+export function normalizeReleasePayload(payload = {}, { releaseId } = {}) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return payload;
+  const canonical = releaseId || releaseIdFromPayload(payload);
+  if (!canonical) return payload;
+  const next = { ...payload, releaseId: payload.releaseId || canonical };
+  if (!next.albumId) next.albumId = canonical;
+  if (next.album && typeof next.album === 'object' && !Array.isArray(next.album)) {
+    next.album = {
+      ...next.album,
+      id: next.album.id || canonical,
+      releaseId: next.album.releaseId || canonical,
+    };
+  }
+  return next;
+}
+
+function tokenRegex() {
+  return /\{\{([^{}]+)\}\}|\{([^{}]+)\}/g;
+}
+
+// Resolve {varName} and {{varName}} tokens in a template string.
 // Throws with the variable name if any token is unresolved.
 export function resolveTemplate(template, vars) {
   if (typeof template !== 'string') return template;
-  return template.replace(/\{\{([^}]+)\}\}/g, (match, name) => {
-    const key = name.trim();
-    if (key in vars) return vars[key];
-    throw new Error(`Unresolved template variable: {{${key}}}`);
+  const normalizedVars = normalizeReleasePayload(vars);
+  return template.replace(tokenRegex(), (match, a, b) => {
+    const key = String(a || b || '').trim();
+    const value = getRuntimeValue(normalizedVars, key);
+    if (value !== undefined && value !== null && value !== '') return String(value);
+    const err = new Error(`Unresolved template variable: ${key}`);
+    err.variable = key;
+    err.token = match;
+    err.availableVariables = availableRuntimeVars(normalizedVars);
+    throw err;
+  });
+}
+
+export function availableRuntimeVars(vars = {}) {
+  return Object.keys(flattenRuntimeVars(normalizeReleasePayload(vars))).sort();
+}
+
+export function unresolvedTemplateVars(template, vars = {}) {
+  const normalizedVars = normalizeReleasePayload(vars);
+  return extractTemplateVars(template).filter(name => {
+    const value = getRuntimeValue(normalizedVars, name);
+    return value === undefined || value === null || value === '';
   });
 }
 
@@ -50,19 +136,19 @@ export function tryResolveTemplate(template, vars) {
   try { return resolveTemplate(template, vars); } catch { return null; }
 }
 
-// Return all {{varName}} tokens found in a string as a deduplicated array.
+// Return all {varName}/{{varName}} tokens found in a string as a deduplicated array.
 export function extractTemplateVars(template) {
   if (typeof template !== 'string') return [];
   const seen = new Set();
-  const re = /\{\{([^}]+)\}\}/g;
+  const re = tokenRegex();
   let m;
-  while ((m = re.exec(template)) !== null) seen.add(m[1].trim());
+  while ((m = re.exec(template)) !== null) seen.add(String(m[1] || m[2] || '').trim());
   return [...seen];
 }
 
-// Return true if the string contains at least one {{...}} token.
+// Return true if the string contains at least one {varName}/{{varName}} token.
 export function hasTemplateVars(s) {
-  return typeof s === 'string' && /\{\{[^}]+\}\}/.test(s);
+  return typeof s === 'string' && (/\{\{[^{}]+\}\}/.test(s) || /\{[^{}]+\}/.test(s));
 }
 
 // Validate that every {{x}} used in the supplied strings is declared in variableDefs.

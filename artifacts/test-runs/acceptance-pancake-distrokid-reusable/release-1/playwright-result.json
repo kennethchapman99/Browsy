@@ -1,0 +1,159 @@
+{
+  "ok": true,
+  "workflow_id": "distrokid-album-submit",
+  "run_id": "pancake-distrokid-reuse-1",
+  "source_system": "playwright_replay",
+  "entity_type": "pancake-robot",
+  "entity_id": "pancake-distrokid-reuse-1",
+  "mode": "preview",
+  "status": "replay_passed",
+  "completedSteps": [
+    {
+      "id": "open_album",
+      "type": "navigate",
+      "status": "completed",
+      "tabId": "distrokidUpload",
+      "url": "http://localhost:21979/releases/album/ALBUM_B"
+    },
+    {
+      "id": "fill_title",
+      "type": "fill",
+      "status": "completed",
+      "tabId": "distrokidUpload"
+    },
+    {
+      "id": "fill_artist",
+      "type": "fill",
+      "status": "completed",
+      "tabId": "distrokidUpload"
+    },
+    {
+      "id": "fill_date",
+      "type": "fill",
+      "status": "completed",
+      "tabId": "distrokidUpload"
+    },
+    {
+      "id": "fill_track_count",
+      "type": "fill",
+      "status": "completed",
+      "tabId": "distrokidUpload"
+    }
+  ],
+  "skippedSteps": [
+    {
+      "id": "checkpoint",
+      "type": "approve",
+      "status": "checkpoint"
+    }
+  ],
+  "filled_fields": [
+    {
+      "field": "album.title",
+      "selector": "#album-title",
+      "status": "filled"
+    },
+    {
+      "field": "album.artistName",
+      "selector": "#artist-name",
+      "status": "filled"
+    },
+    {
+      "field": "album.releaseDate",
+      "selector": "#release-date",
+      "status": "filled"
+    },
+    {
+      "field": "tracks.length",
+      "selector": "#track-count",
+      "status": "filled"
+    }
+  ],
+  "captured_outputs": {},
+  "manual_checkpoints": [
+    {
+      "type": "materialized_checkpoint",
+      "checkpointId": "checkpoint",
+      "label": "Stop before final submit",
+      "reason": "approval required"
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "1-open_album-1780579538943.png",
+      "path": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/release-1/screenshots/1-open_album-1780579538943.png",
+      "pageUrl": "http://localhost:21979/releases/album/ALBUM_B"
+    },
+    {
+      "name": "final-distrokidUpload-1780579539439.png",
+      "path": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/release-1/screenshots/final-distrokidUpload-1780579539439.png",
+      "pageUrl": "http://localhost:21979/releases/album/ALBUM_B"
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "1-open_album-1780579538943.png",
+      "path": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/release-1/screenshots/1-open_album-1780579538943.png",
+      "pageUrl": "http://localhost:21979/releases/album/ALBUM_B",
+      "type": "screenshot"
+    },
+    {
+      "name": "final-distrokidUpload-1780579539439.png",
+      "path": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/release-1/screenshots/final-distrokidUpload-1780579539439.png",
+      "pageUrl": "http://localhost:21979/releases/album/ALBUM_B",
+      "type": "screenshot"
+    }
+  ],
+  "artifact_paths": [
+    "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/release-1/screenshots/1-open_album-1780579538943.png",
+    "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/release-1/screenshots/final-distrokidUpload-1780579539439.png"
+  ],
+  "logs": [
+    {
+      "type": "replay_started",
+      "runId": "pancake-distrokid-reuse-1",
+      "workflowId": "distrokid-album-submit",
+      "mode": "preview",
+      "runDir": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/release-1",
+      "variableResolution": {
+        "availableVariables": [
+          "album",
+          "album.artistName",
+          "album.id",
+          "album.releaseDate",
+          "album.releaseId",
+          "album.title",
+          "albumId",
+          "releaseId",
+          "tracks",
+          "tracks.length",
+          "tracks[]",
+          "tracks[].title"
+        ],
+        "tabs": [
+          {
+            "id": "distrokidUpload",
+            "urlTemplate": "http://localhost:21979/releases/album/{releaseId}",
+            "resolvedUrl": "http://localhost:21979/releases/album/ALBUM_B"
+          }
+        ]
+      }
+    },
+    {
+      "type": "replay_result",
+      "status": "replay_passed",
+      "ok": true,
+      "runDir": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/release-1",
+      "completedStepCount": 5,
+      "failedStepCount": 0,
+      "artifactCount": 2
+    }
+  ],
+  "authProfile": {
+    "authProfileId": "pancake-robot",
+    "userDataDir": "/Users/kchapman/browsy/output/auth-profiles/pancake-robot/user-data",
+    "storageStatePath": "/Users/kchapman/browsy/output/auth-profiles/pancake-robot/storageState.json"
+  },
+  "return_contract_version": "automation-result-v1",
+  "generated_at": "2026-06-04T13:25:39.462Z"
+}

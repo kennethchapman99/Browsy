@@ -445,7 +445,77 @@ export function evaluateProjectReadiness({ workflowDir, runsDir, outputObservati
   states.output_capture_completed = !!latestRun && (has(path.join(latestRun, 'captured-outputs.json')) || has(path.join(latestRun, 'runtime-vars.json')));
   states.promoted_to_reusable = has(path.join(workflowDir || '', 'PROMOTED'));
   const status = [...PROJECT_READINESS_STATES].reverse().find(state => states[state]) || 'intake_draft';
-  return { status, states, observationDocuments: observationDocs, latestRun: latestRun ? path.basename(latestRun) : null };
+  const reusable = evaluateReusableWorkflowReadiness({ workflowDir });
+  return { status: reusable.ready ? 'READY' : status, states, reusable, observationDocuments: observationDocs, latestRun: latestRun ? path.basename(latestRun) : null };
+}
+
+export function evaluateReusableWorkflowReadiness({ workflowDir } = {}) {
+  const missing = [];
+  const warnings = [];
+  const read = rel => {
+    const file = path.join(workflowDir || '', rel);
+    if (!has(file)) return null;
+    try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { warnings.push(`${rel} is not readable JSON`); return null; }
+  };
+  const project = read('project.json') || {};
+  const workflow = read('workflow.json') || {};
+  const manifest = read('manifest.schema.json') || {};
+  const fieldMap = read('field-map.local.json') || null;
+  const packageExample = read('workflow-package.example.json') || read('workflow-package.local.json') || {};
+
+  const payloadContractExists = !!(manifest.type || project.runManifestSchema || packageExample.inputSchema || packageExample.payloadSchema);
+  if (!payloadContractExists) missing.push('payload contract');
+
+  const runtimeVariables = project.runtimeVariables || packageExample.runtimeVariables || {};
+  const inputVars = Array.isArray(runtimeVariables.input) ? runtimeVariables.input : [];
+  const hasVariables = inputVars.length > 0 || !!(manifest.properties && Object.keys(manifest.properties).length > 0);
+  if (!hasVariables) missing.push('runtime variables');
+
+  const targetUrls = [
+    workflow.target?.url,
+    ...(Array.isArray(workflow.tabs) ? workflow.tabs.map(t => t.urlTemplate || t.url) : []),
+    ...(Array.isArray(packageExample.tabs) ? packageExample.tabs.map(t => t.urlTemplate || t.url) : []),
+  ].filter(Boolean);
+  const templateVars = new Set(targetUrls.flatMap(url => {
+    const re = /\{\{([^{}]+)\}\}|\{([^{}]+)\}/g;
+    const vars = [];
+    let m;
+    while ((m = re.exec(String(url))) !== null) vars.push(String(m[1] || m[2] || '').trim());
+    return vars;
+  }));
+  const declared = new Set([
+    ...inputVars.map(v => v.name || v.path).filter(Boolean),
+    ...(Array.isArray(runtimeVariables.derived) ? runtimeVariables.derived.map(v => v.name).filter(Boolean) : []),
+    ...Object.keys(manifest.properties || {}),
+  ]);
+  for (const name of templateVars) if (!declared.has(name) && !declared.has(name.split('.')[0])) missing.push(`template variable ${name}`);
+  if (targetUrls.some(url => /\{[^{}]+\}|\{\{[^{}]+\}\}/.test(String(url))) && templateVars.size === 0) missing.push('URL template validation');
+
+  const authEntries = Array.isArray(workflow.auth) ? workflow.auth : Array.isArray(packageExample.auth) ? packageExample.auth : [];
+  const authRequired = authEntries.some(a => a.requiresAuth !== false && a.mode !== 'optional');
+  if (authRequired && !authEntries.some(a => a.authProfileId || a.siteId)) missing.push('auth profile');
+
+  const recordedSteps = Array.isArray(workflow.recordedSteps) ? workflow.recordedSteps : Array.isArray(packageExample.recordedSteps) ? packageExample.recordedSteps : [];
+  if (!recordedSteps.length) missing.push('recording');
+  if (!fieldMap && !recordedSteps.every(step => step.selector || step.type === 'navigate' || step.requiresApproval)) missing.push('verified field map');
+
+  const completion = packageExample.completionPolicy || workflow.completionPolicy || packageExample.completionConditions || workflow.completionConditions;
+  const outputs = workflow.capturedOutputs || packageExample.expectedOutputs || packageExample.capturedOutputs || [];
+  if (!completion && !outputs.length) missing.push('completion conditions');
+
+  return {
+    ready: missing.length === 0,
+    missing: [...new Set(missing)],
+    warnings,
+    checks: {
+      payloadContractExists,
+      variablesDeclared: hasVariables,
+      templatesValidate: !missing.some(item => item.startsWith('template variable') || item === 'URL template validation'),
+      authProfileDeclared: !missing.includes('auth profile'),
+      recordingExists: recordedSteps.length > 0,
+      completionConditionsExist: !!completion || outputs.length > 0,
+    },
+  };
 }
 
 function getPath(obj, dottedPath) { return String(dottedPath || '').split('.').filter(Boolean).reduce((cur, part) => cur?.[part], obj); }

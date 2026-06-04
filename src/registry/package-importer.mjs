@@ -155,6 +155,15 @@ export function importWorkflowPackage({
       expectedOutputs: metadata.expectedOutputs,
       validationRules: metadata.validationRules,
       replaySettings: metadata.replaySettings,
+      sourceMetadata: metadata.sourceMetadata,
+      sourceAppId: metadata.sourceAppId,
+      sourceWorkflowId: metadata.sourceWorkflowId,
+      sourcePayloadSchema: metadata.sourcePayloadSchema,
+      sourceFieldMappings: metadata.sourceFieldMappings,
+      tabUrlTemplates: metadata.tabUrlTemplates,
+      authProfileRef: metadata.authProfileRef,
+      completionPolicy: metadata.completionPolicy,
+      writebackTargets: metadata.writebackTargets,
     });
   } catch (e) {
     return { ok: false, errors: [e.message] };

@@ -20,6 +20,8 @@ import {
   extractTemplateVars,
   hasTemplateVars,
   validateTemplateVars,
+  getRuntimeValue,
+  flattenRuntimeVars,
   captureFromPage,
   captureVariables,
   computeDerived,
@@ -186,6 +188,28 @@ check('validateTemplateVars catches undeclared variable', () => {
 
 section('runtime engine');
 check('resolveTemplate substitutes songId', () => assert.equal(resolveTemplate('http://x/{{songId}}', { songId: 'SONG_1' }), 'http://x/SONG_1'));
+check('resolveTemplate supports single-brace nested payload templates', () => {
+  const payload = { album: { id: 'ALBUM_1' }, tracks: [{ title: 'One' }, { title: 'Two' }] };
+  assert.equal(resolveTemplate('http://localhost:3737/releases/album/{album.id}', payload), 'http://localhost:3737/releases/album/ALBUM_1');
+  assert.equal(resolveTemplate('tracks/{{tracks.length}}', payload), 'tracks/2');
+});
+check('extractTemplateVars supports both brace styles', () => {
+  assert.deepEqual(extractTemplateVars('/{album.id}/{{tracks.length}}'), ['album.id', 'tracks.length']);
+});
+check('getRuntimeValue resolves nested fields and array lengths', () => {
+  const payload = { album: { title: 'Reusable' }, tracks: [{ audioPath: '/tmp/one.wav' }, { audioPath: '/tmp/two.wav' }] };
+  assert.equal(getRuntimeValue(payload, 'album.title'), 'Reusable');
+  assert.equal(getRuntimeValue(payload, 'tracks.length'), 2);
+  assert.equal(getRuntimeValue(payload, 'tracks[].audioPath'), '/tmp/one.wav');
+  assert.equal(getRuntimeValue(payload, 'tracks[0].audioPath'), '/tmp/one.wav');
+  assert.equal(getRuntimeValue(payload, 'tracks[1].audioPath'), '/tmp/two.wav');
+});
+check('flattenRuntimeVars exposes searchable nested fields', () => {
+  const flat = flattenRuntimeVars({ album: { id: 'ALBUM_1' }, tracks: [{ audioPath: '/tmp/one.wav' }] });
+  assert.equal(flat['album.id'], 'ALBUM_1');
+  assert.equal(flat['tracks.length'], 1);
+  assert.equal(flat['tracks[].audioPath'], '/tmp/one.wav');
+});
 check('tryResolveTemplate returns null for unresolved variable', () => assert.equal(tryResolveTemplate('http://x/{{songId}}', {}), null));
 check('computeDerived builds songUrl', () => {
   const vars = computeDerived(parsed.runtimeVariables.derived, { songId: 'SONG_ABCDEFGH_XY12_T01' });

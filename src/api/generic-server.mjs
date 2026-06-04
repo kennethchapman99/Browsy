@@ -15,6 +15,7 @@ import {
   updateRecordingSessionSetup,
   validateRecordingSessionForLaunch,
   stopRecordingSession,
+  abandonRecordingSession,
   importRecordingSession,
   getRecordingContract,
   listRecordingSessions,
@@ -22,9 +23,12 @@ import {
 import {
   startPlaywrightRecording,
   stopPlaywrightRecording,
+  abandonPlaywrightRecording,
   getActivePlaywrightRecording,
   openAuthSetupProfile,
   runAuthPreflight,
+  inspectAuthProfile,
+  recoverAuthProfileLock,
 } from '../recording/playwright-recording-runtime.mjs';
 
 export const DEFAULT_PORT = 3001;
@@ -43,13 +47,29 @@ function json(req) {
 
 function send(res, status, data) {
   const body = JSON.stringify(data, null, 2);
-  res.writeHead(status, { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) });
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Content-Length': Buffer.byteLength(body),
+    ...corsHeaders(),
+  });
   res.end(body);
 }
 
 function sendHtml(res, status, html) {
-  res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(html) });
+  res.writeHead(status, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Content-Length': Buffer.byteLength(html),
+    ...corsHeaders(),
+  });
   res.end(html);
+}
+
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+  };
 }
 
 function route(pattern, url) {
@@ -79,6 +99,7 @@ function launchRun(workflowObjectId, wv, body) {
     options,
     sessionProfileId: body.sessionProfileId || null,
     callerId: body.callerId || null,
+    correlationId: body.correlationId || null,
     callbackUrl: body.callbackUrl || options.callbackUrl || app?.callbackUrl || null,
   });
   executeRun({
@@ -112,6 +133,23 @@ async function startRecording(recordingSessionId, body) {
   if (!session) throw new Error('recording session not found');
 
   const tabs = session.recordingSetup?.tabs || [];
+  const authProfiles = [...new Set((session.auth || []).map(a => a.authProfileId || a.siteId).filter(Boolean))];
+  for (const authProfileId of authProfiles) {
+    const recovery = recoverAuthProfileLock({ appId: session.appId, workflowId: session.workflowId, authProfileId });
+    const profile = inspectAuthProfile({ appId: session.appId, workflowId: session.workflowId, authProfileId });
+    if (profile.locked) {
+      return {
+        ok: false,
+        launchFailed: true,
+        code: 'auth_profile_locked',
+        error: `Auth profile "${authProfileId}" is locked. Close the existing browser profile and retry.`,
+        authProfile: profile,
+        profileLockRecovery: recovery,
+        recording: null,
+        launch: null,
+      };
+    }
+  }
   console.log('[browsy:recording] /start received', {
     recordingSessionId,
     appId: session.appId,
@@ -149,14 +187,13 @@ async function startRecording(recordingSessionId, body) {
     }
     // Environment/browser unavailable: fall back to manual mode so operator can
     // still import via the wizard URL.
-    const fallbackLaunch = {
-      createdAt: new Date().toISOString(),
-      mode: 'manual_playwright_recorder',
-      recorderUrl: session.recorderUrl,
-      tabs,
-      auth: session.auth || [],
-      launchError: err.message,
-      instructions: ['Playwright launch failed; use the manual recorder URL and stop/import through this session.'],
+      const fallbackLaunch = {
+        createdAt: new Date().toISOString(),
+        mode: 'manual_playwright_recorder',
+        tabs,
+        auth: session.auth || [],
+        launchError: err.message,
+      instructions: ['Playwright launch failed; use this Browsy recording session page to stop/import the recording.'],
     };
     const recording = beginRecordingSession(recordingSessionId, { launch: fallbackLaunch });
     return { ok: true, recording, launch: fallbackLaunch, active: null };
@@ -167,6 +204,12 @@ export function createServer({ port = DEFAULT_PORT } = {}) {
   return http.createServer(async (req, res) => {
     const { method, url } = req;
     try {
+      if (method === 'OPTIONS') {
+        res.writeHead(204, corsHeaders());
+        res.end();
+        return;
+      }
+
       let p = route('/recordings/:recordingSessionId', url);
       if (p && method === 'GET') {
         const session = getRecordingSession(p.recordingSessionId);
@@ -185,6 +228,16 @@ export function createServer({ port = DEFAULT_PORT } = {}) {
         return send(res, 200, { ok: true, recordings: listRecordingSessions() });
       }
 
+      if (method === 'GET' && url === '/api/health') {
+        return send(res, 200, {
+          ok: true,
+          service: 'browsy-registry-api',
+          port,
+          baseUrl: baseUrl(req, port),
+          command: `BROWSY_PORT=${port} npm run api`,
+        });
+      }
+
       if (method === 'POST' && url === '/api/auth-profiles/prepare') {
         const body = await json(req);
         if (!body.targetUrl) return send(res, 400, { ok: false, error: 'targetUrl is required' });
@@ -198,7 +251,7 @@ export function createServer({ port = DEFAULT_PORT } = {}) {
           });
           return send(res, 200, { ok: true, profile });
         } catch (err) {
-          return send(res, 502, { ok: false, error: err.message });
+          return send(res, err.code === 'auth_profile_locked' ? 409 : 502, { ok: false, code: err.code || undefined, error: err.message, profileLock: err.profileLock || undefined });
         }
       }
 
@@ -218,14 +271,37 @@ export function createServer({ port = DEFAULT_PORT } = {}) {
           // detected an unauthenticated state — both return HTTP 200 with the verdict.
           return send(res, 200, { ok: true, preflight });
         } catch (err) {
-          return send(res, 502, { ok: false, error: err.message });
+          return send(res, err.code === 'auth_profile_locked' ? 409 : 502, { ok: false, code: err.code || undefined, error: err.message, profileLock: err.profileLock || undefined });
         }
+      }
+
+      if (method === 'POST' && url === '/api/auth-profiles/inspect') {
+        const body = await json(req);
+        if (!body.authProfileId) return send(res, 400, { ok: false, error: 'authProfileId is required' });
+        return send(res, 200, { ok: true, profile: inspectAuthProfile({ appId: body.appId || null, workflowId: body.workflowId || null, authProfileId: body.authProfileId }) });
+      }
+
+      if (method === 'POST' && url === '/api/auth-profiles/release-stale-lock') {
+        const body = await json(req);
+        if (!body.authProfileId) return send(res, 400, { ok: false, error: 'authProfileId is required' });
+        const recovery = recoverAuthProfileLock({
+          appId: body.appId || null,
+          workflowId: body.workflowId || null,
+          authProfileId: body.authProfileId,
+          force: body.force === true,
+        });
+        if (!recovery.ok) return send(res, 409, { ok: false, code: 'auth_profile_locked', error: 'Auth profile lock is active or too recent to release safely.', recovery });
+        return send(res, 200, { ok: true, recovery });
       }
 
       if (method === 'POST' && url === '/api/recordings/start') {
         const body = await json(req);
-        const session = startRecordingSession(body, { baseUrl: baseUrl(req, port) });
-        return send(res, 201, { ok: true, ...session, recording: session });
+        try {
+          const session = startRecordingSession(body, { baseUrl: baseUrl(req, port) });
+          return send(res, 201, { ok: true, ...session, recording: session });
+        } catch (err) {
+          return send(res, 400, { ok: false, error: err.message, errors: err.errors || [err.message] });
+        }
       }
 
       p = route('/api/recordings/:recordingSessionId/setup', url);
@@ -237,7 +313,7 @@ export function createServer({ port = DEFAULT_PORT } = {}) {
       p = route('/api/recordings/:recordingSessionId/start', url);
       if (p && method === 'POST') {
         const result = await startRecording(p.recordingSessionId, await json(req));
-        if (!result.ok) return send(res, 502, { ok: false, ...result });
+        if (!result.ok) return send(res, result.code === 'auth_profile_locked' ? 409 : 502, { ok: false, ...result });
         return send(res, 200, { ok: true, ...result });
       }
 
@@ -253,6 +329,14 @@ export function createServer({ port = DEFAULT_PORT } = {}) {
         const body = await json(req);
         const runtime = await stopPlaywrightRecording(p.recordingSessionId);
         const session = stopRecordingSession(p.recordingSessionId, body);
+        return send(res, 200, { ok: true, recording: session, runtime });
+      }
+
+      p = route('/api/recordings/:recordingSessionId/abandon', url);
+      if (p && method === 'POST') {
+        const body = await json(req);
+        const runtime = await abandonPlaywrightRecording(p.recordingSessionId, { reason: body.reason || 'abandoned by caller' });
+        const session = abandonRecordingSession(p.recordingSessionId, { ...body, events: body.events });
         return send(res, 200, { ok: true, recording: session, runtime });
       }
 
@@ -398,6 +482,15 @@ export function createServer({ port = DEFAULT_PORT } = {}) {
 
 export function startServer({ port = DEFAULT_PORT } = {}) {
   const server = createServer({ port });
+  server.on('error', error => {
+    if (error?.code === 'EADDRINUSE') {
+      console.error(`Browsy Registry API port ${port} is already in use. If the API is already running, keep using http://localhost:${port}.`);
+      console.error(`To stop it, find the process with: lsof -nP -iTCP:${port} -sTCP:LISTEN`);
+      process.exitCode = 1;
+      return;
+    }
+    throw error;
+  });
   server.listen(port, () => console.log(`Browsy Registry API listening on http://localhost:${port}`));
   return server;
 }

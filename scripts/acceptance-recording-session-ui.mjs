@@ -66,7 +66,6 @@ const setupPayload = {
   appName: 'UI Generic App',
   workflowId: WORKFLOW_ID,
   workflowName: 'UI Generic Workflow',
-  recorderUrl: `${CONTENT}/?mode=record`,
   recordingSetup: {
     tabs: [
       { id: 'sourceApp', title: 'Source App', url: `${CONTENT}/source` },
@@ -180,26 +179,59 @@ try {
 
   assert('/recordings/:id page renders app', (await page.textContent('#app')).includes(APP_ID));
   assert('/recordings/:id page renders workflow', (await page.textContent('#workflow')).includes(WORKFLOW_ID));
+  assert('source data is first nav item', await page.locator('[data-nav="1"]').textContent() === '1. Source data');
+  assert('tabs/auth is second nav item', await page.locator('[data-nav="2"]').textContent() === '2. Tabs and auth');
+  assert('source data question renders first with app name', (await page.textContent('body')).includes('What info do I need to grab from UI Generic App?'));
   assert('Start Recording button exists', await page.locator('[data-testid="start-recording-button"]').count() === 1);
+  assert('Open recorder button is not rendered', await page.getByText('Open recorder', { exact: true }).count() === 0);
   assert('Stop Recording button exists', await page.locator('[data-testid="stop-recording-button"]').count() === 1);
+  assert('Abandon Recording button exists', await page.locator('[data-testid="abandon-recording-button"]').count() === 1);
+  assert('Release Stale Lock button exists', await page.locator('[data-testid="release-stale-lock-button"]').count() === 1);
   assert('Import Workflow button exists', await page.locator('[data-testid="import-workflow-button"]').count() === 1);
   assert('View Contract button exists', await page.locator('[data-testid="view-contract-button"]').count() === 1);
   assert('tabs render', (await page.locator('[data-testid="tabs-table"] tbody tr').count()) === 2);
+
+  await page.fill('[data-testid="field-contract-intent"]', 'release date, number of tracks, for each track: audio file, title, AI disclosure, credits');
   assert('payload fields render', (await page.textContent('[data-testid="payload-fields"]')).includes('recordId'));
   assert('file bindings render', (await page.textContent('[data-testid="file-bindings"]')).includes('primaryUpload'));
+
+  await page.click('[data-nav="2"]');
+  assert('guided tabs/auth question renders after source data', (await page.textContent('body')).includes('What tabs do you need open, which ones require auth?'));
+  await page.fill('[data-testid="auth-profile-id"]', `ui-profile-${TS}`);
+  await page.click('[data-testid="check-auth-button"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="action-result"]')?.textContent.includes('Auth profile ui-profile-'));
+  assert('Check Auth inspects profile path and health', (await page.textContent('[data-testid="action-result"]')).includes('Path:'));
+  await page.click('[data-testid="release-stale-lock-button"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="action-result"]')?.textContent.includes('Stale lock release result'));
+  assert('Release Stale Lock safely no-ops when unlocked', (await page.textContent('[data-testid="action-result"]')).includes('Locked after release: false'));
+
+  await page.click('[data-nav="3"]');
+  assert('completion question renders', (await page.textContent('body')).includes('What should Browsy do when done?'));
+  await page.selectOption('[data-testid="completion-action"]', 'write_outputs_to_source_app');
+  await page.fill('[data-testid="completion-notes"]', 'write confirmation ID back to the source record');
   assert('expected outputs render', (await page.textContent('[data-testid="expected-outputs"]')).includes('confirmationId'));
   assert('human checkpoints render', (await page.textContent('[data-testid="human-checkpoints"]')).includes('finalSubmit'));
 
+  await page.click('[data-nav="4"]');
   await page.click('[data-testid="start-recording-button"]');
   await page.waitForFunction(() => document.querySelector('[data-testid="recording-status"]')?.textContent === 'recording');
   assert('Start Recording changes status to recording', (await page.textContent('[data-testid="recording-status"]')) === 'recording');
-  assert('start action exposes recorderUrl', (await page.textContent('[data-testid="action-result"]')).includes('recorderUrl'));
+  const startActionText = await page.textContent('[data-testid="action-result"]');
+  assert('start action reports real recorder mode', startActionText.includes('real_playwright_recorder'));
+  assert('start action does not expose recorderUrl', !startActionText.includes('recorderUrl'));
 
-  await page.fill('[data-testid="observation-input"]', JSON.stringify(observation));
+  await page.evaluate(() => window.showStep?.(4));
+  await page.evaluate((value) => {
+    document.querySelector('[data-testid="observation-input"]').value = value;
+  }, JSON.stringify(observation));
   await page.click('[data-testid="stop-recording-button"]');
   await page.waitForFunction(() => document.querySelector('[data-testid="recording-status"]')?.textContent === 'stopped');
   assert('Stop Recording changes status to stopped', (await page.textContent('[data-testid="recording-status"]')) === 'stopped');
+  const savedObservation = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'output', 'recordings', recordingSessionId, 'observation.json'), 'utf8'));
+  assert('observation preserves source field intent', savedObservation.fieldContractIntent?.includes('number of tracks'));
+  assert('observation preserves completion policy', savedObservation.completionPolicy?.action === 'write_outputs_to_source_app');
 
+  await page.click('[data-nav="5"]');
   await page.click('[data-testid="import-workflow-button"]');
   await page.waitForFunction(() => document.querySelector('[data-testid="recording-status"]')?.textContent === 'imported');
   assert('Import Workflow changes status to imported', (await page.textContent('[data-testid="recording-status"]')) === 'imported');
