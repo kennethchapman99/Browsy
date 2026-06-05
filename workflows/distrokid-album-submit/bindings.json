@@ -1,0 +1,54 @@
+{
+  "variables": {
+    "releaseDate": {
+      "source": "payload.album.releaseDate",
+      "binding": "album.releaseDate",
+      "selector": "#release-date",
+      "required": true
+    },
+    "numberOfSongs": {
+      "source": "payload.tracks.length",
+      "binding": "tracks.length",
+      "selector": "#num-songs",
+      "required": true
+    },
+    "trackTitle": {
+      "source": "payload.tracks[].title",
+      "binding": "tracks[].title",
+      "selector": "#track-title-1",
+      "required": true
+    },
+    "explicit": {
+      "source": "payload.tracks[].explicit",
+      "binding": "tracks[].explicit",
+      "selector": "#explicit-1",
+      "required": true
+    }
+  },
+  "files": {
+    "coverArtUpload": {
+      "source": "payload.album.coverArtPath",
+      "binding": "album.coverArtPath",
+      "selector": "#cover-art",
+      "required": true
+    },
+    "trackAudioUpload": {
+      "source": "payload.tracks[].audioPath",
+      "binding": "tracks[].audioPath",
+      "selector": "#track-audio-1",
+      "required": true
+    }
+  },
+  "outputs": {
+    "distrokidDraftUrl": {
+      "source": "captured_from_page",
+      "required": false,
+      "storesTo": "captured.distrokidDraftUrl"
+    },
+    "hyperfollowUrl": {
+      "source": "captured_from_page",
+      "required": false,
+      "storesTo": "captured.hyperfollowUrl"
+    }
+  }
+}

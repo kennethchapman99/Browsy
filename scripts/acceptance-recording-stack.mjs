@@ -8,6 +8,7 @@ const checks = [
   'scripts/acceptance-recording-session-ui.mjs',
   'scripts/acceptance-real-playwright-recording.mjs',
   'scripts/acceptance-recording-persistent-profile.mjs',
+  'scripts/acceptance-pancake-distrokid-validator.mjs',
   'scripts/acceptance-recording-launch-verification.mjs',
 ];
 

@@ -1,0 +1,152 @@
+{
+  "ok": true,
+  "workflow_id": "distrokid-album-submit",
+  "run_id": "pancake-distrokid-audio-paths",
+  "source_system": "playwright_replay",
+  "entity_type": "pancake-robot",
+  "entity_id": "pancake-distrokid-audio-paths",
+  "mode": "preview",
+  "status": "replay_passed",
+  "completedSteps": [
+    {
+      "id": "open_album",
+      "type": "navigate",
+      "status": "completed",
+      "tabId": "distrokidUpload",
+      "url": "http://localhost:21979/releases/album/ALBUM_AUDIO"
+    },
+    {
+      "id": "upload_track_1",
+      "type": "uploadFile",
+      "status": "completed",
+      "tabId": "distrokidUpload"
+    },
+    {
+      "id": "upload_track_2",
+      "type": "uploadFile",
+      "status": "completed",
+      "tabId": "distrokidUpload"
+    },
+    {
+      "id": "upload_track_3",
+      "type": "uploadFile",
+      "status": "completed",
+      "tabId": "distrokidUpload"
+    }
+  ],
+  "skippedSteps": [
+    {
+      "id": "checkpoint",
+      "type": "approve",
+      "status": "checkpoint"
+    }
+  ],
+  "uploaded_files": [
+    {
+      "role": "tracks[0].audioPath",
+      "selector": "#track-audio-1",
+      "path": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/fixtures/track-1.wav",
+      "status": "uploaded"
+    },
+    {
+      "role": "tracks[1].audioPath",
+      "selector": "#track-audio-2",
+      "path": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/fixtures/track-2.wav",
+      "status": "uploaded"
+    },
+    {
+      "role": "tracks[2].audioPath",
+      "selector": "#track-audio-3",
+      "path": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/fixtures/track-3.wav",
+      "status": "uploaded"
+    }
+  ],
+  "captured_outputs": {},
+  "manual_checkpoints": [
+    {
+      "type": "materialized_checkpoint",
+      "checkpointId": "checkpoint",
+      "label": "Stop before final submit",
+      "reason": "approval required"
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "1-open_album-1780579540252.png",
+      "path": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/audio-paths/screenshots/1-open_album-1780579540252.png",
+      "pageUrl": "http://localhost:21979/releases/album/ALBUM_AUDIO"
+    },
+    {
+      "name": "final-distrokidUpload-1780579540636.png",
+      "path": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/audio-paths/screenshots/final-distrokidUpload-1780579540636.png",
+      "pageUrl": "http://localhost:21979/releases/album/ALBUM_AUDIO"
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "1-open_album-1780579540252.png",
+      "path": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/audio-paths/screenshots/1-open_album-1780579540252.png",
+      "pageUrl": "http://localhost:21979/releases/album/ALBUM_AUDIO",
+      "type": "screenshot"
+    },
+    {
+      "name": "final-distrokidUpload-1780579540636.png",
+      "path": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/audio-paths/screenshots/final-distrokidUpload-1780579540636.png",
+      "pageUrl": "http://localhost:21979/releases/album/ALBUM_AUDIO",
+      "type": "screenshot"
+    }
+  ],
+  "artifact_paths": [
+    "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/audio-paths/screenshots/1-open_album-1780579540252.png",
+    "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/audio-paths/screenshots/final-distrokidUpload-1780579540636.png"
+  ],
+  "logs": [
+    {
+      "type": "replay_started",
+      "runId": "pancake-distrokid-audio-paths",
+      "workflowId": "distrokid-album-submit",
+      "mode": "preview",
+      "runDir": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/audio-paths",
+      "variableResolution": {
+        "availableVariables": [
+          "album",
+          "album.artistName",
+          "album.id",
+          "album.releaseDate",
+          "album.releaseId",
+          "album.title",
+          "albumId",
+          "releaseId",
+          "tracks",
+          "tracks.length",
+          "tracks[]",
+          "tracks[].audioPath",
+          "tracks[].title"
+        ],
+        "tabs": [
+          {
+            "id": "distrokidUpload",
+            "urlTemplate": "http://localhost:21979/releases/album/{releaseId}",
+            "resolvedUrl": "http://localhost:21979/releases/album/ALBUM_AUDIO"
+          }
+        ]
+      }
+    },
+    {
+      "type": "replay_result",
+      "status": "replay_passed",
+      "ok": true,
+      "runDir": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/audio-paths",
+      "completedStepCount": 4,
+      "failedStepCount": 0,
+      "artifactCount": 2
+    }
+  ],
+  "authProfile": {
+    "authProfileId": "pancake-robot",
+    "userDataDir": "/Users/kchapman/browsy/output/auth-profiles/pancake-robot/user-data",
+    "storageStatePath": "/Users/kchapman/browsy/output/auth-profiles/pancake-robot/storageState.json"
+  },
+  "return_contract_version": "automation-result-v1",
+  "generated_at": "2026-06-04T13:25:40.654Z"
+}

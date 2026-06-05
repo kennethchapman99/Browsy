@@ -1,0 +1,102 @@
+{
+  "schemaVersion": "browsy.workflow.v1",
+  "id": "distrokid-album-submit-live-check",
+  "workflowId": "distrokid-album-submit-live-check",
+  "name": "DistroKid Album Submit Live Check",
+  "description": "Recorded workflow for app pancake-robot",
+  "generatedBy": "browsy.observation-materializer",
+  "generatedAt": "2026-06-02T18:56:18.029Z",
+  "tabs": [
+    {
+      "id": "distrokidUpload",
+      "title": "DistroKid Upload",
+      "url": "https://distrokid.com/new/",
+      "order": 1,
+      "siteId": "distrokid",
+      "requiresAuth": true,
+      "authCheckUrl": "https://distrokid.com/new/",
+      "source": "recording_setup"
+    }
+  ],
+  "auth": [
+    {
+      "tabId": "distrokidUpload",
+      "siteId": "distrokid",
+      "siteName": "DistroKid Upload",
+      "url": "https://distrokid.com/new/",
+      "authCheckUrl": "https://distrokid.com/new/",
+      "authProfileId": "distrokid",
+      "mode": "human_required_if_not_authenticated"
+    }
+  ],
+  "navigationGraph": {
+    "nodes": [
+      {
+        "id": "distrokidUpload",
+        "url": "https://distrokid.com/new/",
+        "title": "DistroKid Upload"
+      }
+    ]
+  },
+  "bindings": {
+    "variables": {},
+    "files": {},
+    "outputs": {}
+  },
+  "variableBindings": {},
+  "humanApprovalCheckpoints": [
+    {
+      "id": "beforeFinalSubmit",
+      "label": "Stop before final submit"
+    }
+  ],
+  "checkpoints": [
+    {
+      "id": "beforeFinalSubmit",
+      "label": "Stop before final submit"
+    }
+  ],
+  "replaySettings": {
+    "defaultMode": "dry_run",
+    "stopBeforeFinalAction": true,
+    "requireVerifiedSelectorsForLive": true,
+    "retry": {
+      "attempts": 2,
+      "backoffMs": 500
+    },
+    "timing": {
+      "afterNavigationMs": 500,
+      "afterActionMs": 250
+    }
+  },
+  "safetyPolicy": {
+    "requiresLiveApproval": true,
+    "dry_run_default": true,
+    "pause_at_end_default": true,
+    "manual_only_categories": [
+      "final submission",
+      "payment",
+      "legal certification",
+      "destructive action"
+    ],
+    "checkpoints": [
+      "beforeFinalSubmit"
+    ]
+  },
+  "artifactPolicy": {
+    "captureReplayPlan": true
+  },
+  "supportedModes": [
+    "preview",
+    "dry_run",
+    "live"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {}
+  }
+}

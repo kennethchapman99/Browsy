@@ -220,20 +220,32 @@ export async function executeRunPlanWithPlaywright({
     for (const step of runPlan.steps) {
       // ── Global fill ──────────────────────────────────────────────────────────
       if (step.type === 'fill_global') {
+        const fieldName = step.source.split('.').pop();
+        const isRequired = fieldMap?.fields?.[fieldName]?.required !== false;
         const sel   = globalFieldSelector(step.source, fieldMap);
         const label = `fill_global[${step.source}]`;
-        await fillField(page, sel, step.value, label);
-        executedSteps.push({ type: step.type, source: step.source, value: step.value });
+        if (!isRequired && await page.locator(sel).count() === 0) {
+          skippedSteps.push({ type: step.type, source: step.source, reason: 'optional field not found on page' });
+        } else {
+          await fillField(page, sel, step.value, label);
+          executedSteps.push({ type: step.type, source: step.source, value: step.value });
+        }
 
       // ── Global upload ────────────────────────────────────────────────────────
       } else if (step.type === 'upload_global') {
+        const fieldName = step.source.split('.').pop();
+        const isRequired = fieldMap?.fields?.[fieldName]?.required !== false;
         const sel      = globalFieldSelector(step.source, fieldMap);
-        const filePath = path.resolve(manifestBaseDir, step.value);
+        const filePath = path.resolve(manifestBaseDir || '.', step.value);
         const label    = `upload_global[${step.source}]`;
-        await uploadField(page, sel, filePath, label);
-        executedSteps.push({
-          type: step.type, source: step.source, value: step.value, resolvedPath: filePath,
-        });
+        if (!isRequired && await page.locator(sel).count() === 0) {
+          skippedSteps.push({ type: step.type, source: step.source, reason: 'optional field not found on page' });
+        } else {
+          await uploadField(page, sel, filePath, label);
+          executedSteps.push({
+            type: step.type, source: step.source, value: step.value, resolvedPath: filePath,
+          });
+        }
 
       // ── Repeat iteration ─────────────────────────────────────────────────────
       } else if (step.type === 'repeat_iteration') {

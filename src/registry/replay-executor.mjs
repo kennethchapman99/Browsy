@@ -1,8 +1,10 @@
 import path from 'path';
 import { chromium } from 'playwright';
 import { OUTPUT_DIR, ensureDir, exists, writeJson } from '../core/paths.mjs';
+import { availableRuntimeVars, getRuntimeValue, normalizeReleasePayload, resolveTemplate, hasTemplateVars } from '../core/runtime-vars.mjs';
 
 export async function runReplay({ runId, workflowVersion, payload = {}, mode = 'preview', options = {}, runDir }) {
+  payload = normalizeReleasePayload(payload);
   const dir = runDir || path.join(OUTPUT_DIR, 'replay-runs', runId);
   const screenshotsDir = path.join(dir, 'screenshots');
   const downloadsDir = path.join(dir, 'downloads');
@@ -23,6 +25,7 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
   const settleMs = Number(options.settleMs || process.env.BROWSY_REPLAY_SETTLE_MS || 2500) || 2500;
   const steps = Array.isArray(workflowVersion.recordedSteps) ? workflowVersion.recordedSteps : [];
   const tabs = Array.isArray(workflowVersion.tabs) ? workflowVersion.tabs : [];
+  const preflight = preflightReplayPayload({ steps, payload });
 
   let browser = null;
   let context = null;
@@ -37,9 +40,56 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
   const filledFields = [];
   const uploadedFiles = [];
   const manualCheckpoints = [];
-  const logs = [];
+  const logs = [{
+    type: 'replay_started',
+    runId,
+    workflowId: workflowVersion.workflowId || workflowVersion.packageWorkflowId,
+    mode,
+    runDir: dir,
+    variableResolution: {
+      availableVariables: availableRuntimeVars(payload),
+      tabs: tabs.map(tab => clean({
+        id: tab.id,
+        urlTemplate: tab.urlTemplate || tab.url || null,
+        resolvedUrl: resolveMaybe(tab.urlTemplate || tab.url, payload),
+      })),
+    },
+  }];
 
   try {
+    if (!preflight.ok) {
+      logs.push({ type: 'replay_result', status: 'preflight_failed', ok: false, runDir: dir, failedStepCount: preflight.errors.length });
+      const result = clean({
+        ok: false,
+        workflow_id: workflowVersion.workflowId || workflowVersion.packageWorkflowId,
+        run_id: runId,
+        source_system: 'playwright_replay',
+        entity_type: workflowVersion.appId,
+        entity_id: runId,
+        mode,
+        status: 'preflight_failed',
+        completedSteps,
+        failedSteps: preflight.errors.map(error => ({ id: 'preflight', type: 'preflight', status: 'failed', error })),
+        skippedSteps,
+        filled_fields: filledFields,
+        uploaded_files: uploadedFiles,
+        captured_outputs: withExpectedOutputs(capturedOutputs, workflowVersion.expectedOutputs || []),
+        manual_checkpoints: manualCheckpoints,
+        downloaded_files: [],
+        screenshots: [],
+        artifacts: [],
+        artifact_paths: [],
+        logs: [...logs, { type: 'preflight_failed', errors: preflight.errors }],
+        authProfile,
+        next_required_action: 'fix_payload',
+        return_contract_version: 'automation-result-v1',
+        generated_at: new Date().toISOString(),
+      });
+      console.log('[browsy:replay] result', { runId, status: result.status, ok: result.ok, runDir: dir, failedStepCount: result.failedSteps.length });
+      writeJson(path.join(dir, 'playwright-result.json'), result);
+      return result;
+    }
+
     if (options.usePersistentProfile === true || process.env.BROWSY_REPLAY_PERSISTENT_PROFILE === 'true') {
       ensureDir(authProfile.userDataDir);
       context = await chromium.launchPersistentContext(authProfile.userDataDir, { headless, slowMo, acceptDownloads: true });
@@ -71,7 +121,7 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
         if (type === 'navigate') {
           const tabId = step.tabId || tabs[0]?.id || 'tab1';
           const page = await getPage(context, pages, tabId);
-          await page.goto(step.url, { waitUntil: step.waitUntil || 'domcontentloaded', timeout });
+          await page.goto(resolveStepUrl(step.url, payload), { waitUntil: step.waitUntil || 'domcontentloaded', timeout });
           await settlePage(page, { timeout, settleMs, targetHost: hostFromStep(step) });
           lastUrls.set(tabId, page.url());
           completedSteps.push({ id: step.id, type, status: 'completed', tabId: step.tabId, url: page.url() });
@@ -160,6 +210,16 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
 
     const uniqueScreenshots = uniqueByPath(screenshots.filter(Boolean));
     const uniqueDownloads = uniqueByPath(downloads.filter(Boolean));
+    const finalStatus = failedSteps.length ? 'replay_failed' : 'replay_passed';
+    logs.push({
+      type: 'replay_result',
+      status: finalStatus,
+      ok: failedSteps.length === 0,
+      runDir: dir,
+      completedStepCount: completedSteps.length,
+      failedStepCount: failedSteps.length,
+      artifactCount: uniqueScreenshots.length + uniqueDownloads.length,
+    });
     const result = clean({
       ok: failedSteps.length === 0,
       workflow_id: workflowVersion.workflowId || workflowVersion.packageWorkflowId,
@@ -168,7 +228,7 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
       entity_type: workflowVersion.appId,
       entity_id: runId,
       mode,
-      status: failedSteps.length ? 'replay_failed' : 'replay_passed',
+      status: finalStatus,
       completedSteps,
       failedSteps,
       skippedSteps,
@@ -186,6 +246,16 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
       return_contract_version: 'automation-result-v1',
       generated_at: new Date().toISOString(),
     });
+    console.log('[browsy:replay] result', {
+      runId,
+      workflowId: result.workflow_id,
+      status: result.status,
+      ok: result.ok,
+      runDir: dir,
+      completedStepCount: completedSteps.length,
+      failedStepCount: failedSteps.length,
+      artifactCount: result.artifacts.length,
+    });
     writeJson(path.join(dir, 'playwright-result.json'), result);
     return result;
   } finally {
@@ -194,6 +264,32 @@ export async function runReplay({ runId, workflowVersion, payload = {}, mode = '
       try { await browser?.close(); } catch {}
     }
   }
+}
+
+function resolveMaybe(template, vars) {
+  try {
+    return template && hasTemplateVars(template) ? resolveTemplate(template, vars) : template;
+  } catch {
+    return null;
+  }
+}
+
+function preflightReplayPayload({ steps = [], payload = {} } = {}) {
+  const errors = [];
+  for (const step of steps) {
+    const type = step.type || step.action;
+    if (type !== 'uploadFile') continue;
+    const binding = step.binding || null;
+    const filePath = fileFor(step.file, payload, binding);
+    if (!filePath) {
+      errors.push(`Missing required file path for ${binding || step.id}. Add ${binding || step.file || 'the upload file'} to the album payload before replay.`);
+      continue;
+    }
+    if (typeof filePath === 'string' && !exists(filePath)) {
+      errors.push(`Required file for ${binding || step.id} does not exist: ${filePath}`);
+    }
+  }
+  return { ok: errors.length === 0, errors };
 }
 
 function authProfileFor(workflowVersion, options = {}) {
@@ -375,17 +471,36 @@ function candidateLabels(step = {}) {
 function valueFor(value, payload = {}, binding = null) {
   if (typeof value !== 'string') return value;
   const m = value.match(/^\{\{inputs\.([^}]+)\}\}$/);
-  if (m) return payload[m[1]];
-  if (binding && Object.prototype.hasOwnProperty.call(payload, binding)) return payload[binding];
+  if (m) return getRuntimeValue(payload, m[1]);
+  const payloadToken = value.match(/^\{\{payload\.([^}]+)\}\}$/);
+  if (payloadToken) return getRuntimeValue(payload, payloadToken[1]);
+  if (hasTemplateVars(value)) return resolveTemplate(value.replace(/\{\{payload\./g, '{{'), payload);
+  if (binding) {
+    const bound = getRuntimeValue(payload, binding);
+    if (bound !== undefined) return bound;
+  }
   return value;
 }
 
 function fileFor(value, payload = {}, binding = null) {
   const direct = valueFor(value, payload, binding);
   if (direct && typeof direct === 'string' && !direct.startsWith('{{')) return direct;
-  if (binding && payload[binding]) return payload[binding];
+  if (binding) {
+    const bound = getRuntimeValue(payload, binding);
+    if (bound) return bound;
+  }
   if (payload.files && binding && payload.files[binding]) return payload.files[binding];
   return null;
+}
+
+function resolveStepUrl(url, payload = {}) {
+  if (typeof url !== 'string' || !hasTemplateVars(url)) return url;
+  try {
+    return resolveTemplate(url.replace(/\{\{payload\./g, '{{'), payload);
+  } catch (err) {
+    const available = err.availableVariables || availableRuntimeVars(payload);
+    throw new Error(`Unresolved template variable "${err.variable || err.token || 'unknown'}" in URL "${url}". Available variables: ${available.join(', ') || '(none)'}`);
+  }
 }
 
 async function infer(page, outputId, expectedOutputs = []) {

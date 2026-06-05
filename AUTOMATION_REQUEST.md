@@ -12,7 +12,7 @@ submit
 
 | Purpose | URL | Requires login? | Notes |
 | --- | --- | --- | --- |
-| Start page |  | yes | |
+| Start page | https://d2l.okta.com/app/UserHome | yes | |
 
 ## 4. Existing APIs or local systems
 

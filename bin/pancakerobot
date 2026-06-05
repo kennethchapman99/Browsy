@@ -1,0 +1,214 @@
+#!/usr/bin/env node
+import http from 'http';
+import { createServer as createBrowsyServer, DEFAULT_PORT as BROWSY_DEFAULT_PORT } from '../src/api/generic-server.mjs';
+
+const PANCAKE_PORT = Number(process.env.PANCAKE_ROBOT_PORT || 3737);
+const BROWSY_PORT = Number(process.env.BROWSY_PORT || BROWSY_DEFAULT_PORT);
+const BROWSY_BASE = process.env.BROWSY_BASE_URL || `http://localhost:${BROWSY_PORT}`;
+
+const albums = new Map([
+  ['ALBUM_MPK9H71S_RTCM', {
+    releaseId: 'ALBUM_MPK9H71S_RTCM',
+    albumId: 'ALBUM_MPK9H71S_RTCM',
+    album: {
+      id: 'ALBUM_MPK9H71S_RTCM',
+      releaseId: 'ALBUM_MPK9H71S_RTCM',
+      title: 'Context Album',
+      artistName: 'Context Artist',
+      releaseDate: '2026-09-01',
+      language: 'English',
+      primaryGenre: 'Hip Hop/Rap',
+      secondaryGenre: '',
+      labelName: '',
+      coverArtPath: '/tmp/context-cover.png',
+    },
+    tracks: [
+      { index: 1, title: 'Track One', artistName: 'Context Artist', audioPath: '/tmp/track-one.wav', explicit: false, instrumental: false },
+    ],
+    derived: { numberOfSongs: 1 },
+  }],
+]);
+
+function send(res, status, body, type = 'text/html; charset=utf-8') {
+  res.writeHead(status, { 'Content-Type': type });
+  res.end(body);
+}
+
+function albumPayload(albumId) {
+  const existing = albums.get(albumId);
+  if (existing) return existing;
+  return {
+    releaseId: albumId,
+    albumId,
+    album: {
+      id: albumId,
+      releaseId: albumId,
+      title: `Album ${albumId}`,
+      artistName: 'Pancake Robot',
+      releaseDate: '2026-09-01',
+      language: 'English',
+      primaryGenre: 'Hip Hop/Rap',
+      secondaryGenre: '',
+      labelName: '',
+      coverArtPath: `/tmp/${albumId}-cover.png`,
+    },
+    tracks: [
+      { index: 1, title: 'Track One', artistName: 'Pancake Robot', audioPath: `/tmp/${albumId}-track-1.wav`, explicit: false, instrumental: false },
+    ],
+    derived: { numberOfSongs: 1 },
+  };
+}
+
+function recordingRequest(payload) {
+  const albumId = payload.album.id;
+  return {
+    appId: 'pancake-robot',
+    appName: 'Pancake Robot',
+    sourceApp: 'pancake-robot',
+    workflowId: 'distrokid-album-submit',
+    workflowName: 'DistroKid Album Submit',
+    targetUrl: 'https://distrokid.com/new/',
+    releaseId: albumId,
+    samplePayload: payload,
+    callbackUrl: `http://localhost:${PANCAKE_PORT}/releases/album/${encodeURIComponent(albumId)}/magic-release/ingest-result`,
+    completionPolicy: {
+      action: 'wait_for_human_submission',
+      notes: 'Stop at ready for user to submit in DistroKid.',
+      closeBrowser: false,
+      requireApprovalBeforeSubmit: true,
+    },
+    writebackTargets: [],
+    recordingSetup: {
+      authProfileId: 'distrokid',
+      tabs: [
+        {
+          id: 'pancakeRelease',
+          title: 'Pancake Robot Release',
+          url: `http://localhost:${PANCAKE_PORT}/releases/album/${encodeURIComponent(albumId)}`,
+          siteId: 'pancake-robot',
+          requiresAuth: false,
+          role: 'source',
+        },
+        {
+          id: 'distrokidUpload',
+          title: 'DistroKid Upload',
+          url: 'https://distrokid.com/new/',
+          siteId: 'distrokid',
+          requiresAuth: true,
+          authProfileId: 'distrokid',
+          role: 'target',
+        },
+      ],
+    },
+  };
+}
+
+async function ensureBrowsyApi() {
+  try {
+    const health = await fetch(`${BROWSY_BASE}/api/health`, { signal: AbortSignal.timeout(1500) });
+    if (health.ok) return { started: false };
+  } catch {}
+  const server = createBrowsyServer({ port: BROWSY_PORT });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(BROWSY_PORT, resolve);
+  });
+  console.log(`Browsy Registry API listening on ${BROWSY_BASE}`);
+  return { started: true, server };
+}
+
+function albumPage(payload) {
+  const albumId = payload.album.id;
+  const json = JSON.stringify(payload, null, 2);
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pancake Robot - ${escapeHtml(albumId)}</title>
+  <style>
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#f6f8fb;color:#17202a}
+    main{max-width:920px;margin:0 auto;padding:28px}
+    section{background:#fff;border:1px solid #dbe1ea;border-radius:8px;padding:22px;margin:14px 0}
+    button,a.button{border:0;border-radius:8px;background:#2457d6;color:#fff;padding:10px 14px;font:inherit;font-weight:800;text-decoration:none;display:inline-flex;cursor:pointer}
+    pre{background:#101828;color:#d1fae5;border-radius:8px;padding:14px;overflow:auto}
+    .muted{color:#697386}.bad{color:#b42318}.ok{color:#0f766e}
+  </style>
+</head>
+<body>
+<main>
+  <section>
+    <p class="muted">Pancake Robot Release</p>
+    <h1>${escapeHtml(payload.album.title)}</h1>
+    <p>${escapeHtml(payload.album.artistName)} / ${escapeHtml(payload.album.releaseDate)} / ${escapeHtml(albumId)}</p>
+    <button id="record">Create Browsy Recording Session</button>
+    <p id="status" class="muted"></p>
+  </section>
+  <section>
+    <h2>Release payload</h2>
+    <pre>${escapeHtml(json)}</pre>
+  </section>
+</main>
+<script>
+const request = ${JSON.stringify(recordingRequest(payload))};
+document.getElementById('record').onclick = async () => {
+  const status = document.getElementById('status');
+  status.className = 'muted';
+  status.textContent = 'Checking Browsy service and creating recording session...';
+  try {
+    const health = await fetch(${JSON.stringify(`${BROWSY_BASE}/api/health`)});
+    if (!health.ok) throw new Error('Browsy API health check failed on ${BROWSY_BASE}. Start it with: BROWSY_PORT=${BROWSY_PORT} npm run api');
+    const res = await fetch(${JSON.stringify(`${BROWSY_BASE}/api/recordings/start`)}, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request)
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.error || res.statusText);
+    status.className = 'ok';
+    status.innerHTML = 'Recording session created. <a class="button" href="' + data.wizardUrl + '">Open Browsy Session</a>';
+  } catch (err) {
+    status.className = 'bad';
+    status.textContent = err.message || String(err);
+  }
+};
+</script>
+</body>
+</html>`;
+}
+
+function escapeHtml(value = '') {
+  return String(value).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+}
+
+await ensureBrowsyApi().catch(error => {
+  console.error(`Browsy API unavailable on ${BROWSY_BASE}.`);
+  console.error(`Expected port: ${BROWSY_PORT}`);
+  console.error(`Command: BROWSY_PORT=${BROWSY_PORT} npm run api`);
+  console.error(error.message);
+  process.exit(1);
+});
+
+const pancakeServer = http.createServer(async (req, res) => {
+  const url = new URL(req.url, `http://localhost:${PANCAKE_PORT}`);
+  const albumMatch = url.pathname.match(/^\/releases\/album\/([^/]+)$/);
+  if (albumMatch && req.method === 'GET') return send(res, 200, albumPage(albumPayload(decodeURIComponent(albumMatch[1]))));
+  const ingestMatch = url.pathname.match(/^\/releases\/album\/([^/]+)\/magic-release\/ingest-result$/);
+  if (ingestMatch && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => send(res, 200, JSON.stringify({ ok: true, albumId: decodeURIComponent(ingestMatch[1]), received: body ? JSON.parse(body) : null }, null, 2), 'application/json'));
+    return;
+  }
+  if (url.pathname === '/' && req.method === 'GET') {
+    res.writeHead(302, { Location: `/releases/album/ALBUM_MPK9H71S_RTCM` });
+    res.end();
+    return;
+  }
+  return send(res, 404, 'Not found', 'text/plain');
+});
+
+pancakeServer.listen(PANCAKE_PORT, () => {
+  const sample = `http://localhost:${PANCAKE_PORT}/releases/album/ALBUM_MPK9H71S_RTCM`;
+  console.log(`Pancake Robot listening on ${sample}`);
+});

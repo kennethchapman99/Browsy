@@ -1,0 +1,29 @@
+{
+  "schema_version": "pancake-distrokid-payload-v1",
+  "release_type": "album",
+  "release_id": "ALBUM_EXAMPLE_001",
+  "releaseTitle": "Midnight Sessions",
+  "artistName": "Pancake Robot",
+  "releaseDate": "2026-06-15",
+  "label": "Figment Factory",
+  "artworkPath": "/path/to/artwork-3000x3000.png",
+  "trackCount": 2,
+  "tracks": [
+    {
+      "trackNumber": 1,
+      "trackTitle": "Opening Act",
+      "audioPath": "/path/to/track-01.mp3",
+      "songwriter": "K. Chapman",
+      "explicit": false,
+      "instrumental": false
+    },
+    {
+      "trackNumber": 2,
+      "trackTitle": "Late Night Drive",
+      "audioPath": "/path/to/track-02.mp3",
+      "songwriter": "K. Chapman",
+      "explicit": false,
+      "instrumental": false
+    }
+  ]
+}

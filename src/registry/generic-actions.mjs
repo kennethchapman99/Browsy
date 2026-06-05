@@ -59,5 +59,14 @@ export function extractWorkflowPackageMetadata(workflowJson = {}, executionPacka
     artifactPolicy: object(workflowJson.artifactPolicy || workflowJson.artifact_policy || executionPackage.artifactPolicy || executionPackage.artifact_policy),
     successAssertions: array(workflowJson.successAssertions || workflowJson.success_assertions || executionPackage.successAssertions || executionPackage.success_assertions),
     failureAssertions: array(workflowJson.failureAssertions || workflowJson.failure_assertions || executionPackage.failureAssertions || executionPackage.failure_assertions),
+    sourceMetadata: object(workflowJson.sourceMetadata || workflowJson.source_metadata || executionPackage.sourceMetadata || executionPackage.source_metadata),
+    sourceAppId: workflowJson.sourceAppId || workflowJson.source_app_id || executionPackage.sourceAppId || executionPackage.source_app_id || null,
+    sourceWorkflowId: workflowJson.sourceWorkflowId || workflowJson.source_workflow_id || executionPackage.sourceWorkflowId || executionPackage.source_workflow_id || null,
+    sourcePayloadSchema: object(workflowJson.sourcePayloadSchema || workflowJson.source_payload_schema || executionPackage.sourcePayloadSchema || executionPackage.source_payload_schema),
+    sourceFieldMappings: array(workflowJson.sourceFieldMappings || workflowJson.source_field_mappings || executionPackage.sourceFieldMappings || executionPackage.source_field_mappings),
+    tabUrlTemplates: array(workflowJson.tabUrlTemplates || workflowJson.tab_url_templates || executionPackage.tabUrlTemplates || executionPackage.tab_url_templates),
+    authProfileRef: workflowJson.authProfileRef || workflowJson.auth_profile_ref || executionPackage.authProfileRef || executionPackage.auth_profile_ref || null,
+    completionPolicy: object(workflowJson.completionPolicy || workflowJson.completion_policy || executionPackage.completionPolicy || executionPackage.completion_policy),
+    writebackTargets: array(workflowJson.writebackTargets || workflowJson.writeback_targets || executionPackage.writebackTargets || executionPackage.writeback_targets),
   };
 }

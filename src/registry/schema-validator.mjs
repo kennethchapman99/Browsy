@@ -23,7 +23,9 @@ export function validatePayload(payload, schema) {
     const expectedType = fieldSchema.type;
     if (expectedType) {
       const actualType = Array.isArray(val) ? 'array' : typeof val;
-      if (actualType !== expectedType) {
+      const typeOk = actualType === expectedType
+        || (expectedType === 'integer' && actualType === 'number' && Number.isInteger(val));
+      if (!typeOk) {
         errors.push(`field ${field}: expected ${expectedType}, got ${actualType}`);
       }
     }

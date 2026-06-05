@@ -1,0 +1,225 @@
+{
+  "schemaVersion": "browsy.replay-plan.v1",
+  "workflowId": "distrokid-album-submit",
+  "generatedAt": "2026-06-04T13:25:32.196Z",
+  "tabs": [
+    {
+      "id": "distrokidUpload",
+      "title": "DistroKid Upload",
+      "url": "https://distrokid.com/new/",
+      "order": 1,
+      "siteId": "distrokid",
+      "requiresAuth": true,
+      "source": "recording_setup"
+    }
+  ],
+  "navigationGraph": {
+    "nodes": [
+      {
+        "id": "distrokidUpload",
+        "url": "https://distrokid.com/new/",
+        "title": "DistroKid Upload"
+      }
+    ]
+  },
+  "steps": [
+    {
+      "id": "navigate_distrokidUpload",
+      "type": "navigate",
+      "order": 1,
+      "tabId": "distrokidUpload",
+      "url": "https://distrokid.com/new/",
+      "waitUntil": "domcontentloaded",
+      "retry": {
+        "attempts": 2,
+        "backoffMs": 500
+      }
+    },
+    {
+      "id": "fill_releaseDate",
+      "type": "fill",
+      "order": 2,
+      "tabId": "distrokidUpload",
+      "selector": "#release-date",
+      "selectorConfidence": "medium",
+      "binding": "album.releaseDate",
+      "value": "{{payload.album.releaseDate}}",
+      "required": true
+    },
+    {
+      "id": "fill_numberOfSongs",
+      "type": "fill",
+      "order": 3,
+      "tabId": "distrokidUpload",
+      "selector": "#num-songs",
+      "selectorConfidence": "medium",
+      "binding": "tracks.length",
+      "value": "{{payload.tracks.length}}",
+      "required": true
+    },
+    {
+      "id": "fill_trackTitle",
+      "type": "fill",
+      "order": 4,
+      "tabId": "distrokidUpload",
+      "selector": "#track-title-1",
+      "selectorConfidence": "medium",
+      "binding": "tracks[].title",
+      "value": "{{payload.tracks[].title}}",
+      "required": true
+    },
+    {
+      "id": "fill_explicit",
+      "type": "fill",
+      "order": 5,
+      "tabId": "distrokidUpload",
+      "selector": "#explicit-1",
+      "selectorConfidence": "medium",
+      "binding": "tracks[].explicit",
+      "value": "{{payload.tracks[].explicit}}",
+      "required": true
+    },
+    {
+      "id": "upload_coverArtUpload",
+      "type": "uploadFile",
+      "order": 6,
+      "tabId": "distrokidUpload",
+      "selector": "#cover-art",
+      "selectorConfidence": "medium",
+      "binding": "album.coverArtPath",
+      "file": "{{payload.album.coverArtPath}}",
+      "required": true
+    },
+    {
+      "id": "upload_trackAudioUpload",
+      "type": "uploadFile",
+      "order": 7,
+      "tabId": "distrokidUpload",
+      "selector": "#track-audio-1",
+      "selectorConfidence": "medium",
+      "binding": "tracks[].audioPath",
+      "file": "{{payload.tracks[].audioPath}}",
+      "required": true
+    },
+    {
+      "id": "extract_distrokidDraftUrl",
+      "type": "extractText",
+      "order": 8,
+      "tabId": "distrokidUpload",
+      "selectorConfidence": "low",
+      "output": "distrokidDraftUrl",
+      "storesTo": "captured.distrokidDraftUrl",
+      "required": false
+    },
+    {
+      "id": "extract_hyperfollowUrl",
+      "type": "extractText",
+      "order": 9,
+      "tabId": "distrokidUpload",
+      "selectorConfidence": "low",
+      "output": "hyperfollowUrl",
+      "storesTo": "captured.hyperfollowUrl",
+      "required": false
+    }
+  ],
+  "bindings": {
+    "variables": {
+      "releaseDate": {
+        "source": "payload.album.releaseDate",
+        "binding": "album.releaseDate",
+        "selector": "#release-date",
+        "required": true
+      },
+      "numberOfSongs": {
+        "source": "payload.tracks.length",
+        "binding": "tracks.length",
+        "selector": "#num-songs",
+        "required": true
+      },
+      "trackTitle": {
+        "source": "payload.tracks[].title",
+        "binding": "tracks[].title",
+        "selector": "#track-title-1",
+        "required": true
+      },
+      "explicit": {
+        "source": "payload.tracks[].explicit",
+        "binding": "tracks[].explicit",
+        "selector": "#explicit-1",
+        "required": true
+      }
+    },
+    "files": {
+      "coverArtUpload": {
+        "source": "payload.album.coverArtPath",
+        "binding": "album.coverArtPath",
+        "selector": "#cover-art",
+        "required": true
+      },
+      "trackAudioUpload": {
+        "source": "payload.tracks[].audioPath",
+        "binding": "tracks[].audioPath",
+        "selector": "#track-audio-1",
+        "required": true
+      }
+    },
+    "outputs": {
+      "distrokidDraftUrl": {
+        "source": "captured_from_page",
+        "required": false,
+        "storesTo": "captured.distrokidDraftUrl"
+      },
+      "hyperfollowUrl": {
+        "source": "captured_from_page",
+        "required": false,
+        "storesTo": "captured.hyperfollowUrl"
+      }
+    }
+  },
+  "outputs": [
+    {
+      "id": "distrokidDraftUrl",
+      "label": "DistroKid draft URL",
+      "kind": "output",
+      "inputType": "text",
+      "scope": "external_link",
+      "selectorConfidence": "low",
+      "required": false,
+      "multiple": false,
+      "source": "captured_from_page",
+      "storesTo": "captured.distrokidDraftUrl"
+    },
+    {
+      "id": "hyperfollowUrl",
+      "label": "HyperFollow URL",
+      "kind": "output",
+      "inputType": "text",
+      "scope": "external_link",
+      "selectorConfidence": "low",
+      "required": false,
+      "multiple": false,
+      "source": "captured_from_page",
+      "storesTo": "captured.hyperfollowUrl"
+    }
+  ],
+  "checkpoints": [
+    {
+      "id": "beforeFinalSubmit",
+      "label": "Stop before final submit",
+      "beforeAction": "finalSubmit"
+    }
+  ],
+  "replaySettings": {
+    "defaultMode": "dry_run",
+    "stopBeforeFinalAction": true,
+    "requireVerifiedSelectorsForLive": true,
+    "retry": {
+      "attempts": 2,
+      "backoffMs": 500
+    },
+    "timing": {
+      "afterNavigationMs": 500,
+      "afterActionMs": 250
+    }
+  }
+}

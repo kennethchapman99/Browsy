@@ -1,0 +1,73 @@
+{
+  "ok": false,
+  "workflow_id": "distrokid-album-submit",
+  "run_id": "pancake-distrokid-missing-audio-path",
+  "source_system": "playwright_replay",
+  "entity_type": "pancake-robot",
+  "entity_id": "pancake-distrokid-missing-audio-path",
+  "mode": "preview",
+  "status": "preflight_failed",
+  "failedSteps": [
+    {
+      "id": "preflight",
+      "type": "preflight",
+      "status": "failed",
+      "error": "Missing required file path for tracks[1].audioPath. Add tracks[1].audioPath to the album payload before replay."
+    }
+  ],
+  "captured_outputs": {},
+  "logs": [
+    {
+      "type": "replay_started",
+      "runId": "pancake-distrokid-missing-audio-path",
+      "workflowId": "distrokid-album-submit",
+      "mode": "preview",
+      "runDir": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/missing-audio-path",
+      "variableResolution": {
+        "availableVariables": [
+          "album",
+          "album.artistName",
+          "album.id",
+          "album.releaseDate",
+          "album.releaseId",
+          "album.title",
+          "albumId",
+          "releaseId",
+          "tracks",
+          "tracks.length",
+          "tracks[]",
+          "tracks[].audioPath",
+          "tracks[].title"
+        ],
+        "tabs": [
+          {
+            "id": "distrokidUpload",
+            "urlTemplate": "http://localhost:21979/releases/album/{releaseId}",
+            "resolvedUrl": "http://localhost:21979/releases/album/ALBUM_AUDIO_MISSING"
+          }
+        ]
+      }
+    },
+    {
+      "type": "replay_result",
+      "status": "preflight_failed",
+      "ok": false,
+      "runDir": "/Users/kchapman/browsy/artifacts/test-runs/acceptance-pancake-distrokid-reusable/missing-audio-path",
+      "failedStepCount": 1
+    },
+    {
+      "type": "preflight_failed",
+      "errors": [
+        "Missing required file path for tracks[1].audioPath. Add tracks[1].audioPath to the album payload before replay."
+      ]
+    }
+  ],
+  "authProfile": {
+    "authProfileId": "pancake-robot",
+    "userDataDir": "/Users/kchapman/browsy/output/auth-profiles/pancake-robot/user-data",
+    "storageStatePath": "/Users/kchapman/browsy/output/auth-profiles/pancake-robot/storageState.json"
+  },
+  "next_required_action": "fix_payload",
+  "return_contract_version": "automation-result-v1",
+  "generated_at": "2026-06-04T13:25:40.678Z"
+}

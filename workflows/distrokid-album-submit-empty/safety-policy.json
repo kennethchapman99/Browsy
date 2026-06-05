@@ -1,0 +1,16 @@
+{
+  "requiresLiveApproval": true,
+  "dry_run_default": true,
+  "pause_at_end_default": true,
+  "never_click_text": [],
+  "never_click_selectors": [],
+  "manual_only_categories": [
+    "final submission",
+    "payment",
+    "legal certification",
+    "destructive action"
+  ],
+  "checkpoints": [
+    "beforeFinalSubmit"
+  ]
+}

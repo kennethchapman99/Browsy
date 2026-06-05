@@ -5,6 +5,7 @@ import { OUTPUT_DIR, ensureDir, exists, readJson, writeJson } from '../core/path
 import { evaluateAuthPreflight } from '../core/auth-preflight.mjs';
 
 const activeRecordings = new Map();
+const STALE_LOCK_AGE_MS = Number(process.env.BROWSY_AUTH_LOCK_STALE_MS || 30 * 60 * 1000);
 
 export function isPlaywrightRecordingActive(recordingSessionId) {
   return activeRecordings.has(recordingSessionId);
@@ -22,6 +23,34 @@ export function getActivePlaywrightRecording(recordingSessionId) {
     authProfile: active.authProfile,
     screenshotsDir: `output/recordings/${recordingSessionId}/screenshots`,
   };
+}
+
+export function inspectAuthProfile({ appId, workflowId, authProfileId } = {}) {
+  const session = { appId, workflowId, recordingSetup: { authProfileId, tabs: [{ siteId: authProfileId, authProfileId }] } };
+  const authProfile = resolveAuthProfile(session, { authProfileId });
+  const lock = detectProfileLock(authProfile.userDataDir);
+  return {
+    authProfileId: authProfile.authProfileId,
+    appId: authProfile.appId,
+    userDataDir: authProfile.userDataDir,
+    storageStatePath: authProfile.storageStatePath,
+    exists: exists(authProfile.userDataDir),
+    hasStorageState: exists(authProfile.storageStatePath),
+    healthy: !lock.locked,
+    locked: lock.locked,
+    lockReason: lock.reason,
+    lockFiles: lock.files,
+    lockOwner: lock.owner,
+    lockAgeMs: lock.ageMs,
+    stale: lock.stale,
+    recoveryAction: lock.recoveryAction,
+  };
+}
+
+export function recoverAuthProfileLock({ appId, workflowId, authProfileId, force = false } = {}) {
+  const session = { appId, workflowId, recordingSetup: { authProfileId, tabs: [{ siteId: authProfileId, authProfileId }] } };
+  const authProfile = resolveAuthProfile(session, { authProfileId });
+  return recoverStaleProfileLock(authProfile, { force });
 }
 
 export async function startPlaywrightRecording({ recordingSessionId, session, options = {} } = {}) {
@@ -49,7 +78,8 @@ export async function startPlaywrightRecording({ recordingSessionId, session, op
     contextOptions.storageState = authProfile.storageStatePath;
   }
 
-  const usePersistent = options.usePersistentProfile === true || process.env.BROWSY_RECORDING_PERSISTENT_PROFILE === 'true';
+  const usePersistent = shouldUsePersistentRecordingProfile({ session, authProfile, options });
+  if (usePersistent) assertProfileNotLocked(authProfile);
   const { browser, context, channel } = await launchBrowserContext({ headless, slowMo, authProfile, usePersistent, contextOptions });
 
   const events = [];
@@ -128,6 +158,7 @@ export async function startPlaywrightRecording({ recordingSessionId, session, op
     writeRuntimeStatus(recordingSessionId, { status: 'launch_failed', verification, active: false });
     try { await context.close(); } catch {}
     try { await browser?.close(); } catch {}
+    recoverStaleProfileLock(authProfile);
     const err = new Error(
       `Recorder launch failed: ${verification.summary}. ` +
       `Expected [${expectedUrls.join(', ')}] but got [${actualUrls.join(', ')}].`
@@ -166,6 +197,28 @@ export async function startPlaywrightRecording({ recordingSessionId, session, op
   };
 
   activeRecordings.set(recordingSessionId, { browser, context, pages, tabs, events, startedAt, launch, authProfile });
+  context.once('close', () => {
+    const active = activeRecordings.get(recordingSessionId);
+    if (!active || active.context !== context) return;
+    activeRecordings.delete(recordingSessionId);
+    const closedAt = new Date().toISOString();
+    appendEventsToDisk(recordingSessionId, [{
+      id: `recording-browser-closed-${Date.now()}`,
+      recordingSessionId,
+      timestamp: closedAt,
+      source: 'playwrightRecorder',
+      type: 'recording_browser_closed',
+      rawEvidence: { eventCount: active.events.length, reason: 'browser_context_closed' },
+    }]);
+    recoverStaleProfileLock(authProfile);
+    writeRuntimeStatus(recordingSessionId, {
+      status: 'browser_closed',
+      active: false,
+      closedAt,
+      eventCount: countEventsOnDisk(recordingSessionId),
+      launch,
+    });
+  });
   writeRuntimeStatus(recordingSessionId, { status: 'recording', launch, active: true });
   return launch;
 }
@@ -174,23 +227,63 @@ export async function startPlaywrightRecording({ recordingSessionId, session, op
 // target URL so a human can sign in once. No recording, no app-specific logic —
 // the profile (userDataDir + storageState) is reused by later recordings/replays.
 export async function openAuthSetupProfile({ appId, workflowId, authProfileId, targetUrl, options = {} } = {}) {
-  if (!targetUrl) throw new Error('targetUrl is required for auth setup');
+  const normalizedTargetUrl = normalizeTargetUrl(targetUrl, 'auth setup');
   const session = { appId, workflowId, recordingSetup: { authProfileId, tabs: [{ siteId: authProfileId, authProfileId }] } };
   const authProfile = resolveAuthProfile(session, { authProfileId });
+  assertProfileNotLocked(authProfile);
   const headless = options.headless === true;
   const slowMo = Number(options.slowMo || 0) || 0;
   const { context, channel } = await launchBrowserContext({
     headless, slowMo, authProfile, usePersistent: true, contextOptions: { acceptDownloads: true },
   });
-  const page = context.pages().find(p => isBlankUrl(p.url())) || await context.newPage();
+  const seededPages = context.pages();
+  const page = seededPages.find(p => isBlankUrl(p.url())) || await context.newPage();
+  for (const extra of seededPages.filter(p => p !== page && isBlankUrl(p.url()))) {
+    try { await extra.close(); } catch {}
+  }
+
+  let finalUrl = safePageUrl(page);
+  let title = '';
+  let navError = null;
+  let savedAuthState = null;
   try {
-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: Number(options.navigationTimeoutMs || 120000) });
-  } catch {}
+    await page.goto(normalizedTargetUrl, { waitUntil: 'domcontentloaded', timeout: Number(options.navigationTimeoutMs || 120000) });
+    finalUrl = safePageUrl(page);
+    title = await safeTitle(page);
+  } catch (err) {
+    navError = err.message;
+    finalUrl = safePageUrl(page);
+  }
+
   ensureDir(authProfile.userDataDir);
+  const openedTabs = [{ id: 'authSetup', requestedUrl: normalizedTargetUrl, finalUrl, title, error: navError }];
+  console.log('[browsy:auth-setup] navigation result', {
+    appId: authProfile.appId,
+    workflowId,
+    authProfileId: authProfile.authProfileId,
+    targetUrl: normalizedTargetUrl,
+    finalUrl,
+    navError,
+    channel,
+  });
+
+  if (navError || isBlankUrl(finalUrl)) {
+    try { await context.close(); } catch {}
+    const details = navError ? `navigation error: ${navError}` : `final URL was ${finalUrl || '(empty)'}`;
+    throw new Error(`Auth setup failed to open ${normalizedTargetUrl}; ${details}.`);
+  }
+
+  try {
+    ensureDir(path.dirname(authProfile.storageStatePath));
+    await context.storageState({ path: authProfile.storageStatePath });
+    savedAuthState = authProfile.storageStatePath;
+  } catch {}
+
   // In headless mode there is no interactive user to close the window; close
   // immediately so the process (and any test server) can drain cleanly.
   if (headless) {
     try { await context.close(); } catch {}
+    recoverStaleProfileLock(authProfile);
   }
   return {
     mode: 'auth_setup',
@@ -198,7 +291,10 @@ export async function openAuthSetupProfile({ appId, workflowId, authProfileId, t
     authProfileId: authProfile.authProfileId,
     userDataDir: authProfile.userDataDir,
     storageStatePath: authProfile.storageStatePath,
-    targetUrl,
+    savedAuthState,
+    targetUrl: normalizedTargetUrl,
+    finalUrl,
+    openedTabs,
     instructions: [
       'Sign in to the target site in the opened Chrome window.',
       'Close the window when done — the session is saved to the persistent profile.',
@@ -213,9 +309,10 @@ export async function openAuthSetupProfile({ appId, workflowId, authProfileId, t
 // is always closed before returning. We never return or log cookies, tokens, or
 // page body text — only the final URL, title, and the generic verdict.
 export async function runAuthPreflight({ appId, workflowId, authProfileId, targetUrl, rules, options = {} } = {}) {
-  if (!targetUrl) throw new Error('targetUrl is required for auth preflight');
+  const normalizedTargetUrl = normalizeTargetUrl(targetUrl, 'auth preflight');
   const session = { appId, workflowId, recordingSetup: { authProfileId, tabs: [{ siteId: authProfileId, authProfileId }] } };
   const authProfile = resolveAuthProfile(session, { authProfileId });
+  assertProfileNotLocked(authProfile);
   const headless = options.headless !== false;
   const slowMo = Number(options.slowMo || 0) || 0;
 
@@ -233,7 +330,7 @@ export async function runAuthPreflight({ appId, workflowId, authProfileId, targe
     channel = launched.channel;
     const page = context.pages().find(p => isBlankUrl(p.url())) || await context.newPage();
     try {
-      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: Number(options.navigationTimeoutMs || 60000) });
+      await page.goto(normalizedTargetUrl, { waitUntil: 'domcontentloaded', timeout: Number(options.navigationTimeoutMs || 60000) });
     } catch (err) {
       navError = err.message;
     }
@@ -242,14 +339,15 @@ export async function runAuthPreflight({ appId, workflowId, authProfileId, targe
     bodyText = await page.evaluate(() => (document.body?.innerText || '').slice(0, 4000)).catch(() => '');
   } finally {
     try { await context?.close(); } catch {}
+    recoverStaleProfileLock(authProfile);
   }
 
-  const verdict = evaluateAuthPreflight({ targetUrl, finalUrl, title, bodyText, rules });
+  const verdict = evaluateAuthPreflight({ targetUrl: normalizedTargetUrl, finalUrl, title, bodyText, rules });
   ensureDir(authProfile.userDataDir);
   console.log('[browsy:auth-preflight] result', {
     appId: authProfile.appId,
     authProfileId: authProfile.authProfileId,
-    targetUrl,
+    targetUrl: normalizedTargetUrl,
     finalUrl,
     ok: verdict.ok,
     code: verdict.code,
@@ -263,7 +361,7 @@ export async function runAuthPreflight({ appId, workflowId, authProfileId, targe
     appId: authProfile.appId,
     userDataDir: authProfile.userDataDir,
     storageStatePath: authProfile.storageStatePath,
-    targetUrl,
+    targetUrl: normalizedTargetUrl,
     finalUrl,
     title,
     matchedRule: verdict.matchedRule,
@@ -299,6 +397,142 @@ async function launchBrowserContext({ headless, slowMo, authProfile, usePersiste
     }
   }
   throw lastError || new Error('failed to launch browser context');
+}
+
+function shouldUsePersistentRecordingProfile({ session, authProfile, options = {} } = {}) {
+  if (options.usePersistentProfile === true) return true;
+  if (options.usePersistentProfile === false) return false;
+  if (process.env.BROWSY_RECORDING_PERSISTENT_PROFILE === 'true') return true;
+  if (process.env.BROWSY_RECORDING_PERSISTENT_PROFILE === 'false') return false;
+  const tabs = Array.isArray(session?.recordingSetup?.tabs) ? session.recordingSetup.tabs : [];
+  const hasAuthRequirement = tabs.some(tab => tab.requiresAuth || tab.authProfileId || tab.authGroupId || tab.ssoProfileId)
+    || (Array.isArray(session?.auth) && session.auth.length > 0);
+  return hasAuthRequirement && !!authProfile?.userDataDir && exists(authProfile.userDataDir);
+}
+
+function assertProfileNotLocked(authProfile) {
+  const recovery = recoverStaleProfileLock(authProfile);
+  const lock = recovery.lock || detectProfileLock(authProfile.userDataDir);
+  if (!lock.locked) return;
+  const err = new Error(`Auth profile "${authProfile.authProfileId}" is locked by another browser process. Close the existing profile window and retry.`);
+  err.code = 'auth_profile_locked';
+  err.profileLock = { ...lock, userDataDir: authProfile.userDataDir, authProfileId: authProfile.authProfileId };
+  throw err;
+}
+
+function detectProfileLock(userDataDir) {
+  const names = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
+  const fileDetails = names.map(name => inspectLockFile(path.join(userDataDir || '', name))).filter(Boolean);
+  const files = fileDetails.map(detail => detail.path);
+  const owner = fileDetails.map(detail => detail.owner).find(Boolean) || null;
+  const ageMs = fileDetails.length ? Math.max(...fileDetails.map(detail => detail.ageMs || 0)) : null;
+  const staleByOwner = owner?.pid ? !isProcessAlive(owner.pid) : false;
+  const staleByAge = !owner?.pid && ageMs !== null && ageMs > STALE_LOCK_AGE_MS;
+  const stale = files.length > 0 && (staleByOwner || staleByAge);
+  return {
+    locked: files.length > 0,
+    files,
+    details: fileDetails,
+    owner,
+    ageMs,
+    stale,
+    recoveryAction: stale ? 'auto_clear_stale_lock' : (files.length ? 'protect_active_or_recent_lock' : 'none'),
+    reason: files.length ? `profile lock file present: ${files.map(file => path.basename(file)).join(', ')}` : null,
+  };
+}
+
+function recoverStaleProfileLock(authProfile, { force = false } = {}) {
+  const lock = detectProfileLock(authProfile.userDataDir);
+  const logBase = {
+    authProfileId: authProfile.authProfileId,
+    appId: authProfile.appId,
+    userDataDir: authProfile.userDataDir,
+    files: lock.files,
+    owner: lock.owner,
+    ageMs: lock.ageMs,
+    stale: lock.stale,
+  };
+  if (!lock.locked) {
+    console.log('[browsy:auth-lock] healthy', { ...logBase, recoveryAction: 'none' });
+    return { ok: true, cleared: false, lock, recoveryAction: 'none' };
+  }
+  if (!force && !lock.stale) {
+    console.log('[browsy:auth-lock] active lock protected', { ...logBase, recoveryAction: 'protected' });
+    return { ok: false, cleared: false, lock, recoveryAction: 'protected' };
+  }
+  const removed = [];
+  const errors = [];
+  for (const file of lock.files) {
+    try {
+      fs.rmSync(file, { force: true });
+      removed.push(file);
+    } catch (err) {
+      errors.push({ file, error: err.message });
+    }
+  }
+  const after = detectProfileLock(authProfile.userDataDir);
+  const result = { ok: !after.locked, cleared: removed.length > 0, lock: after, removed, errors, recoveryAction: force ? 'force_release_lock' : 'auto_clear_stale_lock' };
+  console.log('[browsy:auth-lock] recovered', { ...logBase, recoveryAction: result.recoveryAction, removed, errors, lockedAfter: after.locked });
+  return result;
+}
+
+function inspectLockFile(filePath) {
+  try {
+    const stat = fs.lstatSync(filePath);
+    const target = stat.isSymbolicLink() ? safeReadLink(filePath) : safeReadFile(filePath);
+    return {
+      path: filePath,
+      name: path.basename(filePath),
+      isSymlink: stat.isSymbolicLink(),
+      target,
+      owner: parseLockOwner(target),
+      ageMs: Math.max(0, Date.now() - stat.mtimeMs),
+      mtime: stat.mtime.toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function safeReadLink(filePath) {
+  try { return fs.readlinkSync(filePath); } catch { return ''; }
+}
+
+function safeReadFile(filePath) {
+  try { return fs.readFileSync(filePath, 'utf8').slice(0, 500); } catch { return ''; }
+}
+
+function parseLockOwner(value = '') {
+  const text = String(value || '');
+  const pidMatch = text.match(/(?:^|[^0-9])([1-9][0-9]{1,8})(?:[^0-9]|$)/);
+  if (!pidMatch) return null;
+  return { pid: Number(pidMatch[1]), raw: text };
+}
+
+function isProcessAlive(pid) {
+  if (!pid || pid === process.pid) return !!pid;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return err?.code === 'EPERM';
+  }
+}
+
+function normalizeTargetUrl(value, purpose = 'navigation') {
+  const raw = String(value || '').trim();
+  if (!raw) throw new Error(`targetUrl is required for ${purpose}`);
+  if (isBlankUrl(raw)) throw new Error(`targetUrl for ${purpose} cannot be ${raw}`);
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error(`targetUrl for ${purpose} must be a valid URL: ${raw}`);
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`targetUrl for ${purpose} must use http or https: ${raw}`);
+  }
+  return parsed.toString();
 }
 
 function isBlankUrl(url) {
@@ -366,8 +600,45 @@ export async function stopPlaywrightRecording(recordingSessionId) {
 
   try { await active.context.close(); } catch {}
   try { await active.browser?.close(); } catch {}
+  recoverStaleProfileLock(active.authProfile);
 
   const runtime = { status: 'stopped', active: false, stoppedAt, eventCount: countEventsOnDisk(recordingSessionId), screenshots, savedAuthState };
+  writeRuntimeStatus(recordingSessionId, runtime);
+  return { active: true, ...runtime };
+}
+
+export async function abandonPlaywrightRecording(recordingSessionId, { reason = 'abandoned by caller' } = {}) {
+  const active = activeRecordings.get(recordingSessionId);
+  if (!active) {
+    writeRuntimeStatus(recordingSessionId, { status: 'not_active', active: false });
+    return { active: false, eventCount: countEventsOnDisk(recordingSessionId) };
+  }
+
+  activeRecordings.delete(recordingSessionId);
+  const abandonedAt = new Date().toISOString();
+  let savedAuthState = null;
+  try {
+    if (active.authProfile?.storageStatePath) {
+      ensureDir(path.dirname(active.authProfile.storageStatePath));
+      await active.context.storageState({ path: active.authProfile.storageStatePath });
+      savedAuthState = active.authProfile.storageStatePath;
+    }
+  } catch {}
+
+  appendEventsToDisk(recordingSessionId, [{
+    id: `recording-abandoned-${Date.now()}`,
+    recordingSessionId,
+    timestamp: abandonedAt,
+    source: 'playwrightRecorder',
+    type: 'recording_abandoned',
+    rawEvidence: { eventCount: active.events.length, reason, savedAuthState },
+  }]);
+
+  try { await active.context.close(); } catch {}
+  try { await active.browser?.close(); } catch {}
+  recoverStaleProfileLock(active.authProfile);
+
+  const runtime = { status: 'abandoned', active: false, abandonedAt, eventCount: countEventsOnDisk(recordingSessionId), reason, savedAuthState };
   writeRuntimeStatus(recordingSessionId, runtime);
   return { active: true, ...runtime };
 }

@@ -69,7 +69,10 @@ section(2, 'field-map.local.json — every selector is present in the fixture (n
   const fixtureHtml = fs.readFileSync(FIXTURE, 'utf8');
 
   const selectors = [];
-  for (const [k, v] of Object.entries(fieldMap.fields || {})) selectors.push([k, v.selector]);
+  for (const [k, v] of Object.entries(fieldMap.fields || {})) {
+    if (v.required === false) continue; // optional fields may not be present on the fixture
+    selectors.push([k, v.selector]);
+  }
   for (const rg of fieldMap.repeatGroups || []) {
     if (rg.containerSelector) selectors.push([`repeatGroup.${rg.id}.container`, rg.containerSelector]);
     if (rg.itemSelector) selectors.push([`repeatGroup.${rg.id}.item`, rg.itemSelector]);

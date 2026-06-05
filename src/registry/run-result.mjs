@@ -102,6 +102,7 @@ export function buildRunResult(run = {}) {
 
   return {
     runId: run.runId,
+    correlationId: run.correlationId || null,
     status,
     contractVersion: REGISTRY_CONTRACT_VERSION,
     completedSteps: normalizeArray(internal.completedSteps || internal.completed_steps || internal.filled_fields),
@@ -119,6 +120,7 @@ export function buildRunResult(run = {}) {
 export function buildRunCreateResponse(run = {}) {
   return {
     runId: run.runId,
+    correlationId: run.correlationId || null,
     status: toPublicStatus(run),
     contractVersion: REGISTRY_CONTRACT_VERSION,
     statusUrl: `/api/runs/${run.runId}`,
@@ -165,6 +167,15 @@ export function buildWorkflowContract(workflowVersion, { baseUrl = 'http://local
     validationRules: workflowVersion.validationRules || [],
     replaySettings: workflowVersion.replaySettings || {},
     supportedModes: workflowVersion.supportedModes || [],
+    sourceMetadata: workflowVersion.sourceMetadata || null,
+    sourceAppId: workflowVersion.sourceAppId || workflowVersion.sourceMetadata?.sourceAppId || null,
+    sourceWorkflowId: workflowVersion.sourceWorkflowId || workflowVersion.sourceMetadata?.workflowId || null,
+    sourcePayloadSchema: workflowVersion.sourcePayloadSchema || workflowVersion.sourceMetadata?.sourcePayloadSchema || null,
+    sourceFieldMappings: workflowVersion.sourceFieldMappings || workflowVersion.sourceMetadata?.sourceFieldMappings || [],
+    tabUrlTemplates: workflowVersion.tabUrlTemplates || workflowVersion.sourceMetadata?.tabUrlTemplates || [],
+    authProfileRef: workflowVersion.authProfileRef || workflowVersion.sourceMetadata?.authProfileRef || null,
+    completionPolicy: workflowVersion.completionPolicy || workflowVersion.sourceMetadata?.completionPolicy || null,
+    writebackTargets: workflowVersion.writebackTargets || workflowVersion.sourceMetadata?.writebackTargets || [],
     runEndpoint: `POST ${baseUrl}/api/apps/${workflowVersion.appId}/workflows/${workflowVersion.workflowId}/runs`,
     runStatusEndpoint: `GET ${baseUrl}/api/runs/:runId`,
     approveEndpoint: `POST ${baseUrl}/api/runs/:runId/approve`,
