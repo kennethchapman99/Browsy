@@ -25,6 +25,7 @@ import {
   stopPlaywrightRecording,
   abandonPlaywrightRecording,
   getActivePlaywrightRecording,
+  isPlaywrightRecordingActive,
   openAuthSetupProfile,
   runAuthPreflight,
   inspectAuthProfile,
@@ -32,6 +33,49 @@ import {
 } from '../recording/playwright-recording-runtime.mjs';
 
 export const DEFAULT_PORT = 3001;
+
+// Recording sessions that are left in `recording` status clutter the wizard and
+// scare callers ("still open but idle"). We auto-reap them so nobody has to babysit
+// stale state. Two thresholds, both chosen so a *real* in-progress recording is never
+// killed:
+//   - A session whose Playwright browser is gone (no live context — e.g. after a
+//     server restart the recorder child process is already dead) can't be a real
+//     recording, so we reap it after a short grace that only exists to avoid racing
+//     a launch that's mid-flight.
+//   - A session with a live browser is only reaped after a generous idle window,
+//     since the on-disk updatedAt advances on every recorded event.
+const RECORDING_IDLE_LIMIT_MS = Number(process.env.BROWSY_RECORDING_IDLE_MS || 60 * 60 * 1000);
+const RECORDING_ORPHAN_GRACE_MS = Number(process.env.BROWSY_RECORDING_ORPHAN_MS || 5 * 60 * 1000);
+const RECORDING_REAP_INTERVAL_MS = Number(process.env.BROWSY_RECORDING_REAP_INTERVAL_MS || 5 * 60 * 1000);
+
+export async function reapStaleRecordingSessions({ now = Date.now() } = {}) {
+  const reaped = [];
+  let sessions;
+  try { sessions = listRecordingSessions(); } catch { return reaped; }
+  for (const s of sessions) {
+    if (s.status !== 'recording') continue;
+    const live = isPlaywrightRecordingActive(s.recordingSessionId);
+    const lastActivity = Date.parse(s.updatedAt || s.startedAt || s.createdAt || '') || 0;
+    const idleMs = now - lastActivity;
+    const limit = live ? RECORDING_IDLE_LIMIT_MS : RECORDING_ORPHAN_GRACE_MS;
+    if (idleMs < limit) continue;
+    const idleMin = Math.round(idleMs / 60000);
+    const reason = live
+      ? `auto-reaped: recording idle ${idleMin}m (limit ${Math.round(limit / 60000)}m)`
+      : `auto-reaped: orphaned recording, no live browser (idle ${idleMin}m)`;
+    try {
+      if (live) { try { await abandonPlaywrightRecording(s.recordingSessionId, { reason }); } catch {} }
+      abandonRecordingSession(s.recordingSessionId, { reason });
+      reaped.push({ recordingSessionId: s.recordingSessionId, live, idleMs, reason });
+      console.log('[browsy:recording-reaper] abandoned stale recording', {
+        recordingSessionId: s.recordingSessionId, live, idleMinutes: idleMin,
+      });
+    } catch (err) {
+      console.error('[browsy:recording-reaper] failed to reap', s.recordingSessionId, err?.message);
+    }
+  }
+  return reaped;
+}
 
 function json(req) {
   return new Promise((resolve, reject) => {
@@ -502,6 +546,13 @@ export function startServer({ port = DEFAULT_PORT } = {}) {
     throw error;
   });
   server.listen(port, () => console.log(`Browsy Registry API listening on http://localhost:${port}`));
+  // Clear orphaned recordings left by a prior process, then sweep on an interval.
+  reapStaleRecordingSessions().catch(err => console.error('[browsy:recording-reaper] boot sweep failed', err?.message));
+  const reaperTimer = setInterval(() => {
+    reapStaleRecordingSessions().catch(err => console.error('[browsy:recording-reaper] sweep failed', err?.message));
+  }, RECORDING_REAP_INTERVAL_MS);
+  reaperTimer.unref?.();
+  server.on('close', () => clearInterval(reaperTimer));
   return server;
 }
 
