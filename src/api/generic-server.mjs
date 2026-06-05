@@ -135,8 +135,18 @@ async function startRecording(recordingSessionId, body) {
   const tabs = session.recordingSetup?.tabs || [];
   const authProfiles = [...new Set((session.auth || []).map(a => a.authProfileId || a.siteId).filter(Boolean))];
   for (const authProfileId of authProfiles) {
-    const recovery = recoverAuthProfileLock({ appId: session.appId, workflowId: session.workflowId, authProfileId });
-    const profile = inspectAuthProfile({ appId: session.appId, workflowId: session.workflowId, authProfileId });
+    let recovery = recoverAuthProfileLock({ appId: session.appId, workflowId: session.workflowId, authProfileId });
+    let profile = inspectAuthProfile({ appId: session.appId, workflowId: session.workflowId, authProfileId });
+    // A stale lock (owner PID confirmed dead, or aged out) is never a real
+    // holder — overlapping launch attempts can re-thrash it between recover and
+    // inspect. Force-clear and re-check before refusing to launch.
+    if (profile.locked && profile.stale) {
+      console.log('[browsy:recording] forcing stale auth-profile lock release', {
+        authProfileId, lockOwner: profile.lockOwner, lockAgeMs: profile.lockAgeMs,
+      });
+      recovery = recoverAuthProfileLock({ appId: session.appId, workflowId: session.workflowId, authProfileId, force: true });
+      profile = inspectAuthProfile({ appId: session.appId, workflowId: session.workflowId, authProfileId });
+    }
     if (profile.locked) {
       return {
         ok: false,
