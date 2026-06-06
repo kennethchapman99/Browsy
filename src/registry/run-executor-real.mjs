@@ -38,9 +38,7 @@ export async function executeRun(args) {
     const hasReplayMaterial = Array.isArray(workflowVersion.recordedSteps) && workflowVersion.recordedSteps.length > 0;
     const hasReplayStrategy = !!workflowVersion.replaySettings?.strategy;
     const isDryRun = mode === 'dry_run'
-      || mode === 'preview'
       || workflowVersion.replaySettings?.disableRealReplay === true
-      || (mode !== 'live' && workflowVersion.replaySettings?.defaultMode === 'dry_run')
       || (!hasReplayMaterial && !hasReplayStrategy);
     if (isDryRun) {
       engineResult = dryRunResult({ runId, workflowVersion });

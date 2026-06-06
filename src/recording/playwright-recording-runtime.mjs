@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { execFileSync } from 'child_process';
 import { chromium } from 'playwright';
 import { OUTPUT_DIR, ensureDir, exists, readJson, writeJson } from '../core/paths.mjs';
 import { evaluateAuthPreflight } from '../core/auth-preflight.mjs';
@@ -79,7 +80,7 @@ export async function startPlaywrightRecording({ recordingSessionId, session, op
   }
 
   const usePersistent = shouldUsePersistentRecordingProfile({ session, authProfile, options });
-  if (usePersistent) assertProfileNotLocked(authProfile);
+  if (usePersistent) await assertProfileNotLocked(authProfile);
   const { browser, context, channel } = await launchBrowserContext({ headless, slowMo, authProfile, usePersistent, contextOptions });
 
   const events = [];
@@ -87,7 +88,9 @@ export async function startPlaywrightRecording({ recordingSessionId, session, op
   const append = event => {
     const normalized = normalizeEvent(recordingSessionId, event);
     events.push(normalized);
-    appendEventsToDisk(recordingSessionId, [normalized]);
+    if (events.length <= 10 || events.length % 100 === 0) {
+      writeEventsToDisk(recordingSessionId, events);
+    }
     return normalized;
   };
 
@@ -230,7 +233,7 @@ export async function openAuthSetupProfile({ appId, workflowId, authProfileId, t
   const normalizedTargetUrl = normalizeTargetUrl(targetUrl, 'auth setup');
   const session = { appId, workflowId, recordingSetup: { authProfileId, tabs: [{ siteId: authProfileId, authProfileId }] } };
   const authProfile = resolveAuthProfile(session, { authProfileId });
-  assertProfileNotLocked(authProfile);
+  await assertProfileNotLocked(authProfile);
   const headless = options.headless === true;
   const slowMo = Number(options.slowMo || 0) || 0;
   const { context, channel } = await launchBrowserContext({
@@ -312,7 +315,7 @@ export async function runAuthPreflight({ appId, workflowId, authProfileId, targe
   const normalizedTargetUrl = normalizeTargetUrl(targetUrl, 'auth preflight');
   const session = { appId, workflowId, recordingSetup: { authProfileId, tabs: [{ siteId: authProfileId, authProfileId }] } };
   const authProfile = resolveAuthProfile(session, { authProfileId });
-  assertProfileNotLocked(authProfile);
+  await assertProfileNotLocked(authProfile);
   const headless = options.headless !== false;
   const slowMo = Number(options.slowMo || 0) || 0;
 
@@ -410,7 +413,58 @@ function shouldUsePersistentRecordingProfile({ session, authProfile, options = {
   return hasAuthRequirement && !!authProfile?.userDataDir && exists(authProfile.userDataDir);
 }
 
-function assertProfileNotLocked(authProfile) {
+const reclaimSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function processCommandLine(pid) {
+  if (!pid) return '';
+  try {
+    return execFileSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return '';
+  }
+}
+
+// True only when `pid` is a live Chromium/Chrome bound to this exact profile dir —
+// a browser Browsy itself launched. A user's own Chrome on a different profile
+// never matches and is never reclaimed.
+function isOwnProfileBrowser(pid, userDataDir) {
+  if (!pid || !userDataDir) return false;
+  const cmd = processCommandLine(pid);
+  if (!cmd) return false;
+  return /chrom(e|ium)/i.test(cmd) && cmd.includes(userDataDir);
+}
+
+// A recorder/auth-setup browser left open keeps the persistent profile locked.
+// The next session must take it back, so reclaim a lock held by our own prior
+// browser on the same profile. Foreign owners are left for assertProfileNotLocked.
+async function reclaimOwnProfileLock(authProfile, { pollMs = 150, maxWaitMs = 6000 } = {}) {
+  const lock = detectProfileLock(authProfile.userDataDir);
+  if (!lock.locked) return { reclaimed: false, reason: 'not_locked' };
+  const ownerPid = lock.owner?.pid || null;
+  if (!ownerPid || !isProcessAlive(ownerPid)) return { reclaimed: false, reason: 'no_live_owner' };
+  if (!isOwnProfileBrowser(ownerPid, authProfile.userDataDir)) return { reclaimed: false, reason: 'foreign_owner', ownerPid };
+  try { process.kill(ownerPid, 'SIGTERM'); } catch {}
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline && isProcessAlive(ownerPid)) await reclaimSleep(pollMs);
+  if (isProcessAlive(ownerPid)) {
+    try { process.kill(ownerPid, 'SIGKILL'); } catch {}
+    const hardDeadline = Date.now() + 2000;
+    while (Date.now() < hardDeadline && isProcessAlive(ownerPid)) await reclaimSleep(pollMs);
+  }
+  for (const file of detectProfileLock(authProfile.userDataDir).files) {
+    try { fs.rmSync(file, { force: true }); } catch {}
+  }
+  const after = detectProfileLock(authProfile.userDataDir);
+  return { reclaimed: !after.locked, ownerPid, reason: after.locked ? 'still_locked' : 'reclaimed' };
+}
+
+async function assertProfileNotLocked(authProfile) {
+  if (process.env.BROWSY_NO_RECLAIM_PROFILE !== 'true') {
+    try {
+      const reclaim = await reclaimOwnProfileLock(authProfile);
+      if (reclaim.reclaimed) console.log('[browsy:auth-lock] reclaimed own profile browser', { authProfileId: authProfile.authProfileId, ownerPid: reclaim.ownerPid });
+    } catch {}
+  }
   const recovery = recoverStaleProfileLock(authProfile);
   const lock = recovery.lock || detectProfileLock(authProfile.userDataDir);
   if (!lock.locked) return;
@@ -589,14 +643,16 @@ export async function stopPlaywrightRecording(recordingSessionId) {
     }
   } catch {}
 
-  appendEventsToDisk(recordingSessionId, [{
+  const stoppedEvent = {
     id: `recording-stopped-${Date.now()}`,
     recordingSessionId,
     timestamp: stoppedAt,
     source: 'playwrightRecorder',
     type: 'recording_stopped',
     rawEvidence: { eventCount: active.events.length, screenshots, savedAuthState },
-  }]);
+  };
+  active.events.push(stoppedEvent);
+  writeEventsToDisk(recordingSessionId, active.events);
 
   try { await active.context.close(); } catch {}
   try { await active.browser?.close(); } catch {}
@@ -739,7 +795,8 @@ function buildTabVerification({ tabs, openedTabs }) {
   };
 }
 
-function appendEventsToDisk(recordingSessionId, events = []) { const dir = recordingDir(recordingSessionId); ensureDir(dir); const eventsPath = path.join(dir, 'events.json'); const existing = exists(eventsPath) ? readJson(eventsPath) : []; const merged = [...(Array.isArray(existing) ? existing : []), ...events]; writeJson(eventsPath, merged); const sessionPath = path.join(dir, 'session.json'); if (exists(sessionPath)) { const session = readJson(sessionPath); writeJson(sessionPath, { ...session, events: merged, updatedAt: new Date().toISOString() }); } }
+function appendEventsToDisk(recordingSessionId, events = []) { const dir = recordingDir(recordingSessionId); ensureDir(dir); const eventsPath = path.join(dir, 'events.json'); const existing = exists(eventsPath) ? readJson(eventsPath) : []; const merged = [...(Array.isArray(existing) ? existing : []), ...events]; writeEventsToDisk(recordingSessionId, merged); }
+function writeEventsToDisk(recordingSessionId, events = []) { const dir = recordingDir(recordingSessionId); ensureDir(dir); writeJson(path.join(dir, 'events.json'), Array.isArray(events) ? events : []); const sessionPath = path.join(dir, 'session.json'); if (exists(sessionPath)) { const session = readJson(sessionPath); const { events: _events, ...metadata } = session; writeJson(sessionPath, { ...metadata, eventCount: Array.isArray(events) ? events.length : 0, eventSink: `output/recordings/${recordingSessionId}/events.json`, updatedAt: new Date().toISOString() }); } }
 async function capturePageScreenshot({ recordingSessionId, page, pageId = 'page', reason = 'capture' }) { try { const dir = path.join(recordingDir(recordingSessionId), 'screenshots'); ensureDir(dir); const name = `${safeSegment(pageId)}-${safeSegment(reason)}-${Date.now()}.png`; const filePath = path.join(dir, name); await page.screenshot({ path: filePath, fullPage: true }); return { name, path: filePath, pageUrl: page.url(), reason }; } catch { return null; } }
 function resolveAuthProfile(session, options = {}) { const setup = session?.recordingSetup || {}; const tabs = Array.isArray(setup.tabs) ? setup.tabs : []; const firstAuth = Array.isArray(session?.auth) ? session.auth[0] : null; const firstSiteTab = tabs.find(t => t.siteId); const firstProfileTab = tabs.find(t => t.authProfileId || t.authGroupId || t.ssoProfileId); const explicit = options.authProfileId || options.authGroupId || options.ssoProfileId || setup.authProfileId || setup.authGroupId || setup.ssoProfileId || firstProfileTab?.authProfileId || firstProfileTab?.authGroupId || firstProfileTab?.ssoProfileId; const authProfileId = safeSegment(explicit || firstAuth?.siteId || firstSiteTab?.siteId || session?.appId || 'default'); const appSegment = safeSegment(session?.appId || 'default'); const dir = path.join(OUTPUT_DIR, 'auth-profiles', appSegment, authProfileId); return { authProfileId, appId: appSegment, userDataDir: path.join(dir, 'user-data'), storageStatePath: path.join(dir, 'storageState.json') }; }
 function writeRuntimeStatus(recordingSessionId, status) { const dir = recordingDir(recordingSessionId); ensureDir(dir); writeJson(path.join(dir, 'runtime-status.json'), { recordingSessionId, updatedAt: new Date().toISOString(), ...status }); }

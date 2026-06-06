@@ -33,9 +33,17 @@ function globalFieldSelector(source, fieldMap) {
   return `[data-browsy-field="${fieldName}"]`;
 }
 
-function itemFieldSelector(fieldName, fieldMap) {
+// Substitute 1-based ({n}) and 0-based ({i}) item indices into a selector template.
+function substituteIndex(selector, itemIndex) {
+  if (typeof selector !== 'string') return selector;
+  return selector
+    .replace(/\{n\}/g, String(itemIndex + 1))
+    .replace(/\{i\}/g, String(itemIndex));
+}
+
+function itemFieldSelector(fieldName, fieldMap, itemIndex = 0) {
   if (fieldMap?.fields?.[fieldName]?.selector) {
-    return fieldMap.fields[fieldName].selector;
+    return substituteIndex(fieldMap.fields[fieldName].selector, itemIndex);
   }
   const legacyTestid = ITEM_TESTID[fieldName];
   if (legacyTestid) {
@@ -44,10 +52,117 @@ function itemFieldSelector(fieldName, fieldMap) {
   return `[data-browsy-item-field="${fieldName}"]`;
 }
 
+// True when any item-field selector uses an index template ({n}/{i}). Such
+// selectors are self-indexing (e.g. live DistroKid's input.uploadFileTitle.track_3),
+// so per-item fields run against the whole page rather than a scoped DOM section.
+function usesIndexedSelectors(fieldMap) {
+  const fields = fieldMap?.fields || {};
+  return Object.values(fields).some(
+    f => f?.item && typeof f.selector === 'string' && /\{[ni]\}/.test(f.selector)
+  );
+}
+
+// Drive DistroKid's per-track AI-disclosure modal sequence.
+// Config (from fieldMap.fields[fieldName]): selector (gate radios), scopeSelector,
+// scopeValue, confirmLabels[], saveLabel, optional triggerSelector to open the modal.
+// gateValue: "1"=all-AI, "2"=part AI+human, "0"=none.
+async function handleAiDisclosure(page, fieldDef, gateValue, itemIndex, policy, label) {
+  const sub = (s) => substituteIndex(s, itemIndex);
+
+  if (fieldDef.triggerSelector) {
+    const trig = page.locator(sub(fieldDef.triggerSelector)).first();
+    if (await trig.count() > 0) await safeClick(trig, `${label} trigger`, policy);
+  }
+
+  const gateSel = sub(fieldDef.selector || 'input.distroAiGate');
+  const byValue = page.locator(`${gateSel}[value="${gateValue}"]`).first();
+  if (await byValue.count() > 0) {
+    await byValue.check();
+  } else {
+    const all = page.locator(gateSel);
+    const n = await all.count();
+    if (n === 0) throw new Error(`${label}: AI gate selector "${gateSel}" not found`);
+    await all.nth(Math.min(Number(gateValue) || 0, n - 1)).check();
+  }
+
+  // The follow-up dialogs are SweetAlert2 modals. Scope confirm clicks to the
+  // visible .swal2-popup and click its primary confirm button (.swal2-confirm),
+  // not arbitrary page buttons — otherwise a label like "OK" can match an
+  // unrelated overlay (e.g. the Osano cookie banner).
+  for (let i = 0; i < (fieldDef.confirmLabels || []).length; i++) {
+    const confirm = page.locator('.swal2-popup .swal2-confirm:visible').first();
+    if (await confirm.count() > 0) {
+      await safeClick(confirm, `${label} confirm[${i}]`, policy);
+      await page.waitForTimeout(300);
+    }
+  }
+
+  if (fieldDef.scopeSelector && fieldDef.scopeValue) {
+    const scopeSel = sub(fieldDef.scopeSelector);
+    const scopeByVal = page.locator(`${scopeSel}[value="${fieldDef.scopeValue}"]`).first();
+    if (await scopeByVal.count() > 0) await scopeByVal.check().catch(() => {});
+    else {
+      const anyScope = page.locator(scopeSel).first();
+      if (await anyScope.count() > 0) await anyScope.check().catch(() => {});
+    }
+  }
+
+  const saveBtn = page.locator('.swal2-popup .swal2-confirm:visible').first();
+  if (await saveBtn.count() > 0) await safeClick(saveBtn, `${label} save`, policy);
+}
+
+// Dismiss the Osano cookie-consent banner if present — it overlays the page and
+// intercepts clicks/visibility for elements beneath it.
+async function dismissCookieBanner(page) {
+  const accept = page.locator('.osano-cm-accept-all, .osano-cm-accept, .osano-cm-save').first();
+  try {
+    if (await accept.count() > 0 && await accept.isVisible()) {
+      await accept.click({ timeout: 3000 });
+      await page.waitForTimeout(300);
+    }
+  } catch { /* non-fatal */ }
+}
+
 // Resolve item section selector: prefer generic attribute, fall back to legacy class.
 async function resolveSectionSelector(page) {
   const count = await page.locator('[data-browsy-item-section]').count();
   return count > 0 ? '[data-browsy-item-section]' : '.track-section';
+}
+
+// Select a <select> option, tolerating label punctuation/whitespace differences.
+// Tries Playwright's exact value/label match first, then falls back to a
+// normalized comparison against the actual option list (e.g. payload
+// "Hip-Hop/Rap" vs DistroKid option "Hip Hop/Rap").
+async function selectOptionResilient(el, value, label) {
+  const target = String(value ?? '');
+  const norm = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const wanted = norm(target);
+
+  // Read options via evaluate — works even when the native <select> is hidden
+  // behind a custom widget (e.g. DistroKid's data-dk-searchable-select).
+  const options = await el.evaluate(sel =>
+    [...sel.options].map(o => ({ value: o.value, text: o.textContent || '' }))
+  );
+  const match = options.find(o => o.value === target || o.text.trim() === target)
+    || options.find(o => norm(o.text) === wanted || norm(o.value) === wanted)
+    || (wanted.length > 0 ? options.find(o => norm(o.text).includes(wanted)) : null);
+  if (!match) {
+    throw new Error(`${label}: no <option> matched "${target}" (options: ${options.map(o => o.text.trim()).filter(Boolean).join(', ')})`);
+  }
+
+  try {
+    await el.selectOption(match.value, { timeout: 3000 });
+    return;
+  } catch {
+    // Native select is hidden behind a custom widget — set the value directly
+    // and fire the events the widget/validation listen for.
+    await el.evaluate((node, v) => {
+      node.value = v;
+      node.dispatchEvent(new Event('input', { bubbles: true }));
+      node.dispatchEvent(new Event('change', { bubbles: true }));
+      node.dispatchEvent(new Event('blur', { bubbles: true }));
+    }, match.value);
+  }
 }
 
 // Fill a text/date input, select, or checkbox within `scope` (Page or Locator).
@@ -60,14 +175,27 @@ async function fillField(scope, selector, value, label) {
   const type    = await el.evaluate(e => (e.type || '').toLowerCase());
 
   if (tagName === 'select') {
-    await el.selectOption(String(value ?? ''));
+    await selectOptionResilient(el, value, label);
   } else if (type === 'checkbox') {
     const shouldCheck = Boolean(value);
     if (shouldCheck !== await el.isChecked()) {
       shouldCheck ? await el.check() : await el.uncheck();
     }
   } else {
-    await el.fill(String(value ?? ''));
+    const text = String(value ?? '');
+    try {
+      await el.fill(text, { timeout: 5000 });
+    } catch {
+      // Input exists but isn't visible/editable (e.g. a collapsed DistroKid
+      // credit row). Set the value directly and fire the events validation and
+      // onblur handlers listen for. The human checkpoint still gates submit.
+      await el.evaluate((node, v) => {
+        node.value = v;
+        node.dispatchEvent(new Event('input', { bubbles: true }));
+        node.dispatchEvent(new Event('change', { bubbles: true }));
+        node.dispatchEvent(new Event('blur', { bubbles: true }));
+      }, text);
+    }
   }
 }
 
@@ -161,6 +289,7 @@ export async function executeRunPlanWithPlaywright({
   trace = false,
   safetyPolicy,
   fieldMap,
+  userDataDir = null,
   downloadsDir = null,
 }) {
   const policy          = safetyPolicy ?? defaultSafetyPolicy();
@@ -168,13 +297,25 @@ export async function executeRunPlanWithPlaywright({
   const skippedSteps    = [];
   const capturedOutputs = {};
   const downloadedFiles = [];
+  const indexedMode     = usesIndexedSelectors(fieldMap);
   let checkpoint  = null;
   let finalState  = null;
   let browser     = null;
+  let persistentCtx = null;
 
   try {
-    browser = await chromium.launch({ headless });
-    const ctx  = await browser.newContext({ acceptDownloads: true });
+    let ctx;
+    if (userDataDir) {
+      // Live mode: reuse the persistent auth profile so DistroKid is logged in.
+      persistentCtx = await chromium.launchPersistentContext(userDataDir, {
+        headless,
+        acceptDownloads: true,
+      });
+      ctx = persistentCtx;
+    } else {
+      browser = await chromium.launch({ headless });
+      ctx = await browser.newContext({ acceptDownloads: true });
+    }
 
     if (trace) {
       await ctx.tracing.start({ screenshots: true, snapshots: true });
@@ -183,6 +324,7 @@ export async function executeRunPlanWithPlaywright({
     const page = await ctx.newPage();
     const url  = targetUrl ?? pathToFileURL(path.resolve(fixturePath)).href;
     await page.goto(url);
+    await dismissCookieBanner(page);
 
     // Capture downloads — always record metadata; persist bytes only when downloadsDir is set.
     page.on('download', async download => {
@@ -207,15 +349,16 @@ export async function executeRunPlanWithPlaywright({
     // For live URLs with repeat groups, wait for at least one section to appear before
     // detecting the selector — sections may load asynchronously.
     const hasRepeatSteps = runPlan.steps.some(s => s.type === 'repeat_iteration');
-    if (hasRepeatSteps) {
+    if (hasRepeatSteps && !indexedMode) {
       await page.waitForSelector(
         '[data-browsy-item-section], .track-section',
         { timeout: 10_000 }
       ).catch(() => {}); // graceful: page may have no sections yet on first load
     }
 
-    // Detect section selector once after page load
-    let sectionSel = await resolveSectionSelector(page);
+    // Detect section selector once after page load (skipped in indexed mode,
+    // where item fields self-index via {n}/{i} templated selectors).
+    let sectionSel = indexedMode ? null : await resolveSectionSelector(page);
 
     for (const step of runPlan.steps) {
       // ── Global fill ──────────────────────────────────────────────────────────
@@ -254,7 +397,12 @@ export async function executeRunPlanWithPlaywright({
         for (const sub of subSteps) {
           // ensure_section — verify or create the DOM section for this item
           if (sub.type === 'ensure_section') {
-            if (itemIndex === 0 || !sub.repeatAction) {
+            if (indexedMode) {
+              // Indexed mode: live page has no section markers; per-item fields
+              // target index-templated selectors directly. Nothing to create.
+              executedSteps.push({ type: sub.type, itemIndex, action: 'indexed-noop' });
+
+            } else if (itemIndex === 0 || !sub.repeatAction) {
               // First section pre-exists — verify it is there
               const count = await page.locator(sectionSel).count();
               if (count <= itemIndex) {
@@ -290,22 +438,43 @@ export async function executeRunPlanWithPlaywright({
 
           // fill_item — fill a non-file field scoped to this item section
           } else if (sub.type === 'fill_item') {
-            const section = page.locator(sectionSel).nth(itemIndex);
-            const sel     = itemFieldSelector(sub.fieldName, fieldMap);
-            const label   = `fill_item[${itemIndex}].${sub.fieldName}`;
-            await fillField(section, sel, sub.value, label);
-            executedSteps.push({
-              type: sub.type, itemIndex, fieldName: sub.fieldName, value: sub.value,
-              fromDefault: sub.fromDefault ?? false,
-            });
+            const fieldDef = fieldMap?.fields?.[sub.fieldName] || {};
+            const label    = `fill_item[${itemIndex}].${sub.fieldName}`;
+
+            if (fieldDef.kind === 'ai_disclosure') {
+              // Special: drive DistroKid's per-track AI-disclosure modal sequence.
+              // Non-fatal: AI disclosure is a sensitive, human-reviewed field, so
+              // if the modal flow can't be driven we record it for the human
+              // checkpoint rather than failing the whole run.
+              try {
+                await handleAiDisclosure(page, fieldDef, sub.value, itemIndex, policy, label);
+                executedSteps.push({
+                  type: sub.type, itemIndex, fieldName: sub.fieldName, value: sub.value,
+                  kind: 'ai_disclosure',
+                });
+              } catch (aiErr) {
+                skippedSteps.push({
+                  type: sub.type, itemIndex, fieldName: sub.fieldName,
+                  kind: 'ai_disclosure', reason: `ai_disclosure not driven: ${aiErr.message}`,
+                });
+              }
+            } else {
+              const scope = indexedMode ? page : page.locator(sectionSel).nth(itemIndex);
+              const sel   = itemFieldSelector(sub.fieldName, fieldMap, itemIndex);
+              await fillField(scope, sel, sub.value, label);
+              executedSteps.push({
+                type: sub.type, itemIndex, fieldName: sub.fieldName, value: sub.value,
+                fromDefault: sub.fromDefault ?? false,
+              });
+            }
 
           // upload_item — set a file on an upload field scoped to this item section
           } else if (sub.type === 'upload_item') {
-            const section  = page.locator(sectionSel).nth(itemIndex);
-            const sel      = itemFieldSelector(sub.fieldName, fieldMap);
+            const scope    = indexedMode ? page : page.locator(sectionSel).nth(itemIndex);
+            const sel      = itemFieldSelector(sub.fieldName, fieldMap, itemIndex);
             const filePath = path.resolve(manifestBaseDir, sub.value);
             const label    = `upload_item[${itemIndex}].${sub.fieldName}`;
-            await uploadField(section, sel, filePath, label);
+            await uploadField(scope, sel, filePath, label);
             executedSteps.push({
               type: sub.type, itemIndex, fieldName: sub.fieldName, value: sub.value, resolvedPath: filePath,
             });
@@ -354,13 +523,14 @@ export async function executeRunPlanWithPlaywright({
       await ctx.tracing.stop({ path: path.join(traceDir, 'trace.zip') });
     }
 
-    await browser.close();
-    browser = null;
+    if (persistentCtx) { await persistentCtx.close(); persistentCtx = null; }
+    if (browser)       { await browser.close(); browser = null; }
 
     return { ok: true, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles };
 
   } catch (err) {
-    if (browser) await browser.close().catch(() => {});
+    if (persistentCtx) await persistentCtx.close().catch(() => {});
+    if (browser)       await browser.close().catch(() => {});
     return { ok: false, error: err.message, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles };
   }
 }

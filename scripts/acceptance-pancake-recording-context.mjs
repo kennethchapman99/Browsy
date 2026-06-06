@@ -123,6 +123,7 @@ assert.ok(defaultedSession.bindingHints.some(hint => hint.path === 'tracks[].aud
 assert.equal(defaultedSession.recordingSetup.tabs[0].urlTemplate, 'http://localhost:3737/releases/album/{album.id}');
 assert.equal(defaultedSession.recordingSetup.tabs[0].url, 'http://localhost:3737/releases/album/ALBUM_MPK9H71S_RTCM');
 assert.equal(defaultedSession.callbackUrl, 'http://localhost:3737/releases/album/ALBUM_MPK9H71S_RTCM/magic-release/ingest-result');
+assert.equal(defaultedSession.callbackUrlTemplate, 'http://localhost:3737/releases/album/{album.id}/magic-release/ingest-result');
 assert.equal(defaultedSession.fileBindings[0].binding, 'album.coverArtPath');
 pass('Pancake Robot defaults hydrate releaseId, aliases, callback, file bindings, and source URL template');
 

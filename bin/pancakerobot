@@ -70,7 +70,7 @@ function recordingRequest(payload) {
     targetUrl: 'https://distrokid.com/new/',
     releaseId: albumId,
     samplePayload: payload,
-    callbackUrl: `http://localhost:${PANCAKE_PORT}/releases/album/${encodeURIComponent(albumId)}/magic-release/ingest-result`,
+    callbackUrl: `http://localhost:${PANCAKE_PORT}/releases/album/{album.id}/magic-release/ingest-result`,
     completionPolicy: {
       action: 'wait_for_human_submission',
       notes: 'Stop at ready for user to submit in DistroKid.',

@@ -2,8 +2,12 @@
   "requiresLiveApproval": true,
   "dry_run_default": true,
   "pause_at_end_default": true,
-  "never_click_text": [],
-  "never_click_selectors": [],
+  "never_click_text": [
+    "#release-date-dp"
+  ],
+  "never_click_selectors": [
+    "#release-date-dp"
+  ],
   "manual_only_categories": [
     "final submission",
     "payment",
@@ -11,6 +15,7 @@
     "destructive action"
   ],
   "checkpoints": [
-    "beforeFinalSubmit"
+    "beforeFinalSubmit",
+    "releaseDateDpApproval"
   ]
 }

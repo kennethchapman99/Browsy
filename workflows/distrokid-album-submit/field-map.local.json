@@ -1,0 +1,522 @@
+{
+  "generatedAt": "2026-06-05T19:51:10.543Z",
+  "generatedBy": "browsy.observation-materializer",
+  "workflowId": "distrokid-album-submit",
+  "verificationStatus": "observed_not_verified",
+  "fields": {
+    "howmanysongs": {
+      "selector": "#howManySongsOnThisAlbum",
+      "fallbackSelectors": [
+        "select[name=\"howmanysongs\"]",
+        "select[aria-label=\"\\31 \\ song\\ \\(a\\ single\\)\\a 2\\ songs\\a 3\\ songs\\a 4\\ songs\\a 5\\ songs\\a 6\\ songs\\a 7\\ songs\\a 8\\ songs\\a 9\\ songs\\a 10\\ songs\\a 11\\ songs\\a 12\\ songs\\a 13\\ songs\\a 14\\ songs\\a 15\\ songs\\a 16\\ songs\\a 17\\ songs\\a 18\\ songs\\a 19\\ songs\\a 20\\ songs\\a 21\\ songs\\a 22\\ songs\\a 23\\ songs\\a 24\\ songs\\a 25\\ songs\\a 26\\ songs\\a 27\\ so\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-number-of-.ong:nth-of-type(2) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect"
+      ],
+      "type": "select",
+      "source": "howmanysongs",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "field_detected-1780688217121-1prkwo"
+    },
+    "releaseDate": {
+      "selector": "#release-date-dp",
+      "fallbackSelectors": [
+        "input[name=\"releaseDate\"]",
+        "input[aria-label=\"\\32 026-06-07\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-relea.e-date\\ relea:nth-of-type(11) > div > input.coolInput\\ cool-input-date"
+      ],
+      "type": "date",
+      "source": "album.releaseDate",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "field_detected-1780688230310-i4w5i6"
+    },
+    "primaryGenre": {
+      "selector": "#genrePrimary",
+      "fallbackSelectors": [
+        "select[name=\"genre1\"]",
+        "select[aria-label=\"Select\\ a\\ genre\\a Afrobeat\\a Afropop\\a Alternative\\a Big\\ Band\\a Blues\\a Children\\'s\\ Music\\a Christian\\/Gospel\\a Classical\\a Comedy\\a Contemporary\\ Latin\\a Country\\a Dance\\a Electronic\\a Fitness\\ \\&\\ Workout\\a Folk\\a French\\ Pop\\a German\\ Folk\\a German\\ Pop\\a Hip\\ Hop\\/Rap\\a Holiday\\a J-Pop\\a Jaz\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-primary-genre\\ dkRequiredForSpotify:nth-of-type(20) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect"
+      ],
+      "type": "select",
+      "source": "album.primaryGenre",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "field_detected-1780688242411-id9fqd"
+    },
+    "albumtitle": {
+      "selector": "#albumTitleInput",
+      "fallbackSelectors": [
+        "input[name=\"albumtitle\"]",
+        "input[aria-label=\"Soundhead\"]",
+        "div.upload-mobile > div.upload-mobile-album-title:nth-of-type(23) > div > div.upload-mobile-album-title\\ alert-container > input.coolInput\\ cool-input-text\\ no-emoji"
+      ],
+      "type": "text",
+      "source": "inputs.albumtitle",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "field_detected-1780688284012-z928r7"
+    },
+    "artworkPath": {
+      "selector": "#artwork",
+      "type": "file",
+      "source": "artworkPath",
+      "required": true,
+      "fallbackSelectors": [
+        "input[name=\"artwork\"]",
+        "input[aria-label=\"C\\:\\\\fakepath\\\\default-image\\.png\"]",
+        "div:nth-of-type(2) > div.artworkWrapped\\ margin-right-24:nth-of-type(1) > div.artworkInputBoxVi.ibleContainer\\ re:nth-of-type(1) > div.artworkInputBoxInvi.ible\\ re:nth-of-type(3) > input.large\\ di.troFileInput\\ re"
+      ]
+    },
+    "trackAudio": {
+      "selector": "#js-track-upload-{n}",
+      "type": "file",
+      "source": "track.audioPath",
+      "item": true,
+      "required": true
+    },
+    "trackTitle": {
+      "selector": "input.uploadFileTitle.track_{n}",
+      "type": "text",
+      "source": "track.title",
+      "item": true,
+      "required": true,
+      "fallbackSelectors": [
+        "input[name=\"title_\"].track_{n}",
+        "input[aria-label=\"Track {n} title\"]"
+      ]
+    },
+    "songwriterFirst": {
+      "selector": "input[name=\"songwriter_real_name_first{n}\"]",
+      "type": "text",
+      "source": "track.songwriterFirst",
+      "item": true
+    },
+    "songwriterLast": {
+      "selector": "input[name=\"songwriter_real_name_last{n}\"]",
+      "type": "text",
+      "source": "track.songwriterLast",
+      "item": true
+    },
+    "performerRole": {
+      "selector": "#track-{n}-performer-1-role",
+      "type": "select",
+      "source": "track.performerRole",
+      "item": true
+    },
+    "performerName": {
+      "selector": "#track-{n}-performer-1-name",
+      "type": "text",
+      "source": "track.performerName",
+      "item": true
+    },
+    "producerRole": {
+      "selector": "#track-{n}-producer-1-role",
+      "type": "select",
+      "source": "track.producerRole",
+      "item": true
+    },
+    "producerName": {
+      "selector": "#track-{n}-producer-1-name",
+      "type": "text",
+      "source": "track.producerName",
+      "item": true
+    },
+    "aiDisclosure": {
+      "kind": "ai_disclosure",
+      "selector": "input.distroAiGate",
+      "scopeSelector": "input.distroAiRecordingScope",
+      "scopeValue": "full",
+      "confirmLabels": [
+        "Do it",
+        "OK"
+      ],
+      "saveLabel": "Save",
+      "type": "radio",
+      "source": "track.aiGate",
+      "item": true
+    }
+  },
+  "uploads": {
+    "artwork": {
+      "selector": "#artwork",
+      "fallbackSelectors": [
+        "input[name=\"artwork\"]",
+        "input[aria-label=\"C\\:\\\\fakepath\\\\default-image\\.png\"]",
+        "div:nth-of-type(2) > div.artworkWrapped\\ margin-right-24:nth-of-type(1) > div.artworkInputBoxVi.ibleContainer\\ re:nth-of-type(1) > div.artworkInputBoxInvi.ible\\ re:nth-of-type(3) > input.large\\ di.troFileInput\\ re"
+      ],
+      "type": "file",
+      "source": "artwork",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "file_selected-1780688271912-n6pqc5"
+    },
+    "file": {
+      "selector": "#js-track-upload-3",
+      "fallbackSelectors": [
+        "input[name=\"file\"]",
+        "input[aria-label=\"C\\:\\\\fakepath\\\\still-here-still-dark\\.mp3\"]",
+        "div:nth-of-type(2) > form.uploadForm > div.audioFileInputBoxVi.ibleContainer:nth-of-type(1) > div.audioFileInputBoxInvi.ible:nth-of-type(2) > input.di.troFileInput\\ di"
+      ],
+      "type": "file",
+      "source": "file",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "file_selected-1780688361592-q26xzi"
+    }
+  },
+  "actions": {
+    "1": {
+      "selector": "input[name=\"ai_gate_4eac64db-f891-ced8-825f-232d558966ec\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"\\31 \"]",
+        "div.ai-credit.\\-:nth-of-type(14) > label:nth-of-type(2) > div.flex-input\\ ai-credit.-gate-row > div.padding-right-6:nth-of-type(1) > input.di.troAiGate"
+      ],
+      "type": "click",
+      "source": "1",
+      "required": true,
+      "selectorConfidence": "medium",
+      "sourceEventId": "action_detected-1780688321304-jnn8y9"
+    },
+    "20260607": {
+      "selector": "input[name=\"release_date\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"\\32 026-06-07\"]",
+        "div.flex\\ item.\\-:nth-of-type(1) > div:nth-of-type(2) > form.mt-4\\ flex\\ flex-col\\ gap-2\\ .m\\:flex-row\\  > label.text-.m\\ font- > input.mt-1\\ w-full\\ rounded-xl\\ border\\ border-zinc-200\\ px-3\\ py-2\\ text-.m\\ text-zinc-900"
+      ],
+      "type": "click",
+      "source": "20260607",
+      "required": true,
+      "selectorConfidence": "medium",
+      "sourceEventId": "action_detected-1780688226674-8c6ud2"
+    },
+    "1SongASingle2Songs3Songs4Songs5Songs6Songs7Songs8Songs9Songs10Songs11Songs12Songs13Songs14Songs15Songs16Songs17Songs18Songs19Songs20Songs21Songs22Songs23Songs24Songs25Songs26Songs27So": {
+      "selector": "#howManySongsOnThisAlbum",
+      "fallbackSelectors": [
+        "select[name=\"howmanysongs\"]",
+        "select[aria-label=\"\\31 \\ song\\ \\(a\\ single\\)\\a 2\\ songs\\a 3\\ songs\\a 4\\ songs\\a 5\\ songs\\a 6\\ songs\\a 7\\ songs\\a 8\\ songs\\a 9\\ songs\\a 10\\ songs\\a 11\\ songs\\a 12\\ songs\\a 13\\ songs\\a 14\\ songs\\a 15\\ songs\\a 16\\ songs\\a 17\\ songs\\a 18\\ songs\\a 19\\ songs\\a 20\\ songs\\a 21\\ songs\\a 22\\ songs\\a 23\\ songs\\a 24\\ songs\\a 25\\ songs\\a 26\\ songs\\a 27\\ so\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-number-of-.ong:nth-of-type(2) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect"
+      ],
+      "type": "click",
+      "source": "1SongASingle2Songs3Songs4Songs5Songs6Songs7Songs8Songs9Songs10Songs11Songs12Songs13Songs14Songs15Songs16Songs17Songs18Songs19Songs20Songs21Songs22Songs23Songs24Songs25Songs26Songs27So",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "action_detected-1780688217194-jb0ngr"
+    },
+    "releaseDateDp": {
+      "selector": "#release-date-dp",
+      "fallbackSelectors": [
+        "input[name=\"releaseDate\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-relea.e-date\\ relea:nth-of-type(11) > div > input.coolInput\\ cool-input-date"
+      ],
+      "type": "click",
+      "source": "releaseDateDp",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "action_detected-1780688228954-7ck49r"
+    },
+    "selectAGenreAfrobeatAfropopAlternativeBigBandBluesChildrenSMusicChristianGospelClassicalComedyContemporaryLatinCountryDanceElectronicFitnessWorkoutFolkFrenchPopGermanFolkGermanPopHipHopRapHolidayJPopJaz": {
+      "selector": "#genrePrimary",
+      "fallbackSelectors": [
+        "select[name=\"genre1\"]",
+        "select[aria-label=\"Select\\ a\\ genre\\a Afrobeat\\a Afropop\\a Alternative\\a Big\\ Band\\a Blues\\a Children\\'s\\ Music\\a Christian\\/Gospel\\a Classical\\a Comedy\\a Contemporary\\ Latin\\a Country\\a Dance\\a Electronic\\a Fitness\\ \\&\\ Workout\\a Folk\\a French\\ Pop\\a German\\ Folk\\a German\\ Pop\\a Hip\\ Hop\\/Rap\\a Holiday\\a J-Pop\\a Jaz\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-primary-genre\\ dkRequiredForSpotify:nth-of-type(20) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect"
+      ],
+      "type": "click",
+      "source": "selectAGenreAfrobeatAfropopAlternativeBigBandBluesChildrenSMusicChristianGospelClassicalComedyContemporaryLatinCountryDanceElectronicFitnessWorkoutFolkFrenchPopGermanFolkGermanPopHipHopRapHolidayJPopJaz",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "action_detected-1780688242429-bsnw7q"
+    },
+    "prepareOpenUploadFolder": {
+      "selector": "div:nth-of-type(2) > div.mt-3\\ rounded-2xl\\ border\\ border-zinc-200\\ bg-white\\ p-4:nth-of-type(5) > div.flex\\ flex-wrap\\ item.-center\\ ju:nth-of-type(1) > form > button.rounded-xl\\ border\\ border-.ky-300\\ bg-",
+      "fallbackSelectors": [
+        "button[aria-label=\"Prepare\\ \\&\\ open\\ upload\\ folder\"]"
+      ],
+      "type": "click",
+      "source": "prepareOpenUploadFolder",
+      "required": true,
+      "selectorConfidence": "medium",
+      "sourceEventId": "action_detected-1780688253478-hk033z"
+    },
+    "buttonAriaLabelCopyPath": {
+      "selector": "button[aria-label=\"Copy\\ path\"]",
+      "fallbackSelectors": [
+        "tbody.divide-y\\ divide-zinc-100 > tr:nth-of-type(4) > td.px-3\\ py-2\\ font-mono\\ text-\\[11px\\]\\ text-zinc-500:nth-of-type(3) > span.inline-flex\\ item.-center\\ gap-1\\.5 > button.copy-path-btn\\ .hrink-0\\ rounded-md\\ border\\ border-zinc-200\\ bg-white\\ p-1\\ text-zinc-400\\ hover\\:bg-zinc-50\\ hover\\:text-zinc-700"
+      ],
+      "type": "click",
+      "source": "buttonAriaLabelCopyPath",
+      "required": true,
+      "selectorConfidence": "medium",
+      "sourceEventId": "action_detected-1780688356490-i9k4qc"
+    },
+    "artwork": {
+      "selector": "#artwork",
+      "fallbackSelectors": [
+        "input[name=\"artwork\"]",
+        "div:nth-of-type(2) > div.artworkWrapped\\ margin-right-24:nth-of-type(1) > div.artworkInputBoxVi.ibleContainer\\ re:nth-of-type(1) > div.artworkInputBoxInvi.ible\\ re:nth-of-type(3) > input.large\\ di.troFileInput\\ re"
+      ],
+      "type": "click",
+      "source": "artwork",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "action_detected-1780688265779-298frq"
+    },
+    "albumTitleInput": {
+      "selector": "#albumTitleInput",
+      "fallbackSelectors": [
+        "input[name=\"albumtitle\"]",
+        "div.upload-mobile > div.upload-mobile-album-title:nth-of-type(23) > div > div.upload-mobile-album-title\\ alert-container > input.coolInput\\ cool-input-text\\ no-emoji"
+      ],
+      "type": "click",
+      "source": "albumTitleInput",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "action_detected-1780688275113-zddza8"
+    },
+    "jsTrackUpload1": {
+      "selector": "#js-track-upload-1",
+      "fallbackSelectors": [
+        "input[name=\"file\"]",
+        "div:nth-of-type(2) > form.uploadForm > div.audioFileInputBoxVi.ibleContainer:nth-of-type(1) > div.audioFileInputBoxInvi.ible:nth-of-type(2) > input.di.troFileInput\\ di"
+      ],
+      "type": "click",
+      "source": "jsTrackUpload1",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "action_detected-1780688295795-hnouzi"
+    },
+    "title4eac64dbF891Ced8825f232d558966ec": {
+      "selector": "#title_4eac64db-f891-ced8-825f-232d558966ec",
+      "fallbackSelectors": [
+        "input[name=\"title_4eac64db-f891-ced8-825f-232d558966ec\"]",
+        "input[aria-label=\"Track\\ 1\\ title\"]",
+        "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(2) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_1\\ no-emoji"
+      ],
+      "type": "click",
+      "source": "title4eac64dbF891Ced8825f232d558966ec",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "action_detected-1780688303231-3ldaac"
+    },
+    "inputNameSongwriterRealNameFirst1": {
+      "selector": "input[name=\"songwriter_real_name_first1\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"First\\ name\"]",
+        "div.ongwriter_row:nth-of-type(1) > div.margin-bottom-18\\ border-bottom-gray:nth-of-type(2) > div.ongwriter_full_name > div.mobileBreak\\ flex-input-new:nth-of-type(1) > input.coolInput\\ cool-input-text\\ .ongwriter_real_name_fir"
+      ],
+      "type": "click",
+      "source": "inputNameSongwriterRealNameFirst1",
+      "required": true,
+      "selectorConfidence": "medium",
+      "sourceEventId": "action_detected-1780688311853-4023fy"
+    },
+    "inputNameSongwriterRealNameLast1": {
+      "selector": "input[name=\"songwriter_real_name_last1\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"Last\\ name\"]",
+        "div.ongwriter_row:nth-of-type(1) > div.margin-bottom-18\\ border-bottom-gray:nth-of-type(2) > div.ongwriter_full_name > div.mobileBreak\\ flex-input-new:nth-of-type(3) > input.coolInput\\ cool-input-text\\ .ongwriter_real_name_la"
+      ],
+      "type": "click",
+      "source": "inputNameSongwriterRealNameLast1",
+      "required": true,
+      "selectorConfidence": "medium",
+      "sourceEventId": "action_detected-1780688314404-jlb8az"
+    },
+    "doIt": {
+      "selector": "button[aria-label=\"Confirm\"]",
+      "fallbackSelectors": [
+        "body.wal2-.hown\\  > div.wal2-container\\ .wal2-center\\ :nth-of-type(12) > div.wal2-popup\\ .wal2-modal\\  > div.wal2-action:nth-of-type(3) > button.wal2-confirm\\ .wal2-:nth-of-type(2)"
+      ],
+      "type": "click",
+      "source": "doIt",
+      "required": true,
+      "selectorConfidence": "medium",
+      "sourceEventId": "action_detected-1780688388696-3i6nhw"
+    },
+    "ok": {
+      "selector": "body.wal2-.hown\\  > div.wal2-container\\ .wal2-center\\ :nth-of-type(12) > div.wal2-popup\\ .wal2-modal\\  > div.wal2-action:nth-of-type(3) > button.wal2-confirm\\ .wal2-:nth-of-type(1)",
+      "fallbackSelectors": [
+        "button[aria-label=\"OK\"]"
+      ],
+      "type": "click",
+      "source": "ok",
+      "required": true,
+      "selectorConfidence": "medium",
+      "sourceEventId": "action_detected-1780688389239-0ns1t5"
+    },
+    "full": {
+      "selector": "div.ai-credit.-detail > label:nth-of-type(3) > div.flex-input\\ ai-credit.-item-row > div.padding-right-6:nth-of-type(1) > input.di.troAiRecordingScope",
+      "fallbackSelectors": [
+        "input[aria-label=\"full\"]"
+      ],
+      "type": "click",
+      "source": "full",
+      "required": true,
+      "selectorConfidence": "medium",
+      "sourceEventId": "action_detected-1780688322393-9b50c1"
+    },
+    "save": {
+      "selector": "body.wal2-.hown\\  > div.wal2-container\\ .wal2-center\\ :nth-of-type(12) > div.wal2-popup\\ .wal2-modal\\ ai-credit > div.wal2-action:nth-of-type(3) > button.wal2-confirm\\ ai-modal-btn\\ ai-modal-btn-.ave\\ :nth-of-type(2)",
+      "fallbackSelectors": [
+        "button[aria-label=\"Save\"]"
+      ],
+      "type": "click",
+      "source": "save",
+      "required": true,
+      "selectorConfidence": "medium",
+      "sourceEventId": "action_detected-1780688323666-5yyb6o"
+    },
+    "jsTrackUpload2": {
+      "selector": "#js-track-upload-2",
+      "fallbackSelectors": [
+        "input[name=\"file\"]",
+        "div:nth-of-type(2) > form.uploadForm > div.audioFileInputBoxVi.ibleContainer:nth-of-type(1) > div.audioFileInputBoxInvi.ible:nth-of-type(2) > input.di.troFileInput\\ di"
+      ],
+      "type": "click",
+      "source": "jsTrackUpload2",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "action_detected-1780688332868-hf32wv"
+    },
+    "title488d45ef37b184350f459f27c05fc33a": {
+      "selector": "#title_488d45ef-37b1-8435-0f45-9f27c05fc33a",
+      "fallbackSelectors": [
+        "input[name=\"title_488d45ef-37b1-8435-0f45-9f27c05fc33a\"]",
+        "input[aria-label=\"Track\\ 2\\ title\"]",
+        "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(3) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_2\\ no-emoji"
+      ],
+      "type": "click",
+      "source": "title488d45ef37b184350f459f27c05fc33a",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "action_detected-1780688339401-0w7mhu"
+    },
+    "jsTrackUpload3": {
+      "selector": "#js-track-upload-3",
+      "fallbackSelectors": [
+        "input[name=\"file\"]",
+        "div:nth-of-type(2) > form.uploadForm > div.audioFileInputBoxVi.ibleContainer:nth-of-type(1) > div.audioFileInputBoxInvi.ible:nth-of-type(2) > input.di.troFileInput\\ di"
+      ],
+      "type": "click",
+      "source": "jsTrackUpload3",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "action_detected-1780688358530-ae5m0w"
+    },
+    "titleC34d2c4d2132D9b1Dd9cC4b5339c55e4": {
+      "selector": "#title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4",
+      "fallbackSelectors": [
+        "input[name=\"title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4\"]",
+        "input[aria-label=\"Track\\ 3\\ title\"]",
+        "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(4) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_3\\ no-emoji"
+      ],
+      "type": "click",
+      "source": "titleC34d2c4d2132D9b1Dd9cC4b5339c55e4",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "action_detected-1780688364600-bc9dg0"
+    },
+    "inputAriaLabelSelectARole": {
+      "selector": "input[aria-label=\"Select\\ a\\ role\"]",
+      "fallbackSelectors": [
+        "[role=\"combobox\"]",
+        "div.requirement.-producer:nth-of-type(2) > div.requirement.-producer > div.alert-container:nth-of-type(1) > div.dk-.earchable-:nth-of-type(1) > input.dk-.earchable-"
+      ],
+      "type": "click",
+      "source": "inputAriaLabelSelectARole",
+      "required": true,
+      "selectorConfidence": "medium",
+      "sourceEventId": "action_detected-1780688382248-g3ym1a"
+    },
+    "track1Performer1Name": {
+      "selector": "#track-1-performer-1-name",
+      "fallbackSelectors": [
+        "input[name=\"performer-name\"]",
+        "input[aria-label=\"Name\"]",
+        "div.requirement.-performer > div.alert-container:nth-of-type(1) > div.credit-name-row:nth-of-type(3) > div.credit-input-container > input.performer-name\\ no-emoji\\ no-url\\ coolInput\\ cool-input-text"
+      ],
+      "type": "click",
+      "source": "track1Performer1Name",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "action_detected-1780688379952-ade1y8"
+    },
+    "track1Producer1Name": {
+      "selector": "#track-1-producer-1-name",
+      "fallbackSelectors": [
+        "input[name=\"producer-name\"]",
+        "input[aria-label=\"Name\"]",
+        "div.requirement.-producer > div.alert-container:nth-of-type(1) > div.credit-name-row:nth-of-type(3) > div.credit-input-container > input.producer-name\\ no-emoji\\ no-url\\ coolInput\\ cool-input-text"
+      ],
+      "type": "click",
+      "source": "track1Producer1Name",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "action_detected-1780688386029-fdxf98"
+    },
+    "on": {
+      "selector": "#areyousuretandc",
+      "fallbackSelectors": [
+        "input[aria-label=\"I\\ have\\ read\\ and\\ agree\\ to\\ the\\ terms\\ of\\ the\\ DistroKid\\ Distribution\\ Agreement\"]",
+        "div.checkbox-grid-col.\\ margin-0:nth-of-type(8) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure"
+      ],
+      "type": "click",
+      "source": "on",
+      "required": true,
+      "selectorConfidence": "high",
+      "sourceEventId": "action_detected-1780688396526-t997ji"
+    }
+  },
+  "outputs": {
+    "distrokidReviewState": {
+      "type": "output",
+      "source": "distrokidReviewState",
+      "required": true,
+      "selectorConfidence": "low"
+    },
+    "distrokidReleaseUrl": {
+      "type": "output",
+      "source": "distrokidReleaseUrl",
+      "required": false,
+      "selectorConfidence": "low"
+    }
+  },
+  "repeatGroups": [
+    {
+      "id": "tracks",
+      "itemName": "track",
+      "createAction": null,
+      "itemFields": {
+        "trackAudio": {
+          "source": "track.audioPath"
+        },
+        "trackTitle": {
+          "source": "track.title"
+        },
+        "songwriterFirst": {
+          "source": "track.songwriterFirst"
+        },
+        "songwriterLast": {
+          "source": "track.songwriterLast"
+        },
+        "performerRole": {
+          "source": "track.performerRole"
+        },
+        "performerName": {
+          "source": "track.performerName"
+        },
+        "producerRole": {
+          "source": "track.producerRole"
+        },
+        "producerName": {
+          "source": "track.producerName"
+        },
+        "aiDisclosure": {
+          "source": "track.aiGate"
+        }
+      }
+    }
+  ],
+  "updatedBy": "repeat-group-authoring",
+  "updatedAt": "2026-06-06T03:58:09.277Z"
+}
