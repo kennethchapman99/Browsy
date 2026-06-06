@@ -134,6 +134,55 @@
       "type": "radio",
       "source": "track.aiGate",
       "item": true
+    },
+    "labelName": {
+      "selector": "#labelName",
+      "fallbackSelectors": [
+        "input[name=\"labelName\"]",
+        "input[name=\"label\"]",
+        "input[name=\"recordLabel\"]",
+        "input[aria-label=\"Record label\"]"
+      ],
+      "type": "text",
+      "source": "album.labelName",
+      "required": false,
+      "selectorConfidence": "low",
+      "note": "Record Label = 'Figment Factory'. NOT captured in the recording — selector is a best-effort guess; verify/recapture on a live DistroKid upload page."
+    },
+    "tandc": {
+      "selector": "#areyousuretandc",
+      "type": "checkbox",
+      "source": "agreements.tandc",
+      "required": true,
+      "selectorConfidence": "high"
+    },
+    "otherArtist": {
+      "selector": "#areyousureotherartist",
+      "type": "checkbox",
+      "source": "agreements.otherArtist",
+      "required": true,
+      "selectorConfidence": "high"
+    },
+    "promoServices": {
+      "selector": "#areyousurepromoservices",
+      "type": "checkbox",
+      "source": "agreements.promoServices",
+      "required": true,
+      "selectorConfidence": "high"
+    },
+    "recorded": {
+      "selector": "#areyousurerecorded",
+      "type": "checkbox",
+      "source": "agreements.recorded",
+      "required": true,
+      "selectorConfidence": "high"
+    },
+    "youtube": {
+      "selector": "#areyousureyoutube",
+      "type": "checkbox",
+      "source": "agreements.youtube",
+      "required": true,
+      "selectorConfidence": "high"
     }
   },
   "uploads": {
