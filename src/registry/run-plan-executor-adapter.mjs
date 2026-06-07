@@ -87,6 +87,11 @@ export async function executeRunPlanRun({
   // Base directory for resolving relative upload paths from the payload.
   const manifestBaseDir = options.manifestBaseDir || payload.manifestBaseDir || process.cwd();
 
+  // For a live/headed run, leave the filled browser open at the human checkpoint
+  // so a person can review and click final submit (Pancake requests this via
+  // options.leaveBrowserOpen). Never leave a headless fixture/preview browser open.
+  const leaveBrowserOpen = wantsLiveSite && options.leaveBrowserOpen !== false;
+
   const result = await executeRunPlanWithPlaywright({
     runPlan,
     targetUrl,
@@ -96,6 +101,7 @@ export async function executeRunPlanRun({
     userDataDir,
     manifestBaseDir,
     downloadsDir: runDir || null,
+    leaveBrowserOpen,
   });
 
   return {
@@ -109,6 +115,7 @@ export async function executeRunPlanRun({
     skipped_steps: result.skippedSteps || [],
     checkpoint_reached: !!result.checkpoint,
     human_checkpoint: result.checkpoint || null,
+    browser_left_open: result.browserLeftOpen ?? false,
     final_state: result.finalState || null,
     error: result.error || null,
     artifact_paths: [],

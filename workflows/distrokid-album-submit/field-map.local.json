@@ -530,6 +530,9 @@
       "selectorConfidence": "low"
     }
   },
+  "acknowledgeIfPresent": [
+    "#areyousurenonstandardscaps"
+  ],
   "repeatGroups": [
     {
       "id": "tracks",

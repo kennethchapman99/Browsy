@@ -63,52 +63,79 @@ function usesIndexedSelectors(fieldMap) {
 }
 
 // Drive DistroKid's per-track AI-disclosure modal sequence.
-// Config (from fieldMap.fields[fieldName]): selector (gate radios), scopeSelector,
-// scopeValue, confirmLabels[], saveLabel, optional triggerSelector to open the modal.
-// gateValue: "1"=all-AI, "2"=part AI+human, "0"=none.
+//
+// DistroKid shows a SweetAlert2 modal with checkboxes ("Which parts of this
+// song were AI-generated?") when you click into the AI disclosure section of
+// an upload track. The flow is:
+//   1. Trigger: click the gate selector (the inline AI-gate element) — clicking
+//      it opens the SweetAlert2 checkbox modal as a side effect.
+//   2. Wait for the SweetAlert2 popup to animate in.
+//   3. Inside the popup, check the appropriate gate checkbox(es) — the modal
+//      requires at least one selection before Save is enabled.
+//   4. Click the Save/confirm button (.swal2-confirm) to dismiss the modal.
+//
+// fieldDef (from fieldMap.fields[fieldName]):
+//   selector       — CSS selector for the gate checkboxes (inside the modal)
+//   triggerSelector — optional selector to click to open the modal instead of
+//                    the gate selector itself
+//   saveLabel      — ignored (always uses .swal2-confirm)
+// gateValue: "1"=all-AI, "2"=part AI+human, "0"=none (no disclosure needed).
 async function handleAiDisclosure(page, fieldDef, gateValue, itemIndex, policy, label) {
   const sub = (s) => substituteIndex(s, itemIndex);
 
-  if (fieldDef.triggerSelector) {
-    const trig = page.locator(sub(fieldDef.triggerSelector)).first();
-    if (await trig.count() > 0) await safeClick(trig, `${label} trigger`, policy);
-  }
-
+  // DistroKid's AI disclosure is a per-track No/Yes radio (class distroAiGate,
+  // value "0"=No / "1"=Yes). Selecting "Yes" opens a SweetAlert2 modal where you
+  // pick the recording scope. gateValue: "1"=all-audio AI, "2"=part, "0"/""=none.
+  const gate    = String(gateValue ?? '');
   const gateSel = sub(fieldDef.selector || 'input.distroAiGate');
-  const byValue = page.locator(`${gateSel}[value="${gateValue}"]`).first();
-  if (await byValue.count() > 0) {
-    await byValue.check();
+  const popupSel = '.swal2-popup';
+
+  // "No" — declare no AI: select this track's value="0" gate and stop (no modal).
+  if (gate === '0' || gate === '') {
+    await page.locator(`${gateSel}[value="0"]`).nth(itemIndex).check({ force: true }).catch(() => {});
+    return;
+  }
+
+  // Step 1 — click THIS track's "Yes" gate radio to open the modal. There is one
+  // value="1" radio per track, in DOM order, so .nth(itemIndex) scopes us to the
+  // right track. (The previous .first() always hit track 1's "No", so the modal
+  // never opened and the disclosure silently stayed on "No".)
+  const yesRadio = page.locator(`${gateSel}[value="1"]`).nth(itemIndex);
+  if (await yesRadio.count() > 0) {
+    await yesRadio.check({ force: true }).catch(() => {});
   } else {
-    const all = page.locator(gateSel);
-    const n = await all.count();
-    if (n === 0) throw new Error(`${label}: AI gate selector "${gateSel}" not found`);
-    await all.nth(Math.min(Number(gateValue) || 0, n - 1)).check();
+    await page.locator(gateSel).nth(itemIndex).check({ force: true }).catch(() => {});
   }
 
-  // The follow-up dialogs are SweetAlert2 modals. Scope confirm clicks to the
-  // visible .swal2-popup and click its primary confirm button (.swal2-confirm),
-  // not arbitrary page buttons — otherwise a label like "OK" can match an
-  // unrelated overlay (e.g. the Osano cookie banner).
-  for (let i = 0; i < (fieldDef.confirmLabels || []).length; i++) {
-    const confirm = page.locator('.swal2-popup .swal2-confirm:visible').first();
-    if (await confirm.count() > 0) {
-      await safeClick(confirm, `${label} confirm[${i}]`, policy);
-      await page.waitForTimeout(300);
-    }
+  // Step 2 — wait for the SweetAlert2 disclosure modal.
+  try {
+    await page.waitForSelector(popupSel, { state: 'visible', timeout: 4000 });
+  } catch {
+    return; // No modal (older/inline UI variant) — the gate is set, nothing more.
   }
 
-  if (fieldDef.scopeSelector && fieldDef.scopeValue) {
-    const scopeSel = sub(fieldDef.scopeSelector);
-    const scopeByVal = page.locator(`${scopeSel}[value="${fieldDef.scopeValue}"]`).first();
-    if (await scopeByVal.count() > 0) await scopeByVal.check().catch(() => {});
-    else {
-      const anyScope = page.locator(scopeSel).first();
-      if (await anyScope.count() > 0) await anyScope.check().catch(() => {});
-    }
+  // Step 3 — inside the modal, select the recording scope. Per the Figment Factory
+  // spec every track is "All of the audio (performed by AI)" = the
+  // distroAiRecordingScope checkbox with value "full" ("partial" for gate "2").
+  const scopeSel   = sub(fieldDef.scopeSelector || 'input.distroAiRecordingScope');
+  const scopeValue = gate === '2' ? 'partial' : (fieldDef.scopeValue || 'full');
+  const scopeBox   = page.locator(`${popupSel} ${scopeSel}[value="${scopeValue}"]`).first();
+  if (await scopeBox.count() > 0) {
+    await scopeBox.check({ force: true }).catch(() => {});
   }
 
-  const saveBtn = page.locator('.swal2-popup .swal2-confirm:visible').first();
+  // Step 4 — click Save (.swal2-confirm) to commit the disclosure.
+  const saveSel = `${popupSel} .swal2-confirm`;
+  try {
+    await page.waitForSelector(saveSel, { state: 'visible', timeout: 2000 });
+  } catch {
+    return; // Modal disappeared on its own — nothing more to do.
+  }
+  const saveBtn = page.locator(saveSel).first();
   if (await saveBtn.count() > 0) await safeClick(saveBtn, `${label} save`, policy);
+
+  // Wait for the popup to close before proceeding to the next track.
+  await page.waitForSelector(popupSel, { state: 'hidden', timeout: 4000 }).catch(() => {});
 }
 
 // Dismiss the Osano cookie-consent banner if present — it overlays the page and
@@ -291,6 +318,7 @@ export async function executeRunPlanWithPlaywright({
   fieldMap,
   userDataDir = null,
   downloadsDir = null,
+  leaveBrowserOpen = false,
 }) {
   const policy          = safetyPolicy ?? defaultSafetyPolicy();
   const executedSteps   = [];
@@ -303,6 +331,16 @@ export async function executeRunPlanWithPlaywright({
   let browser     = null;
   let persistentCtx = null;
 
+  // DistroKid uploads artwork and audio to its S3 bucket via XHR. Chrome's
+  // Private/Local Network Access checks block these cross-origin uploads in the
+  // automated browser ("Permission was denied for this request to access the
+  // `local` address space"), which leaves the cover stuck on "Error" and every
+  // track at 0%. Disabling those features lets the uploads through. (Unknown
+  // feature names are ignored by Chromium, so this is safe across versions.)
+  const launchArgs = [
+    '--disable-features=BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults,LocalNetworkAccessChecks,LocalNetworkAccessChecksWarningOnly',
+  ];
+
   try {
     let ctx;
     if (userDataDir) {
@@ -310,10 +348,11 @@ export async function executeRunPlanWithPlaywright({
       persistentCtx = await chromium.launchPersistentContext(userDataDir, {
         headless,
         acceptDownloads: true,
+        args: launchArgs,
       });
       ctx = persistentCtx;
     } else {
-      browser = await chromium.launch({ headless });
+      browser = await chromium.launch({ headless, args: launchArgs });
       ctx = await browser.newContext({ acceptDownloads: true });
     }
 
@@ -508,6 +547,23 @@ export async function executeRunPlanWithPlaywright({
 
       // ── Human checkpoint — always stop here ──────────────────────────────────
       } else if (step.type === 'human_checkpoint') {
+        // Conditional final acknowledgments (e.g. DistroKid's non-standard
+        // capitalization warning) only render after the relevant fields are
+        // filled, so they can't be pre-iteration globals. Check any that are now
+        // present + unchecked right before handing off to the human.
+        for (const ackSel of fieldMap?.acknowledgeIfPresent || []) {
+          const boxes = page.locator(ackSel);
+          const n = await boxes.count();
+          for (let k = 0; k < n; k++) {
+            const box = boxes.nth(k);
+            const visible = await box.isVisible().catch(() => false);
+            const checked = await box.isChecked().catch(() => false);
+            if (visible && !checked) {
+              await box.check({ force: true }).catch(() => {});
+              executedSteps.push({ type: 'acknowledge_if_present', selector: ackSel, index: k });
+            }
+          }
+        }
         checkpoint = step;
         break;
 
@@ -523,10 +579,20 @@ export async function executeRunPlanWithPlaywright({
       await ctx.tracing.stop({ path: path.join(traceDir, 'trace.zip') });
     }
 
+    // Live human handoff: when asked to leave the browser open AND we stopped at a
+    // human checkpoint, hand the live, filled page to the person (review + click
+    // final submit) instead of tearing it down. Detach our references so cleanup
+    // does not close it; it stays open under the launching (server) process.
+    if (leaveBrowserOpen && checkpoint) {
+      persistentCtx = null;
+      browser = null;
+      return { ok: true, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, browserLeftOpen: true };
+    }
+
     if (persistentCtx) { await persistentCtx.close(); persistentCtx = null; }
     if (browser)       { await browser.close(); browser = null; }
 
-    return { ok: true, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles };
+    return { ok: true, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, browserLeftOpen: false };
 
   } catch (err) {
     if (persistentCtx) await persistentCtx.close().catch(() => {});
