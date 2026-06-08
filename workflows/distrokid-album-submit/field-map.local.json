@@ -528,6 +528,13 @@
       "source": "distrokidReleaseUrl",
       "required": false,
       "selectorConfidence": "low"
+    },
+    "hyperfollow_url": {
+      "type": "output",
+      "source": "hyperfollow_url",
+      "required": false,
+      "capturedBy": "postSubmitSteps",
+      "selectorConfidence": "fixture-only"
     }
   },
   "acknowledgeIfPresent": [
@@ -569,6 +576,46 @@
       }
     }
   ],
+  "postSubmitSteps": [
+    {
+      "type": "click",
+      "label": "final submit (Continue)",
+      "selector": "#doneButton",
+      "fixtureSelector": "#btn-submit"
+    },
+    {
+      "type": "waitForUrl",
+      "match": "mixea",
+      "timeoutMs": 180000,
+      "label": "wait for mastering upsell page"
+    },
+    {
+      "type": "check",
+      "label": "Use my originals (fixture radio)",
+      "appliesTo": "fixture",
+      "fixtureSelector": "#use-my-originals"
+    },
+    {
+      "type": "click",
+      "label": "mixea Continue (use uploaded files / originals)",
+      "selector": "button:has-text(\"Continue with my uploaded files\")",
+      "fixtureSelector": "#mixea-continue"
+    },
+    {
+      "type": "waitForUrl",
+      "match": "done",
+      "timeoutMs": 180000,
+      "label": "wait for done / HyperFollow page"
+    },
+    {
+      "type": "capture",
+      "outputId": "hyperfollow_url",
+      "attr": "href",
+      "label": "HyperFollow link",
+      "selector": "#pre-save-page",
+      "fixtureSelector": "[data-hyperfollow-url]"
+    }
+  ],
   "updatedBy": "repeat-group-authoring",
-  "updatedAt": "2026-06-06T03:58:09.277Z"
+  "updatedAt": "2026-06-07T20:00:00.000Z"
 }

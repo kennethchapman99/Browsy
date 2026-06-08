@@ -15,6 +15,7 @@ import { buildRunPlan } from '../core/run-plan.mjs';
 import { executeRunPlanWithPlaywright } from '../core/playwright-executor.mjs';
 import { loadFieldMap, loadSafetyPolicy, loadWorkflowConfig } from '../core/workflow-runtime.mjs';
 import { authProfileFor, assertProfileNotLocked, reclaimOwnProfileLock } from './replay-executor.mjs';
+import { updateRun } from './run-registry.mjs';
 
 export async function executeRunPlanRun({
   runId,
@@ -92,6 +93,23 @@ export async function executeRunPlanRun({
   // options.leaveBrowserOpen). Never leave a headless fixture/preview browser open.
   const leaveBrowserOpen = wantsLiveSite && options.leaveBrowserOpen !== false;
 
+  // End-to-end auto-submit is opt-in only (options.autoSubmit). On the live site
+  // we additionally require a human confirmation (confirmBeforeSubmit) before the
+  // executor clicks final submit; the confirm signal is a flag file under the run
+  // dir, written by POST /api/runs/:runId/confirm-submit. Against the fake fixture
+  // we proceed without a human (no real account is touched).
+  const autoSubmit = options.autoSubmit === true;
+  const confirmBeforeSubmit = autoSubmit && wantsLiveSite && options.confirmBeforeSubmit !== false;
+  const confirmFlagPath = runDir ? join(runDir, 'confirm-submit.flag') : null;
+  const confirmTimeoutMs = Number(options.confirmTimeoutMs) || undefined;
+
+  // When we're going to park for a human confirm, publish the flag path + state
+  // on the run record so POST /api/runs/:runId/confirm-submit can drop the flag
+  // file at exactly the path the executor is polling (no path recomputation).
+  if (confirmBeforeSubmit && confirmFlagPath) {
+    updateRun(runId, { awaitingSubmitConfirm: true, confirmFlagPath });
+  }
+
   const result = await executeRunPlanWithPlaywright({
     runPlan,
     targetUrl,
@@ -102,6 +120,11 @@ export async function executeRunPlanRun({
     manifestBaseDir,
     downloadsDir: runDir || null,
     leaveBrowserOpen,
+    autoSubmit,
+    confirmBeforeSubmit,
+    confirmFlagPath,
+    confirmTimeoutMs,
+    isFixture: !wantsLiveSite,
   });
 
   return {
@@ -113,9 +136,11 @@ export async function executeRunPlanRun({
     status: result.ok ? 'replay_passed' : 'replay_failed',
     completed_steps: result.executedSteps || [],
     skipped_steps: result.skippedSteps || [],
-    checkpoint_reached: !!result.checkpoint,
-    human_checkpoint: result.checkpoint || null,
+    checkpoint_reached: !!result.checkpoint && !result.postSubmitCompleted,
+    human_checkpoint: result.postSubmitCompleted ? null : (result.checkpoint || null),
     browser_left_open: result.browserLeftOpen ?? false,
+    post_submit_completed: result.postSubmitCompleted ?? false,
+    captured_outputs: result.capturedOutputs || {},
     final_state: result.finalState || null,
     error: result.error || null,
     artifact_paths: [],

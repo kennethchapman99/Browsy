@@ -3,7 +3,9 @@ import { parseArgs } from '../core/args.mjs';
 import { registerApp, getApp, listApps } from '../registry/app-registry.mjs';
 import { importWorkflowPackage } from '../registry/package-importer.mjs';
 import { registerWorkflow, getWorkflow, listWorkflows, getWorkflowVersion, parseWorkflowRef } from '../registry/workflow-registry.mjs';
-import { createRun, getRun, stopRun, cancelRun, approveRun, getRunArtifacts } from '../registry/run-registry.mjs';
+import { createRun, getRun, stopRun, cancelRun, approveRun, getRunArtifacts, updateRun } from '../registry/run-registry.mjs';
+import { mkdirSync, writeFileSync } from 'fs';
+import { dirname } from 'path';
 import { executeRun } from '../registry/run-executor.mjs';
 import { buildRunCreateResponse, buildRunResult, buildWorkflowContract } from '../registry/run-result.mjs';
 import { materializeWorkflowPackageFromObservation } from '../core/observation-materializer.mjs';
@@ -498,6 +500,23 @@ export function createServer({ port = DEFAULT_PORT } = {}) {
       if (p && method === 'POST') {
         const run = await approveAndResume(p.runId, await json(req));
         return send(res, 200, { ok: true, ...buildRunCreateResponse(run), run });
+      }
+
+      // Out-of-band "human reviewed the filled live page, go ahead and submit"
+      // signal for the auto-submit opt-in. The run-plan executor is parked at the
+      // human_checkpoint polling for confirmFlagPath; dropping that file lets it
+      // run the post-submit chain (submit → mixea → done → capture HyperFollow).
+      p = route('/api/runs/:runId/confirm-submit', url);
+      if (p && method === 'POST') {
+        const run = getRun(p.runId);
+        if (!run) return send(res, 404, { ok: false, error: 'run not found' });
+        if (!run.awaitingSubmitConfirm || !run.confirmFlagPath) {
+          return send(res, 409, { ok: false, error: 'run is not awaiting submit confirmation' });
+        }
+        mkdirSync(dirname(run.confirmFlagPath), { recursive: true });
+        writeFileSync(run.confirmFlagPath, `confirmed-at:${new Date().toISOString()}\n`);
+        updateRun(p.runId, { submitConfirmedAt: new Date().toISOString() });
+        return send(res, 200, { ok: true, runId: p.runId, confirmed: true });
       }
 
       p = route('/api/runs/:runId/cancel', url);

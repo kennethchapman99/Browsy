@@ -2,7 +2,10 @@
 //
 // Consumes a run plan produced by buildRunPlan() or buildRunPlanFromPackage()
 // and drives a local fixture (or any browser page) through each step.
-// Stops unconditionally at the human_checkpoint — final submit is never automated.
+// Stops at the human_checkpoint by default — final submit is not automated. The
+// only exception is the explicit `autoSubmit` opt-in, which runs the declarative
+// fieldMap.postSubmitSteps chain (final submit → mixea upsell → done page →
+// capture HyperFollow link), optionally gated behind an out-of-band human confirm.
 //
 // Selector strategy (generic first, legacy fallback):
 //   Global fields  → fieldMap override → data-browsy-field="<fieldName>"
@@ -206,7 +209,23 @@ async function fillField(scope, selector, value, label) {
   } else if (type === 'checkbox') {
     const shouldCheck = Boolean(value);
     if (shouldCheck !== await el.isChecked()) {
-      shouldCheck ? await el.check() : await el.uncheck();
+      try {
+        // force: a normal click on some DistroKid checkboxes (e.g.
+        // #areyousuretandc) does not flip state, which makes Playwright's
+        // check()/uncheck() throw "Clicking the checkbox did not change its
+        // state". Forcing skips that post-click assertion.
+        shouldCheck ? await el.check({ force: true }) : await el.uncheck({ force: true });
+      } catch {
+        // Click still didn't take. Set the state directly and fire the events
+        // (input/change + onblur validation hooks like removeRedIfAllFilled).
+        // The human checkpoint still gates final submit.
+        await el.evaluate((node, checked) => {
+          node.checked = checked;
+          node.dispatchEvent(new Event('input', { bubbles: true }));
+          node.dispatchEvent(new Event('change', { bubbles: true }));
+          node.dispatchEvent(new Event('blur', { bubbles: true }));
+        }, shouldCheck);
+      }
     }
   } else {
     const text = String(value ?? '');
@@ -319,6 +338,21 @@ export async function executeRunPlanWithPlaywright({
   userDataDir = null,
   downloadsDir = null,
   leaveBrowserOpen = false,
+  // ── End-to-end auto-submit (opt-in only) ──────────────────────────────────
+  // autoSubmit: when true, instead of parking at the human_checkpoint the
+  //   executor runs fieldMap.postSubmitSteps (click final submit → clear the
+  //   mixea upsell → land on the done page → capture the HyperFollow link).
+  //   Default false → byte-for-byte the old "never automate final submit".
+  // confirmBeforeSubmit: when true, park at the checkpoint and wait for an
+  //   out-of-band confirmation (confirmFlagPath appears) before running the
+  //   post-submit steps. Used for the live "human reviews, then resume" flow.
+  //   If it times out, fall back to the safe leave-browser-open hand-off.
+  // isFixture: pick step.fixtureSelector over step.selector (fake test site).
+  autoSubmit = false,
+  confirmBeforeSubmit = false,
+  confirmFlagPath = null,
+  confirmTimeoutMs = 30 * 60 * 1000,
+  isFixture = false,
 }) {
   const policy          = safetyPolicy ?? defaultSafetyPolicy();
   const executedSteps   = [];
@@ -330,6 +364,7 @@ export async function executeRunPlanWithPlaywright({
   let finalState  = null;
   let browser     = null;
   let persistentCtx = null;
+  let postSubmitCompleted = false;
 
   // DistroKid uploads artwork and audio to its S3 bucket via XHR. Chrome's
   // Private/Local Network Access checks block these cross-origin uploads in the
@@ -565,6 +600,30 @@ export async function executeRunPlanWithPlaywright({
           }
         }
         checkpoint = step;
+
+        // ── End-to-end auto-submit (opt-in) ───────────────────────────────────
+        // Default path: stop here, hand off to a human (final submit is never
+        // automated). Only when autoSubmit is explicitly set do we run the
+        // post-submit chain (submit → mixea → done → capture HyperFollow).
+        const postSubmitSteps = fieldMap?.postSubmitSteps || [];
+        if (autoSubmit && postSubmitSteps.length) {
+          let proceed = true;
+          if (confirmBeforeSubmit) {
+            // Park on the filled page and wait for an out-of-band human confirm
+            // (the confirmFlagPath file appears). Bounded so a forgotten run
+            // doesn't hang forever; on timeout we fall through to the safe
+            // leave-browser-open hand-off below.
+            proceed = await waitForConfirmFlag(confirmFlagPath, confirmTimeoutMs);
+            executedSteps.push({ type: 'await_submit_confirmation', confirmed: proceed, flagPath: confirmFlagPath });
+          }
+          if (proceed) {
+            await runPostSubmitSteps({
+              page, steps: postSubmitSteps, isFixture,
+              capturedOutputs, executedSteps, skippedSteps,
+            });
+            postSubmitCompleted = true;
+          }
+        }
         break;
 
       } else {
@@ -580,23 +639,102 @@ export async function executeRunPlanWithPlaywright({
     }
 
     // Live human handoff: when asked to leave the browser open AND we stopped at a
-    // human checkpoint, hand the live, filled page to the person (review + click
-    // final submit) instead of tearing it down. Detach our references so cleanup
-    // does not close it; it stays open under the launching (server) process.
-    if (leaveBrowserOpen && checkpoint) {
+    // human checkpoint WITHOUT auto-submitting, hand the live, filled page to the
+    // person (review + click final submit) instead of tearing it down. Detach our
+    // references so cleanup does not close it; it stays open under the launching
+    // (server) process. When post-submit ran to completion we are fully done, so
+    // we fall through and close normally.
+    if (leaveBrowserOpen && checkpoint && !postSubmitCompleted) {
       persistentCtx = null;
       browser = null;
-      return { ok: true, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, browserLeftOpen: true };
+      return { ok: true, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, browserLeftOpen: true, postSubmitCompleted };
     }
 
     if (persistentCtx) { await persistentCtx.close(); persistentCtx = null; }
     if (browser)       { await browser.close(); browser = null; }
 
-    return { ok: true, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, browserLeftOpen: false };
+    return { ok: true, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, browserLeftOpen: false, postSubmitCompleted };
 
   } catch (err) {
     if (persistentCtx) await persistentCtx.close().catch(() => {});
     if (browser)       await browser.close().catch(() => {});
-    return { ok: false, error: err.message, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles };
+    return { ok: false, error: err.message, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, postSubmitCompleted };
   }
+}
+
+// ── Post-submit step interpreter ───────────────────────────────────────────────
+// Runs the small, declarative fieldMap.postSubmitSteps program on the SAME page
+// the run filled, after the human_checkpoint. Supported step types:
+//   click      — click an element (e.g. the final Submit/Continue button)
+//   check      — tick a radio/checkbox (e.g. "Use my originals"), JS fallback
+//   waitForUrl — wait until the page URL contains step.match (mixea → done)
+//   capture    — read step.attr (default href) or text into capturedOutputs
+// Each step resolves its selector from step.fixtureSelector when isFixture (the
+// fake test site) else step.selector (live DistroKid). Steps may be marked
+// optional:true to skip-without-failing when the element is absent.
+async function runPostSubmitSteps({ page, steps, isFixture, capturedOutputs, executedSteps, skippedSteps }) {
+  const sel = step => (isFixture && step.fixtureSelector ? step.fixtureSelector : step.selector);
+  for (const step of steps) {
+    // appliesTo scopes a step to one surface: 'fixture' (fake test site only) or
+    // 'live' (real DistroKid only). Undefined runs on both. Lets the fake site and
+    // the real DOM diverge (e.g. live combines "use originals" + continue into one
+    // button, so the fixture-only radio-tick is skipped on live).
+    if (step.appliesTo === 'fixture' && !isFixture) { skippedSteps.push({ type: `post_submit_${step.type}`, reason: 'fixture-only step skipped on live' }); continue; }
+    if (step.appliesTo === 'live' && isFixture) { skippedSteps.push({ type: `post_submit_${step.type}`, reason: 'live-only step skipped on fixture' }); continue; }
+    const selector = sel(step);
+    try {
+      if (step.type === 'waitForUrl') {
+        await page.waitForURL(url => String(url).includes(step.match), { timeout: step.timeoutMs || 120000 });
+        executedSteps.push({ type: 'post_submit_waitForUrl', match: step.match, url: page.url() });
+        continue;
+      }
+
+      // Dismiss the cookie banner if it reappeared between navigations — it can
+      // intercept clicks on the post-submit pages too.
+      await dismissCookieBanner(page).catch(() => {});
+
+      const loc = page.locator(selector).first();
+      const present = await loc.count().catch(() => 0);
+      if (!present) {
+        if (step.optional) { skippedSteps.push({ type: `post_submit_${step.type}`, selector, reason: 'optional element absent' }); continue; }
+        throw new Error(`post-submit ${step.type} target not found: ${selector}`);
+      }
+
+      if (step.type === 'click') {
+        await loc.click({ timeout: step.timeoutMs || 30000 });
+        executedSteps.push({ type: 'post_submit_click', selector, label: step.label || null });
+      } else if (step.type === 'check') {
+        // DistroKid radios/checkboxes are sometimes visually replaced; force-check
+        // and fall back to a dispatched JS click if the native check is blocked.
+        await loc.check({ force: true, timeout: step.timeoutMs || 30000 }).catch(async () => {
+          await loc.evaluate(el => { el.checked = true; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); });
+        });
+        executedSteps.push({ type: 'post_submit_check', selector, label: step.label || null });
+      } else if (step.type === 'capture') {
+        const value = step.attr
+          ? await loc.getAttribute(step.attr)
+          : (await loc.textContent())?.trim() || null;
+        capturedOutputs[step.outputId] = { status: value ? 'captured' : 'empty', value: value || null, selector, required: step.required === true };
+        executedSteps.push({ type: 'post_submit_capture', outputId: step.outputId, captured: !!value });
+      } else {
+        skippedSteps.push({ type: `post_submit_${step.type}`, reason: 'unrecognized post-submit step type' });
+      }
+    } catch (err) {
+      if (step.optional) { skippedSteps.push({ type: `post_submit_${step.type}`, selector, reason: err.message }); continue; }
+      throw new Error(`post-submit step "${step.label || step.type}" failed: ${err.message}`);
+    }
+  }
+}
+
+// Poll for the out-of-band confirmation flag file. Returns true once it appears,
+// false if confirmTimeoutMs elapses first. A null path means "no confirmation
+// channel configured" → never auto-proceed (caller falls back to hand-off).
+async function waitForConfirmFlag(flagPath, confirmTimeoutMs) {
+  if (!flagPath) return false;
+  const deadline = Date.now() + (confirmTimeoutMs || 0);
+  while (Date.now() < deadline) {
+    if (fs.existsSync(flagPath)) return true;
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  return fs.existsSync(flagPath);
 }

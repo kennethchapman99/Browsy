@@ -245,8 +245,17 @@
       const status = document.getElementById('status');
       status.className = 'status-ok';
       status.style.display = 'block';
-      status.textContent = '[FIXTURE] ' + action + ' triggered — in a real workflow this is a manual-only action blocked by Browsy safety policy.';
       window.lastFinalAction = action;
+      if (action === 'submit') {
+        // Final submit advances to DistroKid's post-submit flow:
+        // /new/mixea/ (mastering upsell) → /new/done/ (HyperFollow link).
+        // The "mixea" path token lets the executor's waitForUrl match the same
+        // on fixture and live.
+        status.textContent = '[FIXTURE] submit triggered — advancing to mixea (mastering) page…';
+        location.href = 'mixea.html?albumuuid=fixture-0001';
+        return;
+      }
+      status.textContent = '[FIXTURE] ' + action + ' triggered — in a real workflow this is a manual-only action blocked by Browsy safety policy.';
     }
   </script>
 </body>
