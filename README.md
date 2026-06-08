@@ -291,16 +291,21 @@ These defaults are enforced in `src/core/safety.mjs` and represented in each wor
 
 ## How to create a new automation
 
+The full, site-agnostic procedure is in
+[docs/recording-new-automations.md](docs/recording-new-automations.md). The short
+version:
+
 1. Run `npm run wizard`.
 2. Describe the workflow in plain English.
 3. Define data sources, run inputs, repeat groups, captured outputs, gates, and safety checkpoints.
 4. Save `AUTOMATION_REQUEST.md` and the workflow project draft.
-5. Capture Atlas/Codex observations in `workflows/<id>/observations/`.
-6. Run discovery with `--candidates`.
-7. Create `field-map.local.json` using verified selectors only.
-8. Run a dry-run.
-9. Review run artifacts and safety skips.
-10. Only then consider a live, human-gated run.
+5. **Enrich intent**: copy [templates/automation-request/field-mapping-instruction-template.md](templates/automation-request/field-mapping-instruction-template.md) to `workflows/<id>/field-mapping-instruction.md` and map only the fields that require action (value rules, file sources, dialogs, the human checkpoint, captured outputs). See the worked example: [examples/field-mapping-instruction-distrokid-album.md](examples/field-mapping-instruction-distrokid-album.md).
+6. Capture Atlas/Codex observations and record the business steps (wizard Step 4).
+7. Run discovery with `--candidates` on every page touched — this exposes the real DOM vs. the visible label.
+8. Create `field-map.local.json` using verified selectors only, reconciling intent + recording + discovery.
+9. Run a dry-run.
+10. Review run artifacts and safety skips.
+11. Only then consider a live, human-gated run.
 
 ---
 
@@ -329,6 +334,8 @@ The agent should report exact files, commands, test results, skipped fields, fai
 | `src/core/safety.mjs` | Dangerous action detection |
 | `src/core/discovery.mjs` | Playwright DOM inventory |
 | `src/core/playwright-executor.mjs` | Safe Playwright execution |
+| `docs/recording-new-automations.md` | End-to-end recipe for recording a brand-new automation |
+| `templates/automation-request/field-mapping-instruction-template.md` | Intent/field-mapping enrichment template |
 | `docs/atlas-codex-observation.md` | Observation workflow guide |
 | `docs/patterns/global-repeat-captured-outputs.md` | General repeat/capture/gate pattern |
 | `templates/observation/` | Observation templates |
