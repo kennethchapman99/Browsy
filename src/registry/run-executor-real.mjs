@@ -38,9 +38,7 @@ export async function executeRun(args) {
     const hasReplayMaterial = Array.isArray(workflowVersion.recordedSteps) && workflowVersion.recordedSteps.length > 0;
     const hasReplayStrategy = !!workflowVersion.replaySettings?.strategy;
     const isDryRun = mode === 'dry_run'
-      || mode === 'preview'
       || workflowVersion.replaySettings?.disableRealReplay === true
-      || (mode !== 'live' && workflowVersion.replaySettings?.defaultMode === 'dry_run')
       || (!hasReplayMaterial && !hasReplayStrategy);
     if (isDryRun) {
       engineResult = dryRunResult({ runId, workflowVersion });
@@ -80,6 +78,25 @@ export async function executeRun(args) {
   const artifacts = [...artifactsByPath.values()];
 
   const blocked = engineResult?.ok === false || engineResult?.status === 'replay_failed' || assertionResults.outcome === 'failed';
+  // A passing run that stopped at a human checkpoint (e.g. "review & click final
+  // submit") is awaiting approval, not done. Report it as a waiting status so
+  // callers see "paused for human approval" instead of "completed" — final
+  // submit is never automated.
+  const awaitingApproval = !blocked && (engineResult?.checkpoint_reached === true
+    || (engineResult?.human_checkpoint && typeof engineResult.human_checkpoint === 'object'));
+  if (awaitingApproval) {
+    const checkpoint = engineResult.human_checkpoint || { type: 'human_checkpoint' };
+    return finishRun(runId, {
+      status: 'waiting_for_approval_to_submit',
+      processStatus: 'waiting_for_approval_to_submit',
+      workflowOutcome: 'blocked',
+      artifacts,
+      assertionResults,
+      internalRunResult: engineResult,
+      blockingReason: checkpoint.reason || 'Human must review and click final submit.',
+      checkpoints: [...(getRun(runId)?.checkpoints || []), { status: 'waiting_for_approval_to_submit', ...checkpoint, createdAt: now() }],
+    });
+  }
   return finishRun(runId, { status: blocked ? 'blocked' : 'completed', processStatus: 'completed', workflowOutcome: blocked ? 'failed' : 'success', completedAt: now(), artifacts, assertionResults, internalRunResult: engineResult, blockingReason: blocked ? firstError(engineResult) : null });
 }
 

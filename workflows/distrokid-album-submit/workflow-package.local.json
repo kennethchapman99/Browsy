@@ -34,7 +34,7 @@
     "replayPlan": {
       "schemaVersion": "browsy.replay-plan.v1",
       "workflowId": "distrokid-album-submit",
-      "generatedAt": "2026-06-04T13:25:32.196Z",
+      "generatedAt": "2026-06-05T14:30:26.106Z",
       "tabs": [
         {
           "id": "distrokidUpload",

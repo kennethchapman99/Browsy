@@ -237,6 +237,15 @@ try {
     });
     assert('auth reuse recording stop returns ok', reuseStopped.res.status === 200 && reuseStopped.json.ok === true, JSON.stringify(reuseStopped.json));
     assert('auth reuse recording stop saves auth state', fs.existsSync(reuseStopped.json.runtime?.savedAuthState || ''), JSON.stringify(reuseStopped.json.runtime));
+    const authReuseDir = path.join(REPO_ROOT, 'output', 'recordings', authReuseRecordingSessionId);
+    const authReuseSessionOnDisk = JSON.parse(fs.readFileSync(path.join(authReuseDir, 'session.json'), 'utf8'));
+    const authReuseEventsOnDisk = JSON.parse(fs.readFileSync(path.join(authReuseDir, 'events.json'), 'utf8'));
+    assert('stopped recording session stores event artifact reference instead of embedded events',
+      !Array.isArray(authReuseSessionOnDisk.events)
+        && typeof authReuseSessionOnDisk.eventSink === 'string'
+        && Array.isArray(authReuseEventsOnDisk)
+        && authReuseEventsOnDisk.length > 0,
+      JSON.stringify({ hasSessionEvents: Array.isArray(authReuseSessionOnDisk.events), eventSink: authReuseSessionOnDisk.eventSink, eventCount: authReuseEventsOnDisk.length }));
 
     const inspectUnlocked = await api('POST', '/api/auth-profiles/inspect', { appId: APP_ID, workflowId: WORKFLOW_ID, authProfileId: AUTH_PROFILE_ID });
     assert('auth profile inspect reports healthy when unlocked', inspectUnlocked.res.status === 200 && inspectUnlocked.json.profile?.healthy === true && inspectUnlocked.json.profile?.locked === false, JSON.stringify(inspectUnlocked.json));
@@ -273,6 +282,21 @@ try {
     const releaseStale = await api('POST', '/api/auth-profiles/release-stale-lock', { appId: APP_ID, workflowId: WORKFLOW_ID, authProfileId: AUTH_PROFILE_ID });
     assert('release-stale-lock clears dead-pid stale lock', releaseStale.res.status === 200 && releaseStale.json.recovery?.cleared === true && releaseStale.json.recovery?.lock?.locked === false, JSON.stringify(releaseStale.json));
     assert('release-stale-lock removes stale auth lock file', !fs.existsSync(staleLockFile), staleLockFile);
+
+    const chromePidStyleLock = path.join(expectedDir, 'SingletonLock');
+    const chromeCookieLock = path.join(expectedDir, 'SingletonCookie');
+    fs.symlinkSync('LH9YD4F04Y-99999999', chromePidStyleLock);
+    fs.symlinkSync('1525436860586804749', chromeCookieLock);
+    const inspectChromeStyleStale = await api('POST', '/api/auth-profiles/inspect', { appId: APP_ID, workflowId: WORKFLOW_ID, authProfileId: AUTH_PROFILE_ID });
+    assert('auth profile inspect classifies Chrome SingletonLock + SingletonCookie as stale',
+      inspectChromeStyleStale.json.profile?.locked === true && inspectChromeStyleStale.json.profile?.stale === true && inspectChromeStyleStale.json.profile?.lockFiles?.length === 2,
+      JSON.stringify(inspectChromeStyleStale.json.profile));
+    const releaseChromeStyleStale = await api('POST', '/api/auth-profiles/release-stale-lock', { appId: APP_ID, workflowId: WORKFLOW_ID, authProfileId: AUTH_PROFILE_ID });
+    assert('release-stale-lock clears Chrome SingletonLock + SingletonCookie together',
+      releaseChromeStyleStale.res.status === 200 && releaseChromeStyleStale.json.recovery?.cleared === true && releaseChromeStyleStale.json.recovery?.lock?.locked === false,
+      JSON.stringify(releaseChromeStyleStale.json));
+    assert('release-stale-lock removes Chrome SingletonLock symlink', !fs.existsSync(chromePidStyleLock), chromePidStyleLock);
+    assert('release-stale-lock removes Chrome SingletonCookie symlink', !fs.existsSync(chromeCookieLock), chromeCookieLock);
 
     fs.symlinkSync('stale-host-99999999', staleLockFile);
 

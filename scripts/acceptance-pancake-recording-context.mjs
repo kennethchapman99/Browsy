@@ -11,6 +11,14 @@ import {
   validateRecordingSessionForLaunch,
 } from '../src/registry/recording-registry.mjs';
 
+// Use a disposable workflow id for the session that gets imported/materialized.
+// Importing with overwrite=true writes into workflows/<id>/, so targeting the real
+// "distrokid-album-submit" workflow would clobber its hand-authored repeat-group
+// field-map and recorded workflow files. This test only exercises recording-context
+// plumbing, so a throwaway id is sufficient and keeps the real workflow intact.
+const TEST_WORKFLOW_ID = 'distrokid-album-submit-rec-context';
+const TEST_WORKFLOW_REF = 'pancake-robot.distrokid-album-submit-rec-context';
+
 const samplePayload = {
   releaseId: 'album-context',
   albumId: 'album-context',
@@ -46,8 +54,8 @@ const baseRequest = {
   appId: 'pancake-robot',
   appName: 'Pancake Robot',
   sourceApp: 'pancake-robot',
-  workflowRef: 'pancake-robot.distrokid-album-submit',
-  workflowId: 'distrokid-album-submit',
+  workflowRef: TEST_WORKFLOW_REF,
+  workflowId: TEST_WORKFLOW_ID,
   workflowName: 'DistroKid Album Submit',
   targetUrl: 'https://distrokid.com/new/',
   releaseId: 'album-context',
@@ -123,6 +131,7 @@ assert.ok(defaultedSession.bindingHints.some(hint => hint.path === 'tracks[].aud
 assert.equal(defaultedSession.recordingSetup.tabs[0].urlTemplate, 'http://localhost:3737/releases/album/{album.id}');
 assert.equal(defaultedSession.recordingSetup.tabs[0].url, 'http://localhost:3737/releases/album/ALBUM_MPK9H71S_RTCM');
 assert.equal(defaultedSession.callbackUrl, 'http://localhost:3737/releases/album/ALBUM_MPK9H71S_RTCM/magic-release/ingest-result');
+assert.equal(defaultedSession.callbackUrlTemplate, 'http://localhost:3737/releases/album/{album.id}/magic-release/ingest-result');
 assert.equal(defaultedSession.fileBindings[0].binding, 'album.coverArtPath');
 pass('Pancake Robot defaults hydrate releaseId, aliases, callback, file bindings, and source URL template');
 
@@ -143,7 +152,7 @@ pass('recording context persisted on disk');
 
 const observation = {
   schemaVersion: 'browsy.observation.v1',
-  workflowId: 'distrokid-album-submit',
+  workflowId: TEST_WORKFLOW_ID,
   title: 'DistroKid Album Submit',
   workflowContext: rawSession,
   recordingSetup: baseRequest.recordingSetup,
@@ -177,7 +186,7 @@ assert.ok(contract.recordedSteps.length > 0);
 assert.ok(contract.fileUploadBindings.length > 0);
 assert.ok(contract.humanApprovalCheckpoints.length > 0);
 assert.equal(contract.sourceAppId, 'pancake-robot');
-assert.equal(contract.sourceWorkflowId, 'distrokid-album-submit');
+assert.equal(contract.sourceWorkflowId, TEST_WORKFLOW_ID);
 assert.ok(contract.sourcePayloadSchema?.properties?.releaseId);
 assert.ok(contract.sourceFieldMappings.some(mapping => mapping.path === 'tracks[].audioPath'));
 assert.ok(contract.tabUrlTemplates.some(tab => tab.urlTemplate === 'https://distrokid.com/new/'));
