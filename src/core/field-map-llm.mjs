@@ -10,6 +10,14 @@
 // function. Use makeAnthropicCaller() for the real Anthropic API, or pass a
 // mock in tests.
 
+import fs from 'fs';
+import { join, resolve } from 'path';
+import {
+  OUTPUT_DIR, WORKFLOWS_DIR,
+  exists, readJson, writeJson, safeId,
+} from './paths.mjs';
+import { generateCandidates } from './field-map-candidates.mjs';
+
 // ---------------------------------------------------------------------------
 // extractPackageFields — derive typed field list from a package JSON
 // ---------------------------------------------------------------------------
@@ -268,5 +276,115 @@ export function makeAnthropicCaller({
     });
 
     return response.content?.[0]?.text ?? '';
+  };
+}
+
+// ---------------------------------------------------------------------------
+// generateFieldMapForWorkflow — locate the latest discovery for a workflow,
+// run candidates + LLM mapping for the resolved package, and write
+// field-map.local.json. This is the reusable core behind `discover:map` so
+// other commands (e.g. autopilot) can call it directly instead of shelling out.
+//
+// Returns { outPath, fieldMap, unmapped, confidence, discoveryRunDir,
+//           packageFields, packagePath, model, candidatesCount }.
+// `callLLM` is injectable so tests can run without an API key.
+// ---------------------------------------------------------------------------
+
+export async function generateFieldMapForWorkflow({
+  workflowId,
+  packagePath = null,
+  model = 'claude-haiku-4-5-20251001',
+  callLLM = null,
+  outputDir = OUTPUT_DIR,
+  workflowsDir = WORKFLOWS_DIR,
+} = {}) {
+  const workflow = safeId(workflowId);
+  const wfDir = join(workflowsDir, workflow);
+
+  // 1. Find latest discovered-fields.json for this workflow
+  const runsBase = join(outputDir, 'runs', workflow);
+  if (!exists(runsBase)) {
+    throw new Error(`No run output found for workflow "${workflow}". Run: browsy discover --workflow ${workflow} --url <url>`);
+  }
+  const runDirs = fs.readdirSync(runsBase)
+    .map(d => ({ name: d, path: join(runsBase, d) }))
+    .filter(d => { try { return fs.statSync(d.path).isDirectory(); } catch { return false; } })
+    .sort((a, b) => {
+      try { return fs.statSync(b.path).mtimeMs - fs.statSync(a.path).mtimeMs; } catch { return 0; }
+    });
+
+  let discoveryData = null;
+  let discoveryRunDir = null;
+  for (const rd of runDirs) {
+    const dfPath = join(rd.path, 'discovered-fields.json');
+    if (exists(dfPath)) {
+      discoveryData = readJson(dfPath);
+      discoveryRunDir = rd.path;
+      break;
+    }
+  }
+  if (!discoveryData) {
+    throw new Error(`No discovered-fields.json found for workflow "${workflow}". Run: browsy discover --workflow ${workflow} --url <url>`);
+  }
+
+  // 2. Resolve package JSON — same priority order as the discover:map CLI handler
+  const pkgPaths = packagePath
+    ? [resolve(packagePath)]
+    : [
+        join(wfDir, 'workflow-package.local.json'),
+        join(wfDir, 'workflow-package.example.json'),
+        // Legacy fallback only — do not create these for new workflows
+        join(wfDir, 'sample-package.json'),
+        join(wfDir, 'package.json'),
+      ];
+  let pkg = null;
+  let pkgUsed = null;
+  for (const p of pkgPaths) {
+    if (exists(p)) { pkg = readJson(p); pkgUsed = p; break; }
+  }
+  if (!pkg) {
+    throw new Error(
+      `No package JSON found for workflow "${workflow}". ` +
+      `Create ${join(wfDir, 'workflow-package.example.json')} or pass packagePath.`
+    );
+  }
+
+  // 3. Extract fields + generate candidates
+  const packageFields = extractPackageFields(pkg);
+  if (!packageFields.length) {
+    throw new Error('Package has no fields (globals, assets, defaults, or repeatGroups). Nothing to map.');
+  }
+  const candidates = generateCandidates(discoveryData).candidates;
+
+  // 4. Map with the LLM (real caller by default, injectable for tests)
+  const caller = callLLM || makeAnthropicCaller({ model });
+  const { fieldMap, unmapped, confidence } = await mapFieldsWithLLM({
+    packageFields,
+    candidates,
+    callLLM: caller,
+  });
+
+  // 5. Write field-map.local.json (exact existing shape)
+  const outPath = join(wfDir, 'field-map.local.json');
+  writeJson(outPath, {
+    generatedAt:  new Date().toISOString(),
+    workflowId:   workflow,
+    discoveryRun: discoveryRunDir,
+    model,
+    fields:       fieldMap,
+    unmapped,
+    confidence,
+  });
+
+  return {
+    outPath,
+    fieldMap,
+    unmapped,
+    confidence,
+    discoveryRunDir,
+    packageFields,
+    packagePath: pkgUsed,
+    model,
+    candidatesCount: candidates.length,
   };
 }

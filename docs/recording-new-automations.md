@@ -105,6 +105,11 @@ wizard → enrich (field-mapping instruction) → auth → record → discover -
        → verify field-map → dry-run → human-gated live
 ```
 
+> **One-command shortcut:** [`npm run autopilot`](./agent-autopilot.md) collapses
+> the `discover --candidates → verify field-map → dry-run → review` tail into a
+> single pass and reports what still needs a human. Auth, the recording, and the
+> final live approval stay human.
+
 ## Checklist
 
 - [ ] `AUTOMATION_REQUEST.md` written via the wizard

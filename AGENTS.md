@@ -140,6 +140,12 @@ Reconcile three sources into the verified field map: this instruction's *meaning
 the Step 4 recording's *what was clicked*, and discovery's *what it actually is*.
 Map only fields that require action; everything else accepts site defaults.
 
+**Autopilot shortcut.** `npm run autopilot -- --workflow <id> [--from-recording
+<id|path>]` chains discover → field-map → dry-run and writes
+`output/runs/<id>/<ts>/autopilot-report.{json,md}` listing what is mapped and
+what still needs a human. It never logs in, never clicks dangerous actions, and
+never live-runs. Full recipe: `docs/agent-autopilot.md`.
+
 ---
 
 ## Safety baseline — hard rules

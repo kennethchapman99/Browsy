@@ -307,6 +307,11 @@ version:
 10. Review run artifacts and safety skips.
 11. Only then consider a live, human-gated run.
 
+> **Shortcut:** once you have the intent doc, a recording, and a one-time login,
+> `npm run autopilot -- --workflow <id> [--from-recording <id|path>]` runs steps
+> 7–10 in one pass and reports what still needs a human. See
+> [docs/agent-autopilot.md](docs/agent-autopilot.md).
+
 ---
 
 ## How to use a coding agent with Browsy
