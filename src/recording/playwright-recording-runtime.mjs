@@ -699,42 +699,6 @@ export async function abandonPlaywrightRecording(recordingSessionId, { reason = 
   return { active: true, ...runtime };
 }
 
-export async function abandonPlaywrightRecording(recordingSessionId, { reason = 'abandoned by caller' } = {}) {
-  const active = activeRecordings.get(recordingSessionId);
-  if (!active) {
-    writeRuntimeStatus(recordingSessionId, { status: 'not_active', active: false });
-    return { active: false, eventCount: countEventsOnDisk(recordingSessionId) };
-  }
-
-  activeRecordings.delete(recordingSessionId);
-  const abandonedAt = new Date().toISOString();
-  let savedAuthState = null;
-  try {
-    if (active.authProfile?.storageStatePath) {
-      ensureDir(path.dirname(active.authProfile.storageStatePath));
-      await active.context.storageState({ path: active.authProfile.storageStatePath });
-      savedAuthState = active.authProfile.storageStatePath;
-    }
-  } catch {}
-
-  appendEventsToDisk(recordingSessionId, [{
-    id: `recording-abandoned-${Date.now()}`,
-    recordingSessionId,
-    timestamp: abandonedAt,
-    source: 'playwrightRecorder',
-    type: 'recording_abandoned',
-    rawEvidence: { eventCount: active.events.length, reason, savedAuthState },
-  }]);
-
-  try { await active.context.close(); } catch {}
-  try { await active.browser?.close(); } catch {}
-  recoverStaleProfileLock(active.authProfile);
-
-  const runtime = { status: 'abandoned', active: false, abandonedAt, eventCount: countEventsOnDisk(recordingSessionId), reason, savedAuthState };
-  writeRuntimeStatus(recordingSessionId, runtime);
-  return { active: true, ...runtime };
-}
-
 function attachPageHandlers({ recordingSessionId, page, append, tab = null }) {
   if (page.__browsyAttached) return;
   page.__browsyAttached = true;
