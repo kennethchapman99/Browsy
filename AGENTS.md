@@ -125,6 +125,29 @@ Observation does not replace Playwright discovery. Use both.
 
 ---
 
+## Intent / field-mapping enrichment
+
+Before building, read `workflows/<workflow-id>/field-mapping-instruction.md` when
+it exists. It is the human's plain-English statement of **what each field means,
+its value rule, and where its value comes from** — the authority for intent when
+a visible label does not match the backend field you must wire to.
+
+- Template: `templates/automation-request/field-mapping-instruction-template.md`
+- Worked example: `examples/field-mapping-instruction-distrokid-album.md`
+- Full recipe: `docs/recording-new-automations.md`
+
+Reconcile three sources into the verified field map: this instruction's *meaning*,
+the Step 4 recording's *what was clicked*, and discovery's *what it actually is*.
+Map only fields that require action; everything else accepts site defaults.
+
+**Autopilot shortcut.** `npm run autopilot -- --workflow <id> [--from-recording
+<id|path>]` chains discover → field-map → dry-run and writes
+`output/runs/<id>/<ts>/autopilot-report.{json,md}` listing what is mapped and
+what still needs a human. It never logs in, never clicks dangerous actions, and
+never live-runs. Full recipe: `docs/agent-autopilot.md`.
+
+---
+
 ## Safety baseline — hard rules
 
 The following text must NEVER be clicked by automation under normal operation:
