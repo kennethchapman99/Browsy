@@ -395,9 +395,28 @@ export async function executeRunPlanWithPlaywright({
       await ctx.tracing.start({ screenshots: true, snapshots: true });
     }
 
-    const page = await ctx.newPage();
+    // A persistent context opens with a default about:blank page — reuse it
+    // instead of opening a second tab. Opening a fresh tab left the default
+    // blank page orphaned, so a navigation that stalled looked like "two
+    // about:blank tabs hung". Close any extra pre-existing blank pages.
+    const seededBlank = ctx.pages().filter(p => { try { const u = p.url(); return !u || u === 'about:blank'; } catch { return false; } });
+    const page = seededBlank[0] || await ctx.newPage();
+    for (const extra of seededBlank.slice(1)) { try { await extra.close(); } catch {} }
+
     const url  = targetUrl ?? pathToFileURL(path.resolve(fixturePath)).href;
-    await page.goto(url);
+    // Navigate with waitUntil:'domcontentloaded' and an explicit, generous
+    // timeout. Playwright's default (waitUntil:'load', 30s) intermittently
+    // times out on a heavy live site whose 'load' event never fires (lingering
+    // analytics/long-poll/websocket connections), which surfaced as a hung
+    // about:blank tab and an opaque replay_failed. 'domcontentloaded' commits as
+    // soon as the DOM is ready; retry once before giving up on a transient.
+    const navTimeoutMs = Number(process.env.BROWSY_REPLAY_NAV_TIMEOUT_MS) || 60000;
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: navTimeoutMs });
+    } catch (navErr) {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: navTimeoutMs })
+        .catch(() => { throw new Error(`initial navigation to ${url} failed after retry: ${navErr.message}`); });
+    }
     await dismissCookieBanner(page);
 
     // Capture downloads — always record metadata; persist bytes only when downloadsDir is set.
