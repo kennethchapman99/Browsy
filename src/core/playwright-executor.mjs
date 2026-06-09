@@ -365,6 +365,9 @@ export async function executeRunPlanWithPlaywright({
   let browser     = null;
   let persistentCtx = null;
   let postSubmitCompleted = false;
+  // Hoisted so the catch can report which step failed and on what page.
+  let page        = null;
+  let currentStep = null;
 
   // DistroKid uploads artwork and audio to its S3 bucket via XHR. Chrome's
   // Private/Local Network Access checks block these cross-origin uploads in the
@@ -400,8 +403,9 @@ export async function executeRunPlanWithPlaywright({
     // blank page orphaned, so a navigation that stalled looked like "two
     // about:blank tabs hung". Close any extra pre-existing blank pages.
     const seededBlank = ctx.pages().filter(p => { try { const u = p.url(); return !u || u === 'about:blank'; } catch { return false; } });
-    const page = seededBlank[0] || await ctx.newPage();
+    page = seededBlank[0] || await ctx.newPage();
     for (const extra of seededBlank.slice(1)) { try { await extra.close(); } catch {} }
+    currentStep = { type: 'initial_navigation', url: targetUrl ?? fixturePath };
 
     const url  = targetUrl ?? pathToFileURL(path.resolve(fixturePath)).href;
     // Navigate with waitUntil:'domcontentloaded' and an explicit, generous
@@ -454,6 +458,7 @@ export async function executeRunPlanWithPlaywright({
     let sectionSel = indexedMode ? null : await resolveSectionSelector(page);
 
     for (const step of runPlan.steps) {
+      currentStep = { type: step.type, source: step.source || null, selector: step.selector || null, label: step.label || null };
       // ── Global fill ──────────────────────────────────────────────────────────
       if (step.type === 'fill_global') {
         const fieldName = step.source.split('.').pop();
@@ -488,6 +493,7 @@ export async function executeRunPlanWithPlaywright({
         const { itemIndex, steps: subSteps } = step;
 
         for (const sub of subSteps) {
+          currentStep = { type: sub.type, itemIndex, fieldName: sub.fieldName || null, selector: sub.selector || sub.repeatAction?.selector || null };
           // ensure_section — verify or create the DOM section for this item
           if (sub.type === 'ensure_section') {
             if (indexedMode) {
@@ -675,10 +681,29 @@ export async function executeRunPlanWithPlaywright({
     return { ok: true, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, browserLeftOpen: false, postSubmitCompleted };
 
   } catch (err) {
+    // Make the failure self-describing: which step failed, and on what page.
+    // Without this the only signal upstream was a bare "replay_failed".
+    const stepDesc = describeStep(currentStep);
+    let pageUrl = null;
+    try { pageUrl = page ? page.url() : null; } catch {}
+    const error = `${err.message}${stepDesc ? ` [step: ${stepDesc}]` : ''}${pageUrl ? ` [url: ${pageUrl}]` : ''}`;
     if (persistentCtx) await persistentCtx.close().catch(() => {});
     if (browser)       await browser.close().catch(() => {});
-    return { ok: false, error: err.message, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, postSubmitCompleted };
+    return { ok: false, error, failed_step: currentStep, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, postSubmitCompleted };
   }
+}
+
+// Compact one-line description of the step that was in flight when a run failed.
+function describeStep(step) {
+  if (!step || typeof step !== 'object') return null;
+  const parts = [step.type];
+  if (step.itemIndex !== undefined && step.itemIndex !== null) parts.push(`item#${step.itemIndex}`);
+  if (step.fieldName) parts.push(step.fieldName);
+  if (step.source) parts.push(step.source);
+  if (step.label) parts.push(`"${step.label}"`);
+  if (step.selector) parts.push(step.selector);
+  if (step.url) parts.push(step.url);
+  return parts.filter(Boolean).join(' ');
 }
 
 // ── Post-submit step interpreter ───────────────────────────────────────────────

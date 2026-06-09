@@ -169,5 +169,5 @@ function artifactType(filePath = '') {
 }
 
 function firstError(result = {}) {
-  return result.failedSteps?.[0]?.error || result.errors?.[0] || result.status || null;
+  return result.failedSteps?.[0]?.error || result.errors?.[0] || result.error || result.status || null;
 }

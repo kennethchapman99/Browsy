@@ -143,6 +143,7 @@ export async function executeRunPlanRun({
     captured_outputs: result.capturedOutputs || {},
     final_state: result.finalState || null,
     error: result.error || null,
+    failed_step: result.failed_step || null,
     artifact_paths: [],
     artifacts: [],
     return_contract_version: 'automation-result-v1',
