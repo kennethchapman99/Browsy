@@ -37,6 +37,7 @@ export function startRecordingSession(input = {}, { baseUrl = 'http://localhost:
     releaseId: normalized.releaseId,
     packageId: normalized.packageId,
     callbackUrl: normalized.callbackUrl,
+    callbackUrlTemplate: normalized.callbackUrlTemplate,
     recordingSetup: normalized.recordingSetup,
     inputSchema: normalized.inputSchema,
     payloadSchema: normalized.payloadSchema,
@@ -84,9 +85,13 @@ export function updateRecordingSessionSetup(recordingSessionId, input = {}) {
   if (session.status === 'imported') throw new Error('cannot edit setup after workflow import; create a new recording session');
   const recordingSetup = normalizeRecordingSetup(input.recordingSetup || session.recordingSetup || {}, { vars: flattenRuntimeVars(session.samplePayload) });
   validateUsableTabs(recordingSetup.tabs, { allowUnresolvedTemplates: true });
+  const callback = normalizeCallbackUrlUpdate(input.callbackUrl !== undefined ? input.callbackUrl : session.callbackUrlTemplate || session.callbackUrl, {
+    vars: flattenRuntimeVars(session.samplePayload || {}),
+  });
   const updated = {
     ...session,
-    callbackUrl: resolveOptionalTemplate(input.callbackUrl !== undefined ? input.callbackUrl || null : session.callbackUrl, flattenRuntimeVars(session.samplePayload || {}), 'callbackUrl'),
+    callbackUrl: callback.url,
+    callbackUrlTemplate: callback.urlTemplate,
     recordingSetup,
     fieldContractIntent: normalizeText(input.fieldContractIntent ?? input.dataContractIntent ?? session.fieldContractIntent),
     completionPolicy: normalizeCompletionPolicy(input.completionPolicy || session.completionPolicy || {}),
@@ -103,7 +108,7 @@ export function updateRecordingSessionSetup(recordingSessionId, input = {}) {
 export function validateRecordingSessionForLaunch(recordingSessionId) {
   const session = mustReadSession(recordingSessionId);
   validateUsableTabs(session.recordingSetup?.tabs || [], { vars: flattenRuntimeVars(session.samplePayload || {}) });
-  validateOptionalTemplate(session.callbackUrl, { vars: flattenRuntimeVars(session.samplePayload || {}), label: 'callbackUrl' });
+  validateOptionalTemplate(session.callbackUrlTemplate || session.callbackUrl, { vars: flattenRuntimeVars(session.samplePayload || {}), label: 'callbackUrl' });
   return publicSession(session);
 }
 
@@ -142,15 +147,16 @@ export function getRecordingSession(recordingSessionId) {
 export function stopRecordingSession(recordingSessionId, input = {}) {
   const session = mustReadSession(recordingSessionId);
   const now = new Date().toISOString();
-  const events = Array.isArray(input.events) ? input.events : session.events;
-  const observation = enrichObservationWithSession(input.observation || session.observation || buildObservationFromSession(session, events || []), session, events || []);
+  const events = Array.isArray(input.events) ? input.events : readRecordingEvents(recordingSessionId);
+  const observation = enrichObservationWithSession(input.observation || readRecordingObservation(recordingSessionId) || buildObservationFromSession(session, events || []), session, events || []);
   const updated = {
     ...session,
     status: 'stopped',
     updatedAt: now,
     stoppedAt: now,
     observation,
-    events,
+    eventCount: events.length,
+    eventSink: `output/recordings/${recordingSessionId}/events.json`,
   };
   persistSession(updated);
   writeJson(path.join(recordingDir(recordingSessionId), 'observation.json'), observation);
@@ -161,14 +167,15 @@ export function stopRecordingSession(recordingSessionId, input = {}) {
 export function abandonRecordingSession(recordingSessionId, input = {}) {
   const session = mustReadSession(recordingSessionId);
   const now = new Date().toISOString();
-  const events = Array.isArray(input.events) ? input.events : session.events;
+  const events = Array.isArray(input.events) ? input.events : readRecordingEvents(recordingSessionId);
   const updated = {
     ...session,
     status: 'abandoned',
     updatedAt: now,
     abandonedAt: now,
     abandonReason: normalizeText(input.reason) || 'abandoned by caller',
-    events,
+    eventCount: events.length,
+    eventSink: `output/recordings/${recordingSessionId}/events.json`,
   };
   persistSession(updated);
   writeJson(path.join(recordingDir(recordingSessionId), 'events.json'), events || []);
@@ -177,7 +184,8 @@ export function abandonRecordingSession(recordingSessionId, input = {}) {
 
 export function importRecordingSession(recordingSessionId, input = {}, { baseUrl = 'http://localhost:3001' } = {}) {
   const session = mustReadSession(recordingSessionId);
-  const observation = enrichObservationWithSession(input.observation || session.observation || buildObservationFromSession(session, input.events || session.events || []), session, input.events || session.events || []);
+  const events = Array.isArray(input.events) ? input.events : readRecordingEvents(recordingSessionId);
+  const observation = enrichObservationWithSession(input.observation || readRecordingObservation(recordingSessionId) || buildObservationFromSession(session, events), session, events);
   const materialized = materializeWorkflowPackageFromObservation({ observation, overwrite: input.overwrite === true, packageKind: input.packageKind || 'example', appId: input.appId || session.appId, appName: input.appName || session.appName || session.appId, version: input.version || '1.0.0', autoRegisterApp: input.autoRegisterApp !== false });
   const workflowObjectId = `${input.appId || session.appId}.${observation.workflowId}`;
   const version = input.version || '1.0.0';
@@ -265,8 +273,8 @@ function normalizeRecordingRequest(input = {}) {
   const payloadSchema = inputSchema && typeof inputSchema === 'object' ? inputSchema : { type: 'object', additionalProperties: true, properties: {}, required: [] };
   if (errors.length) { const err = new Error(errors.join('; ')); err.errors = errors; throw err; }
   const runtimeVars = flattenRuntimeVars(samplePayload || {});
-  const callbackUrl = resolveOptionalTemplate(input.callbackUrl || null, runtimeVars, 'callbackUrl');
-  return { appId, appName: input.appName || appId, sourceApp, workflowRef, workflowId, workflowName: input.workflowName || input.name || workflowId, targetUrl, releaseId, packageId: input.packageId || null, callbackUrl, recorderUrl: input.recorderUrl || null, recordingSetup, inputSchema: payloadSchema, payloadSchema, requiredAssets: asArray(input.requiredAssets), samplePayload, derivedVariables: input.derivedVariables || {}, bindingHints: withTemplateBindingHints(asArray(input.bindingHints), recordingSetup), fileBindings: asArray(input.fileBindings).map(normalizeBinding), expectedOutputs: asArray(input.expectedOutputs).map(normalizeOutput), humanCheckpoints: asArray(input.humanCheckpoints).map(normalizeCheckpoint), fieldContractIntent: normalizeText(input.fieldContractIntent ?? input.dataContractIntent), completionPolicy: normalizeCompletionPolicy(input.completionPolicy || {}), writebackTargets: asArray(input.writebackTargets).map(normalizeWritebackTarget), auth: buildAuthRequirements(recordingSetup) };
+  const callback = normalizeCallbackUrlUpdate(input.callbackUrl || null, { vars: runtimeVars });
+  return { appId, appName: input.appName || appId, sourceApp, workflowRef, workflowId, workflowName: input.workflowName || input.name || workflowId, targetUrl, releaseId, packageId: input.packageId || null, callbackUrl: callback.url, callbackUrlTemplate: callback.urlTemplate, recorderUrl: input.recorderUrl || null, recordingSetup, inputSchema: payloadSchema, payloadSchema, requiredAssets: asArray(input.requiredAssets), samplePayload, derivedVariables: input.derivedVariables || {}, bindingHints: withTemplateBindingHints(asArray(input.bindingHints), recordingSetup), fileBindings: asArray(input.fileBindings).map(normalizeBinding), expectedOutputs: asArray(input.expectedOutputs).map(normalizeOutput), humanCheckpoints: asArray(input.humanCheckpoints).map(normalizeCheckpoint), fieldContractIntent: normalizeText(input.fieldContractIntent ?? input.dataContractIntent), completionPolicy: normalizeCompletionPolicy(input.completionPolicy || {}), writebackTargets: asArray(input.writebackTargets).map(normalizeWritebackTarget), auth: buildAuthRequirements(recordingSetup) };
 }
 
 function normalizeRecordingSetup(setup = {}, { vars = {} } = {}) {
@@ -297,9 +305,11 @@ function normalizeWritebackTarget(target = {}) { if (typeof target === 'string')
 function buildAuthRequirements(recordingSetup) { return recordingSetup.tabs.filter(tab => tab.requiresAuth || tab.siteId).map(tab => ({ tabId: tab.id, siteId: tab.siteId || safeId(tab.title || tab.id), url: tab.url, authCheckUrl: tab.authCheckUrl || tab.url, authProfileId: tab.authProfileId || recordingSetup.authProfileId || recordingSetup.authGroupId || null, mode: tab.requiresAuth ? 'human_required_if_not_authenticated' : 'optional' })); }
 function buildObservationFromSession(session, events = []) { const tabs = asArray(session.recordingSetup?.tabs); return { schemaVersion: 'browsy.observation.v1', workflowId: session.workflowId, title: session.workflowName || session.workflowId, goal: `Recorded workflow for app ${session.appId}`, workflowContext: pickWorkflowContext(session), recordingSetup: session.recordingSetup, pages: tabs.map(tab => ({ id: tab.id, purpose: tab.title, url: tab.url })), fields: [], availableBindings: session.bindingHints || [], requiredAssets: session.requiredAssets || [], capturedOutputs: session.expectedOutputs || [], humanCheckpoints: session.humanCheckpoints || [], completionPolicy: session.completionPolicy || null, writebackTargets: session.writebackTargets || [], fieldContractIntent: session.fieldContractIntent || '', sessionEvents: events }; }
 function enrichObservationWithSession(observation = {}, session, events = []) { const base = observation && typeof observation === 'object' ? observation : {}; const tabs = asArray(session.recordingSetup?.tabs); return { ...base, schemaVersion: base.schemaVersion || 'browsy.observation.v1', workflowId: base.workflowId || session.workflowId, title: base.title || session.workflowName || session.workflowId, workflowContext: { ...pickWorkflowContext(session), ...(base.workflowContext || {}) }, recordingSetup: base.recordingSetup || session.recordingSetup, pages: asArray(base.pages).length ? base.pages : tabs.map(tab => ({ id: tab.id, purpose: tab.title, url: tab.url })), availableBindings: asArray(base.availableBindings).length ? base.availableBindings : session.bindingHints || [], requiredAssets: asArray(base.requiredAssets).length ? base.requiredAssets : session.requiredAssets || [], capturedOutputs: asArray(base.capturedOutputs).length ? base.capturedOutputs : session.expectedOutputs || [], humanCheckpoints: asArray(base.humanCheckpoints).length ? base.humanCheckpoints : session.humanCheckpoints || [], completionPolicy: base.completionPolicy || session.completionPolicy || null, writebackTargets: asArray(base.writebackTargets).length ? base.writebackTargets : session.writebackTargets || [], fieldContractIntent: base.fieldContractIntent || session.fieldContractIntent || '', sessionEvents: asArray(base.sessionEvents).length ? base.sessionEvents : events }; }
-function publicSession(session) { return { recordingSessionId: session.recordingSessionId, status: session.status, appId: session.appId, appName: session.appName, sourceApp: session.sourceApp || null, workflowId: session.workflowId, workflowName: session.workflowName, workflowRefPreview: session.workflowRefPreview, workflowRef: session.workflowRef || null, targetUrl: session.targetUrl || null, releaseId: session.releaseId || null, packageId: session.packageId || null, wizardUrl: session.wizardUrl, recordAutomationControl: { label: 'Record Automation', href: session.wizardUrl, action: 'open_browsy_new_automation_wizard', recordingSessionId: session.recordingSessionId }, recorderUrl: session.recorderUrl, callbackUrl: session.callbackUrl, recordingSetup: session.recordingSetup, inputSchema: session.inputSchema || session.payloadSchema, payloadSchema: session.payloadSchema, requiredAssets: session.requiredAssets || [], samplePayload: session.samplePayload || null, derivedVariables: session.derivedVariables || {}, bindingHints: session.bindingHints || [], fileBindings: session.fileBindings, expectedOutputs: session.expectedOutputs, humanCheckpoints: session.humanCheckpoints, fieldContractIntent: session.fieldContractIntent || '', completionPolicy: session.completionPolicy || normalizeCompletionPolicy(), writebackTargets: session.writebackTargets || [], auth: session.auth, launch: session.launch || null, createdAt: session.createdAt, updatedAt: session.updatedAt, startedAt: session.startedAt || null, stoppedAt: session.stoppedAt, importedAt: session.importedAt, materializedSummary: session.materialized?.summary || null }; }
-function persistSession(session) { const dir = recordingDir(session.recordingSessionId); ensureDir(dir); writeJson(path.join(dir, 'session.json'), session); writeJson(path.join(dir, 'setup.json'), { ...pickWorkflowContext(session), callbackUrl: session.callbackUrl, recorderUrl: session.recorderUrl, recordingSetup: session.recordingSetup, payloadSchema: session.payloadSchema, fileBindings: session.fileBindings, expectedOutputs: session.expectedOutputs, humanCheckpoints: session.humanCheckpoints, fieldContractIntent: session.fieldContractIntent || '', completionPolicy: session.completionPolicy || null, writebackTargets: session.writebackTargets || [], auth: session.auth }); }
-function pickWorkflowContext(session) { return { appId: session.appId, appName: session.appName, sourceApp: session.sourceApp || null, workflowRef: session.workflowRef || null, workflowId: session.workflowId, workflowName: session.workflowName, targetUrl: session.targetUrl || null, releaseId: session.releaseId || null, packageId: session.packageId || null, inputSchema: session.inputSchema || session.payloadSchema, sourcePayloadSchema: session.inputSchema || session.payloadSchema, sourceFieldMappings: session.bindingHints || [], tabUrlTemplates: asArray(session.recordingSetup?.tabs).map(t => ({ id: t.id, urlTemplate: t.urlTemplate || t.url, siteId: t.siteId || null, role: t.role || null })), authProfileRef: session.recordingSetup?.authProfileId || session.recordingSetup?.authGroupId || session.recordingSetup?.ssoProfileId || null, requiredAssets: session.requiredAssets || [], samplePayload: session.samplePayload || null, derivedVariables: session.derivedVariables || {}, bindingHints: session.bindingHints || [], fieldContractIntent: session.fieldContractIntent || '', completionPolicy: session.completionPolicy || null, writebackTargets: session.writebackTargets || [] }; }
+function publicSession(session) { return { recordingSessionId: session.recordingSessionId, status: session.status, appId: session.appId, appName: session.appName, sourceApp: session.sourceApp || null, workflowId: session.workflowId, workflowName: session.workflowName, workflowRefPreview: session.workflowRefPreview, workflowRef: session.workflowRef || null, targetUrl: session.targetUrl || null, releaseId: session.releaseId || null, packageId: session.packageId || null, wizardUrl: session.wizardUrl, recordAutomationControl: { label: 'Record Automation', href: session.wizardUrl, action: 'open_browsy_new_automation_wizard', recordingSessionId: session.recordingSessionId }, recorderUrl: session.recorderUrl, callbackUrl: session.callbackUrl, callbackUrlTemplate: session.callbackUrlTemplate || null, recordingSetup: session.recordingSetup, inputSchema: session.inputSchema || session.payloadSchema, payloadSchema: session.payloadSchema, requiredAssets: session.requiredAssets || [], samplePayload: session.samplePayload || null, derivedVariables: session.derivedVariables || {}, bindingHints: session.bindingHints || [], fileBindings: session.fileBindings, expectedOutputs: session.expectedOutputs, humanCheckpoints: session.humanCheckpoints, fieldContractIntent: session.fieldContractIntent || '', completionPolicy: session.completionPolicy || normalizeCompletionPolicy(), writebackTargets: session.writebackTargets || [], auth: session.auth, launch: session.launch || null, createdAt: session.createdAt, updatedAt: session.updatedAt, startedAt: session.startedAt || null, stoppedAt: session.stoppedAt, importedAt: session.importedAt, materializedSummary: session.materialized?.summary || null }; }
+function persistSession(session) { const dir = recordingDir(session.recordingSessionId); ensureDir(dir); const { events: _events, observation: _observation, ...metadata } = session; writeJson(path.join(dir, 'session.json'), { ...metadata, observationSink: `output/recordings/${session.recordingSessionId}/observation.json` }); writeJson(path.join(dir, 'setup.json'), { ...pickWorkflowContext(session), callbackUrl: session.callbackUrl, callbackUrlTemplate: session.callbackUrlTemplate || null, recorderUrl: session.recorderUrl, recordingSetup: session.recordingSetup, payloadSchema: session.payloadSchema, fileBindings: session.fileBindings, expectedOutputs: session.expectedOutputs, humanCheckpoints: session.humanCheckpoints, fieldContractIntent: session.fieldContractIntent || '', completionPolicy: session.completionPolicy || null, writebackTargets: session.writebackTargets || [], auth: session.auth }); }
+function readRecordingEvents(recordingSessionId) { const p = path.join(recordingDir(recordingSessionId), 'events.json'); if (!exists(p)) return []; const events = readJson(p); return Array.isArray(events) ? events : []; }
+function readRecordingObservation(recordingSessionId) { const p = path.join(recordingDir(recordingSessionId), 'observation.json'); if (!exists(p)) return null; const observation = readJson(p); return observation && typeof observation === 'object' ? observation : null; }
+function pickWorkflowContext(session) { return { appId: session.appId, appName: session.appName, sourceApp: session.sourceApp || null, workflowRef: session.workflowRef || null, workflowId: session.workflowId, workflowName: session.workflowName, targetUrl: session.targetUrl || null, releaseId: session.releaseId || null, packageId: session.packageId || null, callbackUrl: session.callbackUrl || null, callbackUrlTemplate: session.callbackUrlTemplate || null, inputSchema: session.inputSchema || session.payloadSchema, sourcePayloadSchema: session.inputSchema || session.payloadSchema, sourceFieldMappings: session.bindingHints || [], tabUrlTemplates: asArray(session.recordingSetup?.tabs).map(t => ({ id: t.id, urlTemplate: t.urlTemplate || t.url, siteId: t.siteId || null, role: t.role || null })), authProfileRef: session.recordingSetup?.authProfileId || session.recordingSetup?.authGroupId || session.recordingSetup?.ssoProfileId || null, requiredAssets: session.requiredAssets || [], samplePayload: session.samplePayload || null, derivedVariables: session.derivedVariables || {}, bindingHints: session.bindingHints || [], fieldContractIntent: session.fieldContractIntent || '', completionPolicy: session.completionPolicy || null, writebackTargets: session.writebackTargets || [] }; }
 function inferTargetUrl(recordingSetup = {}) { const tabs = asArray(recordingSetup.tabs); return tabs.find(tab => tab.role === 'target')?.url || tabs.find(tab => tab.requiresAuth)?.url || tabs[tabs.length - 1]?.url || ''; }
 function requiresStructuredRecordingContext(input = {}) { return !!(input.samplePayload || asArray(input.requiredAssets).length || asArray(input.bindingHints).length); }
 function validateStructuredRecordingContext({ inputSchema, samplePayload, requiredAssets }, errors) { if (!inputSchema || typeof inputSchema !== 'object') errors.push('inputSchema is required for structured recording context'); const album = samplePayload?.album || null; const tracks = Array.isArray(samplePayload?.tracks) ? samplePayload.tracks : null; if (!samplePayload) errors.push('samplePayload is required for structured recording context'); if (album) { if (!album.releaseDate) errors.push('samplePayload.album.releaseDate is required'); if (!album.coverArtPath) errors.push('samplePayload.album.coverArtPath is required'); } if (tracks) { if (!tracks.length) errors.push('samplePayload.tracks must include at least one track'); tracks.forEach((track, index) => { if (!track.audioPath) errors.push(`samplePayload.tracks[${index}].audioPath is required`); }); } if (!asArray(requiredAssets).length) errors.push('requiredAssets are required for structured recording context'); }
@@ -328,6 +338,15 @@ function mergeRecordingSetup(defaultSetup = {}, inputSetup = {}) {
   const setup = { ...defaultSetup, ...inputSetup };
   setup.tabs = asArray(inputSetup.tabs).length ? inputSetup.tabs : defaultSetup.tabs;
   return setup;
+}
+function normalizeCallbackUrlUpdate(value, { vars = {} } = {}) {
+  if (!value) return { url: null, urlTemplate: null };
+  const raw = String(value).trim();
+  validateOptionalTemplate(raw, { vars, label: 'callbackUrl' });
+  return {
+    url: resolveOptionalTemplate(raw, vars, 'callbackUrl'),
+    urlTemplate: hasTemplateVars(raw) ? raw : null,
+  };
 }
 function resolveOptionalTemplate(value, vars = {}, label = 'template') {
   if (!value) return null;

@@ -3,7 +3,9 @@ import { parseArgs } from '../core/args.mjs';
 import { registerApp, getApp, listApps } from '../registry/app-registry.mjs';
 import { importWorkflowPackage } from '../registry/package-importer.mjs';
 import { registerWorkflow, getWorkflow, listWorkflows, getWorkflowVersion, parseWorkflowRef } from '../registry/workflow-registry.mjs';
-import { createRun, getRun, stopRun, cancelRun, approveRun, getRunArtifacts } from '../registry/run-registry.mjs';
+import { createRun, getRun, stopRun, cancelRun, approveRun, getRunArtifacts, updateRun } from '../registry/run-registry.mjs';
+import { mkdirSync, writeFileSync } from 'fs';
+import { dirname } from 'path';
 import { executeRun } from '../registry/run-executor.mjs';
 import { buildRunCreateResponse, buildRunResult, buildWorkflowContract } from '../registry/run-result.mjs';
 import { materializeWorkflowPackageFromObservation } from '../core/observation-materializer.mjs';
@@ -25,6 +27,7 @@ import {
   stopPlaywrightRecording,
   abandonPlaywrightRecording,
   getActivePlaywrightRecording,
+  isPlaywrightRecordingActive,
   openAuthSetupProfile,
   runAuthPreflight,
   inspectAuthProfile,
@@ -32,6 +35,49 @@ import {
 } from '../recording/playwright-recording-runtime.mjs';
 
 export const DEFAULT_PORT = 3001;
+
+// Recording sessions that are left in `recording` status clutter the wizard and
+// scare callers ("still open but idle"). We auto-reap them so nobody has to babysit
+// stale state. Two thresholds, both chosen so a *real* in-progress recording is never
+// killed:
+//   - A session whose Playwright browser is gone (no live context — e.g. after a
+//     server restart the recorder child process is already dead) can't be a real
+//     recording, so we reap it after a short grace that only exists to avoid racing
+//     a launch that's mid-flight.
+//   - A session with a live browser is only reaped after a generous idle window,
+//     since the on-disk updatedAt advances on every recorded event.
+const RECORDING_IDLE_LIMIT_MS = Number(process.env.BROWSY_RECORDING_IDLE_MS || 60 * 60 * 1000);
+const RECORDING_ORPHAN_GRACE_MS = Number(process.env.BROWSY_RECORDING_ORPHAN_MS || 5 * 60 * 1000);
+const RECORDING_REAP_INTERVAL_MS = Number(process.env.BROWSY_RECORDING_REAP_INTERVAL_MS || 5 * 60 * 1000);
+
+export async function reapStaleRecordingSessions({ now = Date.now() } = {}) {
+  const reaped = [];
+  let sessions;
+  try { sessions = listRecordingSessions(); } catch { return reaped; }
+  for (const s of sessions) {
+    if (s.status !== 'recording') continue;
+    const live = isPlaywrightRecordingActive(s.recordingSessionId);
+    const lastActivity = Date.parse(s.updatedAt || s.startedAt || s.createdAt || '') || 0;
+    const idleMs = now - lastActivity;
+    const limit = live ? RECORDING_IDLE_LIMIT_MS : RECORDING_ORPHAN_GRACE_MS;
+    if (idleMs < limit) continue;
+    const idleMin = Math.round(idleMs / 60000);
+    const reason = live
+      ? `auto-reaped: recording idle ${idleMin}m (limit ${Math.round(limit / 60000)}m)`
+      : `auto-reaped: orphaned recording, no live browser (idle ${idleMin}m)`;
+    try {
+      if (live) { try { await abandonPlaywrightRecording(s.recordingSessionId, { reason }); } catch {} }
+      abandonRecordingSession(s.recordingSessionId, { reason });
+      reaped.push({ recordingSessionId: s.recordingSessionId, live, idleMs, reason });
+      console.log('[browsy:recording-reaper] abandoned stale recording', {
+        recordingSessionId: s.recordingSessionId, live, idleMinutes: idleMin,
+      });
+    } catch (err) {
+      console.error('[browsy:recording-reaper] failed to reap', s.recordingSessionId, err?.message);
+    }
+  }
+  return reaped;
+}
 
 function json(req) {
   return new Promise((resolve, reject) => {
@@ -135,8 +181,18 @@ async function startRecording(recordingSessionId, body) {
   const tabs = session.recordingSetup?.tabs || [];
   const authProfiles = [...new Set((session.auth || []).map(a => a.authProfileId || a.siteId).filter(Boolean))];
   for (const authProfileId of authProfiles) {
-    const recovery = recoverAuthProfileLock({ appId: session.appId, workflowId: session.workflowId, authProfileId });
-    const profile = inspectAuthProfile({ appId: session.appId, workflowId: session.workflowId, authProfileId });
+    let recovery = recoverAuthProfileLock({ appId: session.appId, workflowId: session.workflowId, authProfileId });
+    let profile = inspectAuthProfile({ appId: session.appId, workflowId: session.workflowId, authProfileId });
+    // A stale lock (owner PID confirmed dead, or aged out) is never a real
+    // holder — overlapping launch attempts can re-thrash it between recover and
+    // inspect. Force-clear and re-check before refusing to launch.
+    if (profile.locked && profile.stale) {
+      console.log('[browsy:recording] forcing stale auth-profile lock release', {
+        authProfileId, lockOwner: profile.lockOwner, lockAgeMs: profile.lockAgeMs,
+      });
+      recovery = recoverAuthProfileLock({ appId: session.appId, workflowId: session.workflowId, authProfileId, force: true });
+      profile = inspectAuthProfile({ appId: session.appId, workflowId: session.workflowId, authProfileId });
+    }
     if (profile.locked) {
       return {
         ok: false,
@@ -446,6 +502,23 @@ export function createServer({ port = DEFAULT_PORT } = {}) {
         return send(res, 200, { ok: true, ...buildRunCreateResponse(run), run });
       }
 
+      // Out-of-band "human reviewed the filled live page, go ahead and submit"
+      // signal for the auto-submit opt-in. The run-plan executor is parked at the
+      // human_checkpoint polling for confirmFlagPath; dropping that file lets it
+      // run the post-submit chain (submit → mixea → done → capture HyperFollow).
+      p = route('/api/runs/:runId/confirm-submit', url);
+      if (p && method === 'POST') {
+        const run = getRun(p.runId);
+        if (!run) return send(res, 404, { ok: false, error: 'run not found' });
+        if (!run.awaitingSubmitConfirm || !run.confirmFlagPath) {
+          return send(res, 409, { ok: false, error: 'run is not awaiting submit confirmation' });
+        }
+        mkdirSync(dirname(run.confirmFlagPath), { recursive: true });
+        writeFileSync(run.confirmFlagPath, `confirmed-at:${new Date().toISOString()}\n`);
+        updateRun(p.runId, { submitConfirmedAt: new Date().toISOString() });
+        return send(res, 200, { ok: true, runId: p.runId, confirmed: true });
+      }
+
       p = route('/api/runs/:runId/cancel', url);
       if (p && method === 'POST') {
         const body = await json(req);
@@ -492,6 +565,13 @@ export function startServer({ port = DEFAULT_PORT } = {}) {
     throw error;
   });
   server.listen(port, () => console.log(`Browsy Registry API listening on http://localhost:${port}`));
+  // Clear orphaned recordings left by a prior process, then sweep on an interval.
+  reapStaleRecordingSessions().catch(err => console.error('[browsy:recording-reaper] boot sweep failed', err?.message));
+  const reaperTimer = setInterval(() => {
+    reapStaleRecordingSessions().catch(err => console.error('[browsy:recording-reaper] sweep failed', err?.message));
+  }, RECORDING_REAP_INTERVAL_MS);
+  reaperTimer.unref?.();
+  server.on('close', () => clearInterval(reaperTimer));
   return server;
 }
 

@@ -71,6 +71,16 @@ async function fetchJson(url) {
   return { res, body };
 }
 
+async function putJson(url, body) {
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json();
+  return { res, body: json };
+}
+
 async function withDummyServer(port, fn) {
   const server = http.createServer((req, res) => {
     res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -121,8 +131,21 @@ try {
   assert('recording session exists', session.res.status === 200 && session.body.ok === true, JSON.stringify(session.body));
   assert('recording source URL is resolved album URL', recording.recordingSetup.tabs[0].url === `http://localhost:${pancakePort}/releases/album/${albumId}`, recording.recordingSetup.tabs[0].url);
   assert('recording callback URL is resolved album ingest URL', recording.callbackUrl === `http://localhost:${pancakePort}/releases/album/${albumId}/magic-release/ingest-result`, recording.callbackUrl);
+  assert('recording callback URL template is preserved for editing', recording.callbackUrlTemplate === `http://localhost:${pancakePort}/releases/album/{album.id}/magic-release/ingest-result`, recording.callbackUrlTemplate);
   assert('recording keeps DistroKid auth profile', recording.recordingSetup.authProfileId === 'distrokid', recording.recordingSetup.authProfileId);
   assert('writebacks are optional for pre-submit workflow', Array.isArray(recording.writebackTargets) && recording.writebackTargets.length === 0, JSON.stringify(recording.writebackTargets));
+
+  const editedCallbackTemplate = `http://localhost:${pancakePort}/releases/album/{album.id}/magic-release/ingest-result`;
+  const saved = await putJson(`http://localhost:${browsyPort}/api/recordings/${sessionId}/setup`, {
+    recordingSetup: recording.recordingSetup,
+    callbackUrl: editedCallbackTemplate,
+    fieldContractIntent: recording.fieldContractIntent,
+    completionPolicy: recording.completionPolicy,
+    writebackTargets: recording.writebackTargets,
+  });
+  const savedRecording = saved.body.recording;
+  assert('save setup keeps edited callback URL template', saved.res.status === 200 && savedRecording.callbackUrlTemplate === editedCallbackTemplate, JSON.stringify(saved.body));
+  assert('save setup keeps resolved callback URL for execution', savedRecording.callbackUrl === `http://localhost:${pancakePort}/releases/album/${albumId}/magic-release/ingest-result`, savedRecording.callbackUrl);
 
   await browser.close();
   browser = null;

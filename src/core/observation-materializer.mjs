@@ -197,10 +197,26 @@ function buildSourceMetadata(raw = {}) {
   });
 }
 
+// A field-map is "hand-authored" if it declares repeat groups or was explicitly
+// stamped by the repeat-group authoring tooling. Such maps must survive generic
+// observation re-materialization (which cannot reconstruct repeat groups).
+function isHandAuthoredFieldMap(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) return false;
+    const existing = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (Array.isArray(existing?.repeatGroups) && existing.repeatGroups.length > 0) return true;
+    if (existing?.updatedBy === 'repeat-group-authoring') return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function materializeWorkflowPackageFromObservation({
   observation,
   repoRoot = path.resolve(WORKFLOWS_DIR, '..'),
   overwrite = false,
+  forceFieldMap = false,
   packageKind = 'example',
   appId = null,
   appName = null,
@@ -239,7 +255,16 @@ export function materializeWorkflowPackageFromObservation({
   writeJson(files.workflowPackage, compiled.workflowPackage);
   writeJson(files.replayPlan, compiled.replayPlan);
   writeJson(files.bindings, compiled.bindings);
-  writeJson(files.fieldMap, compiled.fieldMap);
+  // Preserve a hand-authored field-map. Repeat-group configs and curated
+  // selectors (e.g. the DistroKid album upload) are authored by hand and cannot
+  // be reconstructed from a generic observation — re-materializing must not clobber
+  // them. We skip the write when the existing field-map declares repeatGroups or is
+  // explicitly marked as hand-authored, unless the caller passes forceFieldMap=true.
+  if (!forceFieldMap && isHandAuthoredFieldMap(files.fieldMap)) {
+    console.warn(`[materializer] preserving hand-authored field-map for "${compiled.workflowId}" (has repeatGroups / repeat-group-authoring); pass forceFieldMap=true to regenerate.`);
+  } else {
+    writeJson(files.fieldMap, compiled.fieldMap);
+  }
   writeJson(files.safetyPolicy, compiled.safetyPolicy);
   writeText(files.runPlan, compiled.runPlanMd);
   writeJson(files.observation, parseInput(observation));
