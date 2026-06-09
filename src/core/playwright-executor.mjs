@@ -173,11 +173,27 @@ async function selectOptionResilient(el, value, label) {
   const options = await el.evaluate(sel =>
     [...sel.options].map(o => ({ value: o.value, text: o.textContent || '' }))
   );
-  const match = options.find(o => o.value === target || o.text.trim() === target)
+  let match = options.find(o => o.value === target || o.text.trim() === target)
     || options.find(o => norm(o.text) === wanted || norm(o.value) === wanted)
     || (wanted.length > 0 ? options.find(o => norm(o.text).includes(wanted)) : null);
   if (!match) {
-    throw new Error(`${label}: no <option> matched "${target}" (options: ${options.map(o => o.text.trim()).filter(Boolean).join(', ')})`);
+    // Credit-role selects: DistroKid's option set doesn't include generic values
+    // like "Performer". Rather than fail the whole run on a non-critical credit
+    // role, fall back to "Audio" (DistroKid's generic performer role), then to
+    // the first real (non-placeholder) option, then to the first option. Other
+    // selects still throw so a genuine mismatch (e.g. genre) surfaces loudly.
+    if (/role/i.test(label)) {
+      match = options.find(o => norm(o.text) === norm('Audio') || norm(o.value) === norm('Audio'))
+        || options.find(o => o.value && o.value.trim() !== '')
+        || options[0]
+        || null;
+      if (match) {
+        console.warn(`[browsy:executor] ${label}: no option matched "${target}"; falling back to "${String(match.text || match.value).trim()}"`);
+      }
+    }
+    if (!match) {
+      throw new Error(`${label}: no <option> matched "${target}" (options: ${options.map(o => o.text.trim()).filter(Boolean).join(', ')})`);
+    }
   }
 
   try {
