@@ -173,11 +173,27 @@ async function selectOptionResilient(el, value, label) {
   const options = await el.evaluate(sel =>
     [...sel.options].map(o => ({ value: o.value, text: o.textContent || '' }))
   );
-  const match = options.find(o => o.value === target || o.text.trim() === target)
+  let match = options.find(o => o.value === target || o.text.trim() === target)
     || options.find(o => norm(o.text) === wanted || norm(o.value) === wanted)
     || (wanted.length > 0 ? options.find(o => norm(o.text).includes(wanted)) : null);
   if (!match) {
-    throw new Error(`${label}: no <option> matched "${target}" (options: ${options.map(o => o.text.trim()).filter(Boolean).join(', ')})`);
+    // Credit-role selects: DistroKid's option set doesn't include generic values
+    // like "Performer". Rather than fail the whole run on a non-critical credit
+    // role, fall back to "Audio" (DistroKid's generic performer role), then to
+    // the first real (non-placeholder) option, then to the first option. Other
+    // selects still throw so a genuine mismatch (e.g. genre) surfaces loudly.
+    if (/role/i.test(label)) {
+      match = options.find(o => norm(o.text) === norm('Audio') || norm(o.value) === norm('Audio'))
+        || options.find(o => o.value && o.value.trim() !== '')
+        || options[0]
+        || null;
+      if (match) {
+        console.warn(`[browsy:executor] ${label}: no option matched "${target}"; falling back to "${String(match.text || match.value).trim()}"`);
+      }
+    }
+    if (!match) {
+      throw new Error(`${label}: no <option> matched "${target}" (options: ${options.map(o => o.text.trim()).filter(Boolean).join(', ')})`);
+    }
   }
 
   try {
@@ -343,15 +359,15 @@ export async function executeRunPlanWithPlaywright({
   //   executor runs fieldMap.postSubmitSteps (click final submit → clear the
   //   mixea upsell → land on the done page → capture the HyperFollow link).
   //   Default false → byte-for-byte the old "never automate final submit".
-  // confirmBeforeSubmit: when true, park at the checkpoint and wait for an
-  //   out-of-band confirmation (confirmFlagPath appears) before running the
-  //   post-submit steps. Used for the live "human reviews, then resume" flow.
-  //   If it times out, fall back to the safe leave-browser-open hand-off.
+  // confirmBeforeSubmit: when true (the live site), do NOT run the post-submit
+  //   steps at all. Park the filled browser open at the checkpoint and return a
+  //   waiting status immediately — non-blocking, so it never fights the caller's
+  //   run timeout. The human reviews, clicks final submit, and finishes the tail
+  //   (mixea + HyperFollow) themselves. When false (fake fixture / fully
+  //   automated), the post-submit chain runs inline here.
   // isFixture: pick step.fixtureSelector over step.selector (fake test site).
   autoSubmit = false,
   confirmBeforeSubmit = false,
-  confirmFlagPath = null,
-  confirmTimeoutMs = 30 * 60 * 1000,
   isFixture = false,
 }) {
   const policy          = safetyPolicy ?? defaultSafetyPolicy();
@@ -365,6 +381,9 @@ export async function executeRunPlanWithPlaywright({
   let browser     = null;
   let persistentCtx = null;
   let postSubmitCompleted = false;
+  // Hoisted so the catch can report which step failed and on what page.
+  let page        = null;
+  let currentStep = null;
 
   // DistroKid uploads artwork and audio to its S3 bucket via XHR. Chrome's
   // Private/Local Network Access checks block these cross-origin uploads in the
@@ -395,9 +414,29 @@ export async function executeRunPlanWithPlaywright({
       await ctx.tracing.start({ screenshots: true, snapshots: true });
     }
 
-    const page = await ctx.newPage();
+    // A persistent context opens with a default about:blank page — reuse it
+    // instead of opening a second tab. Opening a fresh tab left the default
+    // blank page orphaned, so a navigation that stalled looked like "two
+    // about:blank tabs hung". Close any extra pre-existing blank pages.
+    const seededBlank = ctx.pages().filter(p => { try { const u = p.url(); return !u || u === 'about:blank'; } catch { return false; } });
+    page = seededBlank[0] || await ctx.newPage();
+    for (const extra of seededBlank.slice(1)) { try { await extra.close(); } catch {} }
+    currentStep = { type: 'initial_navigation', url: targetUrl ?? fixturePath };
+
     const url  = targetUrl ?? pathToFileURL(path.resolve(fixturePath)).href;
-    await page.goto(url);
+    // Navigate with waitUntil:'domcontentloaded' and an explicit, generous
+    // timeout. Playwright's default (waitUntil:'load', 30s) intermittently
+    // times out on a heavy live site whose 'load' event never fires (lingering
+    // analytics/long-poll/websocket connections), which surfaced as a hung
+    // about:blank tab and an opaque replay_failed. 'domcontentloaded' commits as
+    // soon as the DOM is ready; retry once before giving up on a transient.
+    const navTimeoutMs = Number(process.env.BROWSY_REPLAY_NAV_TIMEOUT_MS) || 60000;
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: navTimeoutMs });
+    } catch (navErr) {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: navTimeoutMs })
+        .catch(() => { throw new Error(`initial navigation to ${url} failed after retry: ${navErr.message}`); });
+    }
     await dismissCookieBanner(page);
 
     // Capture downloads — always record metadata; persist bytes only when downloadsDir is set.
@@ -435,6 +474,7 @@ export async function executeRunPlanWithPlaywright({
     let sectionSel = indexedMode ? null : await resolveSectionSelector(page);
 
     for (const step of runPlan.steps) {
+      currentStep = { type: step.type, source: step.source || null, selector: step.selector || null, label: step.label || null };
       // ── Global fill ──────────────────────────────────────────────────────────
       if (step.type === 'fill_global') {
         const fieldName = step.source.split('.').pop();
@@ -469,6 +509,7 @@ export async function executeRunPlanWithPlaywright({
         const { itemIndex, steps: subSteps } = step;
 
         for (const sub of subSteps) {
+          currentStep = { type: sub.type, itemIndex, fieldName: sub.fieldName || null, selector: sub.selector || sub.repeatAction?.selector || null };
           // ensure_section — verify or create the DOM section for this item
           if (sub.type === 'ensure_section') {
             if (indexedMode) {
@@ -602,27 +643,24 @@ export async function executeRunPlanWithPlaywright({
         checkpoint = step;
 
         // ── End-to-end auto-submit (opt-in) ───────────────────────────────────
-        // Default path: stop here, hand off to a human (final submit is never
-        // automated). Only when autoSubmit is explicitly set do we run the
-        // post-submit chain (submit → mixea → done → capture HyperFollow).
+        // Default path: stop here and hand the filled browser to a human (final
+        // submit is never automated). Only when autoSubmit is set AND there is no
+        // human gate (fake fixture / fully-automated) do we run the post-submit
+        // chain inline (submit → mixea → done → capture HyperFollow).
+        //
+        // On the live site a human gate (confirmBeforeSubmit) ALWAYS applies, so
+        // we do NOT run post-submit and do NOT block waiting for a confirm here —
+        // an earlier blocking design fought the caller's own run timeout and
+        // stranded runs. We simply fall through to the leave-browser-open hand-off
+        // below; the person reviews, clicks submit, and finishes the tail (mixea +
+        // HyperFollow) themselves in the open window.
         const postSubmitSteps = fieldMap?.postSubmitSteps || [];
-        if (autoSubmit && postSubmitSteps.length) {
-          let proceed = true;
-          if (confirmBeforeSubmit) {
-            // Park on the filled page and wait for an out-of-band human confirm
-            // (the confirmFlagPath file appears). Bounded so a forgotten run
-            // doesn't hang forever; on timeout we fall through to the safe
-            // leave-browser-open hand-off below.
-            proceed = await waitForConfirmFlag(confirmFlagPath, confirmTimeoutMs);
-            executedSteps.push({ type: 'await_submit_confirmation', confirmed: proceed, flagPath: confirmFlagPath });
-          }
-          if (proceed) {
-            await runPostSubmitSteps({
-              page, steps: postSubmitSteps, isFixture,
-              capturedOutputs, executedSteps, skippedSteps,
-            });
-            postSubmitCompleted = true;
-          }
+        if (autoSubmit && postSubmitSteps.length && !confirmBeforeSubmit) {
+          await runPostSubmitSteps({
+            page, steps: postSubmitSteps, isFixture,
+            capturedOutputs, executedSteps, skippedSteps,
+          });
+          postSubmitCompleted = true;
         }
         break;
 
@@ -656,10 +694,29 @@ export async function executeRunPlanWithPlaywright({
     return { ok: true, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, browserLeftOpen: false, postSubmitCompleted };
 
   } catch (err) {
+    // Make the failure self-describing: which step failed, and on what page.
+    // Without this the only signal upstream was a bare "replay_failed".
+    const stepDesc = describeStep(currentStep);
+    let pageUrl = null;
+    try { pageUrl = page ? page.url() : null; } catch {}
+    const error = `${err.message}${stepDesc ? ` [step: ${stepDesc}]` : ''}${pageUrl ? ` [url: ${pageUrl}]` : ''}`;
     if (persistentCtx) await persistentCtx.close().catch(() => {});
     if (browser)       await browser.close().catch(() => {});
-    return { ok: false, error: err.message, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, postSubmitCompleted };
+    return { ok: false, error, failed_step: currentStep, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, postSubmitCompleted };
   }
+}
+
+// Compact one-line description of the step that was in flight when a run failed.
+function describeStep(step) {
+  if (!step || typeof step !== 'object') return null;
+  const parts = [step.type];
+  if (step.itemIndex !== undefined && step.itemIndex !== null) parts.push(`item#${step.itemIndex}`);
+  if (step.fieldName) parts.push(step.fieldName);
+  if (step.source) parts.push(step.source);
+  if (step.label) parts.push(`"${step.label}"`);
+  if (step.selector) parts.push(step.selector);
+  if (step.url) parts.push(step.url);
+  return parts.filter(Boolean).join(' ');
 }
 
 // ── Post-submit step interpreter ───────────────────────────────────────────────
@@ -726,15 +783,3 @@ async function runPostSubmitSteps({ page, steps, isFixture, capturedOutputs, exe
   }
 }
 
-// Poll for the out-of-band confirmation flag file. Returns true once it appears,
-// false if confirmTimeoutMs elapses first. A null path means "no confirmation
-// channel configured" → never auto-proceed (caller falls back to hand-off).
-async function waitForConfirmFlag(flagPath, confirmTimeoutMs) {
-  if (!flagPath) return false;
-  const deadline = Date.now() + (confirmTimeoutMs || 0);
-  while (Date.now() < deadline) {
-    if (fs.existsSync(flagPath)) return true;
-    await new Promise(r => setTimeout(r, 2000));
-  }
-  return fs.existsSync(flagPath);
-}
