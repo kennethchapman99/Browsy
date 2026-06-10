@@ -6,6 +6,12 @@ output/
 playwright-report/
 test-results/
 workflows/*/field-map.local.json
+workflows/bare-workflow/
+workflows/kitchen-sink-workflow/
+workflows/observed-album-upload/
+workflows/okta-salesforce-smoke/
+workflows/salesforce-report-smoke-clean/
+workflows/simple-upload/
 tmp/
 .DS_Store
 registry/

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!--
+    Fake DistroKid "Choose a version" (mastering upsell) page.
+    Mirrors https://distrokid.com/new/mixea/?albumuuid=... so the post-submit
+    automation can be exercised headless without touching the real account.
+    The path token "mixea" lets the executor's waitForUrl match work the same on
+    fixture and live.
+  -->
+  <title>Choose a version — Mixea (Browsy Fixture)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 48px auto; padding: 0 20px; background: #f5f5f5; }
+    h1 { color: #222; }
+    .option { border: 2px solid #cfd8e3; border-radius: 8px; padding: 1em 1.2em; margin: 1em 0; background: #fff; display: flex; gap: .7em; align-items: flex-start; }
+    .option label { font-weight: 600; color: #223; }
+    .option p { margin: .3em 0 0; font-size: .85rem; color: #666; }
+    .price { float: right; color: #2a7; font-weight: 700; }
+    .btn { padding: .6em 1.6em; border-radius: 4px; font-size: 1em; cursor: pointer; border: none; background: #1769ff; color: #fff; margin-top: 1em; }
+    .btn:hover { background: #0f53cc; }
+  </style>
+</head>
+<body>
+  <h1>Choose a version</h1>
+  <p style="color:#666">Your release is uploading. Pick how you want it mastered.</p>
+
+  <div class="option">
+    <input type="radio" name="masterChoice" id="use-my-originals"
+      value="originals" data-browsy-field="useMyOriginals">
+    <div>
+      <label for="use-my-originals">Use my originals <span class="price">$0</span></label>
+      <p>Release the exact files you uploaded, no extra mastering.</p>
+    </div>
+  </div>
+
+  <div class="option">
+    <input type="radio" name="masterChoice" id="use-mixea-master"
+      value="mixea">
+    <div>
+      <label for="use-mixea-master">Master with Mixea <span class="price">$$</span></label>
+      <p>Pay for AI mastering before release.</p>
+    </div>
+  </div>
+
+  <button class="btn" id="mixea-continue" type="button"
+    data-browsy-action="mixea-continue"
+    onclick="goDone()">Continue</button>
+
+  <script>
+    function goDone() {
+      const chosen = document.querySelector('input[name="masterChoice"]:checked');
+      if (!chosen) { alert('Pick an option first'); return; }
+      // Mirror the live URL shape: /new/done/?albumuuid=...
+      const uuid = new URLSearchParams(location.search).get('albumuuid') || 'fixture-0001';
+      location.href = 'done.html?albumuuid=' + encodeURIComponent(uuid) + '&master=' + chosen.value;
+    }
+  </script>
+</body>
+</html>

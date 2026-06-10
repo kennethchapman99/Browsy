@@ -1,6 +1,6 @@
 {
   "id": "distributor-album-submit",
-  "description": "Materialized scaffold: upload an album-style multi-track release to a music distributor up to the human-gated final submit. Verified against fixtures/distrokid-wizard/index.html.",
+  "description": "Upload an album-style multi-track release to a music distributor up to the human-gated final submit. Browsy never clicks Submit / Upload to stores / Publish / Pay. A human completes the final action manually.",
   "auth": {
     "mode": "manual-save-state",
     "storage_state": ".auth/distributor-album-submit.json"
@@ -11,11 +11,11 @@
     "pause_at_end_default": true
   },
   "targets": {
-    "start_url": "file:///Users/kchapman/browsy/fixtures/distrokid-wizard/index.html",
-    "urls": []
+    "start_url": "https://distrokid.com/upload",
+    "fixture_url": "fixtures/distrokid-wizard/index.html"
   },
   "discovery_urls": [],
-  "execution_strategy": "playwright",
+  "execution_strategy": "run-plan",
   "artifacts": {
     "screenshots": true,
     "html_snapshot": true,

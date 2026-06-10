@@ -520,7 +520,7 @@ function normalizeFields(fields = [], options = {}) {
     const id = toCamel(field.id || field.name || field.label || field.field || 'field');
     const inputType = normalizeInputType(field.inputType || field.type || field.kind || options.defaultInputType || 'text');
     const defaultScope = inputType === 'file' ? 'asset' : options.defaultScope || 'global';
-    return cleanObject({ id, label: field.label || field.name || humanize(id), inputType, scope: field.scope || defaultScope, source: field.source || field.sourcePath || id, selectorHint: field.selectorHint || field.selector || '', selectorCandidates: field.selectorCandidates || [], selectorConfidence: field.selectorConfidence || '', exampleValue: field.exampleValue ?? field.example ?? field.value, required: field.required !== false, notes: field.notes || '' });
+    return cleanObject({ id, label: field.label || field.name || humanize(id), inputType, scope: field.scope || defaultScope, source: field.source || field.sourcePath || id, binding: field.binding || null, selectorHint: field.selectorHint || field.selector || '', selectorCandidates: field.selectorCandidates || [], selectorConfidence: field.selectorConfidence || '', exampleValue: field.exampleValue ?? field.example ?? field.value, required: field.required !== false, notes: field.notes || '' });
   });
 }
 

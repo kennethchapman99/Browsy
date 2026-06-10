@@ -85,6 +85,7 @@ try {
   assert('start returns recordingSessionId', /^rec_/.test(session.recordingSessionId || ''));
   assert('status is setup_ready', session.status === 'setup_ready', session.status);
   assert('wizardUrl returned', session.wizardUrl?.includes(`/recordings/${session.recordingSessionId}`));
+  assert('record automation control returned', session.recordAutomationControl?.label === 'Record Automation' && session.recordAutomationControl.href === session.wizardUrl);
   assert('workflowRefPreview returned', session.workflowRefPreview === `${APP_ID}.${WORKFLOW_ID}`);
   assert('recordingSetup tabs persisted', session.recordingSetup?.tabs?.length === 2);
   assert('auth requirement detected', session.auth?.length === 1 && session.auth[0].siteId === 'target-site');

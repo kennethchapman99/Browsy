@@ -2,7 +2,10 @@
 //
 // Consumes a run plan produced by buildRunPlan() or buildRunPlanFromPackage()
 // and drives a local fixture (or any browser page) through each step.
-// Stops unconditionally at the human_checkpoint — final submit is never automated.
+// Stops at the human_checkpoint by default — final submit is not automated. The
+// only exception is the explicit `autoSubmit` opt-in, which runs the declarative
+// fieldMap.postSubmitSteps chain (final submit → mixea upsell → done page →
+// capture HyperFollow link), optionally gated behind an out-of-band human confirm.
 //
 // Selector strategy (generic first, legacy fallback):
 //   Global fields  → fieldMap override → data-browsy-field="<fieldName>"
@@ -34,9 +37,17 @@ function globalFieldSelector(source, fieldMap) {
   return `[data-browsy-field="${fieldName}"]`;
 }
 
-function itemFieldSelector(fieldName, fieldMap) {
+// Substitute 1-based ({n}) and 0-based ({i}) item indices into a selector template.
+function substituteIndex(selector, itemIndex) {
+  if (typeof selector !== 'string') return selector;
+  return selector
+    .replace(/\{n\}/g, String(itemIndex + 1))
+    .replace(/\{i\}/g, String(itemIndex));
+}
+
+function itemFieldSelector(fieldName, fieldMap, itemIndex = 0) {
   if (fieldMap?.fields?.[fieldName]?.selector) {
-    return fieldMap.fields[fieldName].selector;
+    return substituteIndex(fieldMap.fields[fieldName].selector, itemIndex);
   }
   const legacyTestid = ITEM_TESTID[fieldName];
   if (legacyTestid) {
@@ -45,10 +56,160 @@ function itemFieldSelector(fieldName, fieldMap) {
   return `[data-browsy-item-field="${fieldName}"]`;
 }
 
+// True when any item-field selector uses an index template ({n}/{i}). Such
+// selectors are self-indexing (e.g. live DistroKid's input.uploadFileTitle.track_3),
+// so per-item fields run against the whole page rather than a scoped DOM section.
+function usesIndexedSelectors(fieldMap) {
+  const fields = fieldMap?.fields || {};
+  return Object.values(fields).some(
+    f => f?.item && typeof f.selector === 'string' && /\{[ni]\}/.test(f.selector)
+  );
+}
+
+// Drive DistroKid's per-track AI-disclosure modal sequence.
+//
+// DistroKid shows a SweetAlert2 modal with checkboxes ("Which parts of this
+// song were AI-generated?") when you click into the AI disclosure section of
+// an upload track. The flow is:
+//   1. Trigger: click the gate selector (the inline AI-gate element) — clicking
+//      it opens the SweetAlert2 checkbox modal as a side effect.
+//   2. Wait for the SweetAlert2 popup to animate in.
+//   3. Inside the popup, check the appropriate gate checkbox(es) — the modal
+//      requires at least one selection before Save is enabled.
+//   4. Click the Save/confirm button (.swal2-confirm) to dismiss the modal.
+//
+// fieldDef (from fieldMap.fields[fieldName]):
+//   selector       — CSS selector for the gate checkboxes (inside the modal)
+//   triggerSelector — optional selector to click to open the modal instead of
+//                    the gate selector itself
+//   saveLabel      — ignored (always uses .swal2-confirm)
+// gateValue: "1"=all-AI, "2"=part AI+human, "0"=none (no disclosure needed).
+async function handleAiDisclosure(page, fieldDef, gateValue, itemIndex, policy, label) {
+  const sub = (s) => substituteIndex(s, itemIndex);
+
+  // DistroKid's AI disclosure is a per-track No/Yes radio (class distroAiGate,
+  // value "0"=No / "1"=Yes). Selecting "Yes" opens a SweetAlert2 modal where you
+  // pick the recording scope. gateValue: "1"=all-audio AI, "2"=part, "0"/""=none.
+  const gate    = String(gateValue ?? '');
+  const gateSel = sub(fieldDef.selector || 'input.distroAiGate');
+  const popupSel = '.swal2-popup';
+
+  // "No" — declare no AI: select this track's value="0" gate and stop (no modal).
+  if (gate === '0' || gate === '') {
+    await page.locator(`${gateSel}[value="0"]`).nth(itemIndex).check({ force: true }).catch(() => {});
+    return;
+  }
+
+  // Step 1 — click THIS track's "Yes" gate radio to open the modal. There is one
+  // value="1" radio per track, in DOM order, so .nth(itemIndex) scopes us to the
+  // right track. (The previous .first() always hit track 1's "No", so the modal
+  // never opened and the disclosure silently stayed on "No".)
+  const yesRadio = page.locator(`${gateSel}[value="1"]`).nth(itemIndex);
+  if (await yesRadio.count() > 0) {
+    await yesRadio.check({ force: true }).catch(() => {});
+  } else {
+    await page.locator(gateSel).nth(itemIndex).check({ force: true }).catch(() => {});
+  }
+
+  // Step 2 — wait for the SweetAlert2 disclosure modal.
+  try {
+    await page.waitForSelector(popupSel, { state: 'visible', timeout: 4000 });
+  } catch {
+    return; // No modal (older/inline UI variant) — the gate is set, nothing more.
+  }
+
+  // Step 3 — inside the modal, select the recording scope. Per the Figment Factory
+  // spec every track is "All of the audio (performed by AI)" = the
+  // distroAiRecordingScope checkbox with value "full" ("partial" for gate "2").
+  const scopeSel   = sub(fieldDef.scopeSelector || 'input.distroAiRecordingScope');
+  const scopeValue = gate === '2' ? 'partial' : (fieldDef.scopeValue || 'full');
+  const scopeBox   = page.locator(`${popupSel} ${scopeSel}[value="${scopeValue}"]`).first();
+  if (await scopeBox.count() > 0) {
+    await scopeBox.check({ force: true }).catch(() => {});
+  }
+
+  // Step 4 — click Save (.swal2-confirm) to commit the disclosure.
+  const saveSel = `${popupSel} .swal2-confirm`;
+  try {
+    await page.waitForSelector(saveSel, { state: 'visible', timeout: 2000 });
+  } catch {
+    return; // Modal disappeared on its own — nothing more to do.
+  }
+  const saveBtn = page.locator(saveSel).first();
+  if (await saveBtn.count() > 0) await safeClick(saveBtn, `${label} save`, policy);
+
+  // Wait for the popup to close before proceeding to the next track.
+  await page.waitForSelector(popupSel, { state: 'hidden', timeout: 4000 }).catch(() => {});
+}
+
+// Dismiss the Osano cookie-consent banner if present — it overlays the page and
+// intercepts clicks/visibility for elements beneath it.
+async function dismissCookieBanner(page) {
+  const accept = page.locator('.osano-cm-accept-all, .osano-cm-accept, .osano-cm-save').first();
+  try {
+    if (await accept.count() > 0 && await accept.isVisible()) {
+      await accept.click({ timeout: 3000 });
+      await page.waitForTimeout(300);
+    }
+  } catch { /* non-fatal */ }
+}
+
 // Resolve item section selector: prefer generic attribute, fall back to legacy class.
 async function resolveSectionSelector(page) {
   const count = await page.locator('[data-browsy-item-section]').count();
   return count > 0 ? '[data-browsy-item-section]' : '.track-section';
+}
+
+// Select a <select> option, tolerating label punctuation/whitespace differences.
+// Tries Playwright's exact value/label match first, then falls back to a
+// normalized comparison against the actual option list (e.g. payload
+// "Hip-Hop/Rap" vs DistroKid option "Hip Hop/Rap").
+async function selectOptionResilient(el, value, label) {
+  const target = String(value ?? '');
+  const norm = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const wanted = norm(target);
+
+  // Read options via evaluate — works even when the native <select> is hidden
+  // behind a custom widget (e.g. DistroKid's data-dk-searchable-select).
+  const options = await el.evaluate(sel =>
+    [...sel.options].map(o => ({ value: o.value, text: o.textContent || '' }))
+  );
+  let match = options.find(o => o.value === target || o.text.trim() === target)
+    || options.find(o => norm(o.text) === wanted || norm(o.value) === wanted)
+    || (wanted.length > 0 ? options.find(o => norm(o.text).includes(wanted)) : null);
+  if (!match) {
+    // Credit-role selects: DistroKid's option set doesn't include generic values
+    // like "Performer". Rather than fail the whole run on a non-critical credit
+    // role, fall back to "Audio" (DistroKid's generic performer role), then to
+    // the first real (non-placeholder) option, then to the first option. Other
+    // selects still throw so a genuine mismatch (e.g. genre) surfaces loudly.
+    if (/role/i.test(label)) {
+      match = options.find(o => norm(o.text) === norm('Audio') || norm(o.value) === norm('Audio'))
+        || options.find(o => o.value && o.value.trim() !== '')
+        || options[0]
+        || null;
+      if (match) {
+        console.warn(`[browsy:executor] ${label}: no option matched "${target}"; falling back to "${String(match.text || match.value).trim()}"`);
+      }
+    }
+    if (!match) {
+      throw new Error(`${label}: no <option> matched "${target}" (options: ${options.map(o => o.text.trim()).filter(Boolean).join(', ')})`);
+    }
+  }
+
+  try {
+    await el.selectOption(match.value, { timeout: 3000 });
+    return;
+  } catch {
+    // Native select is hidden behind a custom widget — set the value directly
+    // and fire the events the widget/validation listen for.
+    await el.evaluate((node, v) => {
+      node.value = v;
+      node.dispatchEvent(new Event('input', { bubbles: true }));
+      node.dispatchEvent(new Event('change', { bubbles: true }));
+      node.dispatchEvent(new Event('blur', { bubbles: true }));
+    }, match.value);
+  }
 }
 
 // Fill a text/date input, select, or checkbox within `scope` (Page or Locator).
@@ -61,14 +222,43 @@ async function fillField(scope, selector, value, label) {
   const type    = await el.evaluate(e => (e.type || '').toLowerCase());
 
   if (tagName === 'select') {
-    await el.selectOption(String(value ?? ''));
+    await selectOptionResilient(el, value, label);
   } else if (type === 'checkbox') {
     const shouldCheck = Boolean(value);
     if (shouldCheck !== await el.isChecked()) {
-      shouldCheck ? await el.check() : await el.uncheck();
+      try {
+        // force: a normal click on some DistroKid checkboxes (e.g.
+        // #areyousuretandc) does not flip state, which makes Playwright's
+        // check()/uncheck() throw "Clicking the checkbox did not change its
+        // state". Forcing skips that post-click assertion.
+        shouldCheck ? await el.check({ force: true }) : await el.uncheck({ force: true });
+      } catch {
+        // Click still didn't take. Set the state directly and fire the events
+        // (input/change + onblur validation hooks like removeRedIfAllFilled).
+        // The human checkpoint still gates final submit.
+        await el.evaluate((node, checked) => {
+          node.checked = checked;
+          node.dispatchEvent(new Event('input', { bubbles: true }));
+          node.dispatchEvent(new Event('change', { bubbles: true }));
+          node.dispatchEvent(new Event('blur', { bubbles: true }));
+        }, shouldCheck);
+      }
     }
   } else {
-    await el.fill(String(value ?? ''));
+    const text = String(value ?? '');
+    try {
+      await el.fill(text, { timeout: 5000 });
+    } catch {
+      // Input exists but isn't visible/editable (e.g. a collapsed DistroKid
+      // credit row). Set the value directly and fire the events validation and
+      // onblur handlers listen for. The human checkpoint still gates submit.
+      await el.evaluate((node, v) => {
+        node.value = v;
+        node.dispatchEvent(new Event('input', { bubbles: true }));
+        node.dispatchEvent(new Event('change', { bubbles: true }));
+        node.dispatchEvent(new Event('blur', { bubbles: true }));
+      }, text);
+    }
   }
 }
 
@@ -162,32 +352,97 @@ export async function executeRunPlanWithPlaywright({
   trace = false,
   safetyPolicy,
   fieldMap,
+  userDataDir = null,
   downloadsDir = null,
   workflowId = null,
   runId = null,
   callbackUrl = null,
   signals = true,
+  leaveBrowserOpen = false,
+  // ── End-to-end auto-submit (opt-in only) ──────────────────────────────────
+  // autoSubmit: when true, instead of parking at the human_checkpoint the
+  //   executor runs fieldMap.postSubmitSteps (click final submit → clear the
+  //   mixea upsell → land on the done page → capture the HyperFollow link).
+  //   Default false → byte-for-byte the old "never automate final submit".
+  // confirmBeforeSubmit: when true (the live site), do NOT run the post-submit
+  //   steps at all. Park the filled browser open at the checkpoint and return a
+  //   waiting status immediately — non-blocking, so it never fights the caller's
+  //   run timeout. The human reviews, clicks final submit, and finishes the tail
+  //   (mixea + HyperFollow) themselves. When false (fake fixture / fully
+  //   automated), the post-submit chain runs inline here.
+  // isFixture: pick step.fixtureSelector over step.selector (fake test site).
+  autoSubmit = false,
+  confirmBeforeSubmit = false,
+  isFixture = false,
 }) {
   const policy          = safetyPolicy ?? defaultSafetyPolicy();
   const executedSteps   = [];
   const skippedSteps    = [];
   const capturedOutputs = {};
   const downloadedFiles = [];
+  const indexedMode     = usesIndexedSelectors(fieldMap);
   let checkpoint  = null;
   let finalState  = null;
   let browser     = null;
+  let persistentCtx = null;
+  let postSubmitCompleted = false;
+  // Hoisted so the catch can report which step failed and on what page.
+  let page        = null;
+  let currentStep = null;
+
+  // DistroKid uploads artwork and audio to its S3 bucket via XHR. Chrome's
+  // Private/Local Network Access checks block these cross-origin uploads in the
+  // automated browser ("Permission was denied for this request to access the
+  // `local` address space"), which leaves the cover stuck on "Error" and every
+  // track at 0%. Disabling those features lets the uploads through. (Unknown
+  // feature names are ignored by Chromium, so this is safe across versions.)
+  const launchArgs = [
+    '--disable-features=BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults,LocalNetworkAccessChecks,LocalNetworkAccessChecksWarningOnly',
+  ];
 
   try {
-    browser = await chromium.launch({ headless });
-    const ctx  = await browser.newContext({ acceptDownloads: true });
+    let ctx;
+    if (userDataDir) {
+      // Live mode: reuse the persistent auth profile so DistroKid is logged in.
+      persistentCtx = await chromium.launchPersistentContext(userDataDir, {
+        headless,
+        acceptDownloads: true,
+        args: launchArgs,
+      });
+      ctx = persistentCtx;
+    } else {
+      browser = await chromium.launch({ headless, args: launchArgs });
+      ctx = await browser.newContext({ acceptDownloads: true });
+    }
 
     if (trace) {
       await ctx.tracing.start({ screenshots: true, snapshots: true });
     }
 
-    const page = await ctx.newPage();
+    // A persistent context opens with a default about:blank page — reuse it
+    // instead of opening a second tab. Opening a fresh tab left the default
+    // blank page orphaned, so a navigation that stalled looked like "two
+    // about:blank tabs hung". Close any extra pre-existing blank pages.
+    const seededBlank = ctx.pages().filter(p => { try { const u = p.url(); return !u || u === 'about:blank'; } catch { return false; } });
+    page = seededBlank[0] || await ctx.newPage();
+    for (const extra of seededBlank.slice(1)) { try { await extra.close(); } catch {} }
+    currentStep = { type: 'initial_navigation', url: targetUrl ?? fixturePath };
+
     const url  = targetUrl ?? pathToFileURL(path.resolve(fixturePath)).href;
-    await page.goto(url);
+    // Navigate with waitUntil:'domcontentloaded' and an explicit, generous
+    // timeout. Playwright's default (waitUntil:'load', 30s) intermittently
+    // times out on a heavy live site whose 'load' event never fires (lingering
+    // analytics/long-poll/websocket connections), which surfaced as a hung
+    // about:blank tab and an opaque replay_failed. 'domcontentloaded' commits as
+    // soon as the DOM is ready; retry once before giving up on a transient.
+    const navTimeoutMs = Number(process.env.BROWSY_REPLAY_NAV_TIMEOUT_MS) || 60000;
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: navTimeoutMs });
+    } catch (navErr) {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: navTimeoutMs })
+        .catch(() => { throw new Error(`initial navigation to ${url} failed after retry: ${navErr.message}`); });
+    }
+    await dismissCookieBanner(page);
 
     // Capture downloads — always record metadata; persist bytes only when downloadsDir is set.
     page.on('download', async download => {
@@ -212,42 +467,62 @@ export async function executeRunPlanWithPlaywright({
     // For live URLs with repeat groups, wait for at least one section to appear before
     // detecting the selector — sections may load asynchronously.
     const hasRepeatSteps = runPlan.steps.some(s => s.type === 'repeat_iteration');
-    if (hasRepeatSteps) {
+    if (hasRepeatSteps && !indexedMode) {
       await page.waitForSelector(
         '[data-browsy-item-section], .track-section',
         { timeout: 10_000 }
       ).catch(() => {}); // graceful: page may have no sections yet on first load
     }
 
-    // Detect section selector once after page load
-    let sectionSel = await resolveSectionSelector(page);
+    // Detect section selector once after page load (skipped in indexed mode,
+    // where item fields self-index via {n}/{i} templated selectors).
+    let sectionSel = indexedMode ? null : await resolveSectionSelector(page);
 
     for (const step of runPlan.steps) {
+      currentStep = { type: step.type, source: step.source || null, selector: step.selector || null, label: step.label || null };
       // ── Global fill ──────────────────────────────────────────────────────────
       if (step.type === 'fill_global') {
+        const fieldName = step.source.split('.').pop();
+        const isRequired = fieldMap?.fields?.[fieldName]?.required !== false;
         const sel   = globalFieldSelector(step.source, fieldMap);
         const label = `fill_global[${step.source}]`;
-        await fillField(page, sel, step.value, label);
-        executedSteps.push({ type: step.type, source: step.source, value: step.value });
+        if (!isRequired && await page.locator(sel).count() === 0) {
+          skippedSteps.push({ type: step.type, source: step.source, reason: 'optional field not found on page' });
+        } else {
+          await fillField(page, sel, step.value, label);
+          executedSteps.push({ type: step.type, source: step.source, value: step.value });
+        }
 
       // ── Global upload ────────────────────────────────────────────────────────
       } else if (step.type === 'upload_global') {
+        const fieldName = step.source.split('.').pop();
+        const isRequired = fieldMap?.fields?.[fieldName]?.required !== false;
         const sel      = globalFieldSelector(step.source, fieldMap);
-        const filePath = path.resolve(manifestBaseDir, step.value);
+        const filePath = path.resolve(manifestBaseDir || '.', step.value);
         const label    = `upload_global[${step.source}]`;
-        await uploadField(page, sel, filePath, label);
-        executedSteps.push({
-          type: step.type, source: step.source, value: step.value, resolvedPath: filePath,
-        });
+        if (!isRequired && await page.locator(sel).count() === 0) {
+          skippedSteps.push({ type: step.type, source: step.source, reason: 'optional field not found on page' });
+        } else {
+          await uploadField(page, sel, filePath, label);
+          executedSteps.push({
+            type: step.type, source: step.source, value: step.value, resolvedPath: filePath,
+          });
+        }
 
       // ── Repeat iteration ─────────────────────────────────────────────────────
       } else if (step.type === 'repeat_iteration') {
         const { itemIndex, steps: subSteps } = step;
 
         for (const sub of subSteps) {
+          currentStep = { type: sub.type, itemIndex, fieldName: sub.fieldName || null, selector: sub.selector || sub.repeatAction?.selector || null };
           // ensure_section — verify or create the DOM section for this item
           if (sub.type === 'ensure_section') {
-            if (itemIndex === 0 || !sub.repeatAction) {
+            if (indexedMode) {
+              // Indexed mode: live page has no section markers; per-item fields
+              // target index-templated selectors directly. Nothing to create.
+              executedSteps.push({ type: sub.type, itemIndex, action: 'indexed-noop' });
+
+            } else if (itemIndex === 0 || !sub.repeatAction) {
               // First section pre-exists — verify it is there
               const count = await page.locator(sectionSel).count();
               if (count <= itemIndex) {
@@ -283,22 +558,43 @@ export async function executeRunPlanWithPlaywright({
 
           // fill_item — fill a non-file field scoped to this item section
           } else if (sub.type === 'fill_item') {
-            const section = page.locator(sectionSel).nth(itemIndex);
-            const sel     = itemFieldSelector(sub.fieldName, fieldMap);
-            const label   = `fill_item[${itemIndex}].${sub.fieldName}`;
-            await fillField(section, sel, sub.value, label);
-            executedSteps.push({
-              type: sub.type, itemIndex, fieldName: sub.fieldName, value: sub.value,
-              fromDefault: sub.fromDefault ?? false,
-            });
+            const fieldDef = fieldMap?.fields?.[sub.fieldName] || {};
+            const label    = `fill_item[${itemIndex}].${sub.fieldName}`;
+
+            if (fieldDef.kind === 'ai_disclosure') {
+              // Special: drive DistroKid's per-track AI-disclosure modal sequence.
+              // Non-fatal: AI disclosure is a sensitive, human-reviewed field, so
+              // if the modal flow can't be driven we record it for the human
+              // checkpoint rather than failing the whole run.
+              try {
+                await handleAiDisclosure(page, fieldDef, sub.value, itemIndex, policy, label);
+                executedSteps.push({
+                  type: sub.type, itemIndex, fieldName: sub.fieldName, value: sub.value,
+                  kind: 'ai_disclosure',
+                });
+              } catch (aiErr) {
+                skippedSteps.push({
+                  type: sub.type, itemIndex, fieldName: sub.fieldName,
+                  kind: 'ai_disclosure', reason: `ai_disclosure not driven: ${aiErr.message}`,
+                });
+              }
+            } else {
+              const scope = indexedMode ? page : page.locator(sectionSel).nth(itemIndex);
+              const sel   = itemFieldSelector(sub.fieldName, fieldMap, itemIndex);
+              await fillField(scope, sel, sub.value, label);
+              executedSteps.push({
+                type: sub.type, itemIndex, fieldName: sub.fieldName, value: sub.value,
+                fromDefault: sub.fromDefault ?? false,
+              });
+            }
 
           // upload_item — set a file on an upload field scoped to this item section
           } else if (sub.type === 'upload_item') {
-            const section  = page.locator(sectionSel).nth(itemIndex);
-            const sel      = itemFieldSelector(sub.fieldName, fieldMap);
+            const scope    = indexedMode ? page : page.locator(sectionSel).nth(itemIndex);
+            const sel      = itemFieldSelector(sub.fieldName, fieldMap, itemIndex);
             const filePath = path.resolve(manifestBaseDir, sub.value);
             const label    = `upload_item[${itemIndex}].${sub.fieldName}`;
-            await uploadField(section, sel, filePath, label);
+            await uploadField(scope, sel, filePath, label);
             executedSteps.push({
               type: sub.type, itemIndex, fieldName: sub.fieldName, value: sub.value, resolvedPath: filePath,
             });
@@ -332,10 +628,47 @@ export async function executeRunPlanWithPlaywright({
 
       // ── Human checkpoint — always stop here ──────────────────────────────────
       } else if (step.type === 'human_checkpoint') {
+        // Conditional final acknowledgments (e.g. DistroKid's non-standard
+        // capitalization warning) only render after the relevant fields are
+        // filled, so they can't be pre-iteration globals. Check any that are now
+        // present + unchecked right before handing off to the human.
+        for (const ackSel of fieldMap?.acknowledgeIfPresent || []) {
+          const boxes = page.locator(ackSel);
+          const n = await boxes.count();
+          for (let k = 0; k < n; k++) {
+            const box = boxes.nth(k);
+            const visible = await box.isVisible().catch(() => false);
+            const checked = await box.isChecked().catch(() => false);
+            if (visible && !checked) {
+              await box.check({ force: true }).catch(() => {});
+              executedSteps.push({ type: 'acknowledge_if_present', selector: ackSel, index: k });
+            }
+          }
+        }
         checkpoint = step;
-        // Make the hand-off to a human unmistakable: paint the live page and
-        // push a "needs input" signal to the terminal / calling app.
-        if (signals) {
+
+        // ── End-to-end auto-submit (opt-in) ───────────────────────────────────
+        // Default path: stop here and hand the filled browser to a human (final
+        // submit is never automated). Only when autoSubmit is set AND there is no
+        // human gate (fake fixture / fully-automated) do we run the post-submit
+        // chain inline (submit → mixea → done → capture HyperFollow).
+        //
+        // On the live site a human gate (confirmBeforeSubmit) ALWAYS applies, so
+        // we do NOT run post-submit and do NOT block waiting for a confirm here —
+        // an earlier blocking design fought the caller's own run timeout and
+        // stranded runs. We simply fall through to the leave-browser-open hand-off
+        // below; the person reviews, clicks submit, and finishes the tail (mixea +
+        // HyperFollow) themselves in the open window.
+        const postSubmitSteps = fieldMap?.postSubmitSteps || [];
+        if (autoSubmit && postSubmitSteps.length && !confirmBeforeSubmit) {
+          await runPostSubmitSteps({
+            page, steps: postSubmitSteps, isFixture,
+            capturedOutputs, executedSteps, skippedSteps,
+          });
+          postSubmitCompleted = true;
+        } else if (signals) {
+          // Handing off to a human: make it unmistakable — paint the live page
+          // and push a "needs input" signal to the terminal / calling app.
           await emitNeedsInput({
             reason: step.reason || 'Human review required before the final action.',
             workflowId,
@@ -356,8 +689,9 @@ export async function executeRunPlanWithPlaywright({
 
     // Signal completion before tearing down. When we stopped at a human
     // checkpoint the run is "waiting on a human", not done — that case already
-    // emitted a needs_input signal above, so only emit done when we ran clean.
-    if (signals && !checkpoint) {
+    // emitted a needs_input signal above. Emit done when we ran clean, or when
+    // an opt-in auto-submit ran the full post-submit chain to completion.
+    if (signals && (!checkpoint || postSubmitCompleted)) {
       await emitDone({
         status: 'completed',
         workflowId,
@@ -375,13 +709,110 @@ export async function executeRunPlanWithPlaywright({
       await ctx.tracing.stop({ path: path.join(traceDir, 'trace.zip') });
     }
 
-    await browser.close();
-    browser = null;
+    // Live human handoff: when asked to leave the browser open AND we stopped at a
+    // human checkpoint WITHOUT auto-submitting, hand the live, filled page to the
+    // person (review + click final submit) instead of tearing it down. Detach our
+    // references so cleanup does not close it; it stays open under the launching
+    // (server) process. When post-submit ran to completion we are fully done, so
+    // we fall through and close normally.
+    if (leaveBrowserOpen && checkpoint && !postSubmitCompleted) {
+      persistentCtx = null;
+      browser = null;
+      return { ok: true, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, browserLeftOpen: true, postSubmitCompleted };
+    }
 
-    return { ok: true, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles };
+    if (persistentCtx) { await persistentCtx.close(); persistentCtx = null; }
+    if (browser)       { await browser.close(); browser = null; }
+
+    return { ok: true, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, browserLeftOpen: false, postSubmitCompleted };
 
   } catch (err) {
-    if (browser) await browser.close().catch(() => {});
-    return { ok: false, error: err.message, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles };
+    // Make the failure self-describing: which step failed, and on what page.
+    // Without this the only signal upstream was a bare "replay_failed".
+    const stepDesc = describeStep(currentStep);
+    let pageUrl = null;
+    try { pageUrl = page ? page.url() : null; } catch {}
+    const error = `${err.message}${stepDesc ? ` [step: ${stepDesc}]` : ''}${pageUrl ? ` [url: ${pageUrl}]` : ''}`;
+    if (persistentCtx) await persistentCtx.close().catch(() => {});
+    if (browser)       await browser.close().catch(() => {});
+    return { ok: false, error, failed_step: currentStep, executedSteps, skippedSteps, checkpoint, finalState, capturedOutputs, downloadedFiles, postSubmitCompleted };
   }
 }
+
+// Compact one-line description of the step that was in flight when a run failed.
+function describeStep(step) {
+  if (!step || typeof step !== 'object') return null;
+  const parts = [step.type];
+  if (step.itemIndex !== undefined && step.itemIndex !== null) parts.push(`item#${step.itemIndex}`);
+  if (step.fieldName) parts.push(step.fieldName);
+  if (step.source) parts.push(step.source);
+  if (step.label) parts.push(`"${step.label}"`);
+  if (step.selector) parts.push(step.selector);
+  if (step.url) parts.push(step.url);
+  return parts.filter(Boolean).join(' ');
+}
+
+// ── Post-submit step interpreter ───────────────────────────────────────────────
+// Runs the small, declarative fieldMap.postSubmitSteps program on the SAME page
+// the run filled, after the human_checkpoint. Supported step types:
+//   click      — click an element (e.g. the final Submit/Continue button)
+//   check      — tick a radio/checkbox (e.g. "Use my originals"), JS fallback
+//   waitForUrl — wait until the page URL contains step.match (mixea → done)
+//   capture    — read step.attr (default href) or text into capturedOutputs
+// Each step resolves its selector from step.fixtureSelector when isFixture (the
+// fake test site) else step.selector (live DistroKid). Steps may be marked
+// optional:true to skip-without-failing when the element is absent.
+async function runPostSubmitSteps({ page, steps, isFixture, capturedOutputs, executedSteps, skippedSteps }) {
+  const sel = step => (isFixture && step.fixtureSelector ? step.fixtureSelector : step.selector);
+  for (const step of steps) {
+    // appliesTo scopes a step to one surface: 'fixture' (fake test site only) or
+    // 'live' (real DistroKid only). Undefined runs on both. Lets the fake site and
+    // the real DOM diverge (e.g. live combines "use originals" + continue into one
+    // button, so the fixture-only radio-tick is skipped on live).
+    if (step.appliesTo === 'fixture' && !isFixture) { skippedSteps.push({ type: `post_submit_${step.type}`, reason: 'fixture-only step skipped on live' }); continue; }
+    if (step.appliesTo === 'live' && isFixture) { skippedSteps.push({ type: `post_submit_${step.type}`, reason: 'live-only step skipped on fixture' }); continue; }
+    const selector = sel(step);
+    try {
+      if (step.type === 'waitForUrl') {
+        await page.waitForURL(url => String(url).includes(step.match), { timeout: step.timeoutMs || 120000 });
+        executedSteps.push({ type: 'post_submit_waitForUrl', match: step.match, url: page.url() });
+        continue;
+      }
+
+      // Dismiss the cookie banner if it reappeared between navigations — it can
+      // intercept clicks on the post-submit pages too.
+      await dismissCookieBanner(page).catch(() => {});
+
+      const loc = page.locator(selector).first();
+      const present = await loc.count().catch(() => 0);
+      if (!present) {
+        if (step.optional) { skippedSteps.push({ type: `post_submit_${step.type}`, selector, reason: 'optional element absent' }); continue; }
+        throw new Error(`post-submit ${step.type} target not found: ${selector}`);
+      }
+
+      if (step.type === 'click') {
+        await loc.click({ timeout: step.timeoutMs || 30000 });
+        executedSteps.push({ type: 'post_submit_click', selector, label: step.label || null });
+      } else if (step.type === 'check') {
+        // DistroKid radios/checkboxes are sometimes visually replaced; force-check
+        // and fall back to a dispatched JS click if the native check is blocked.
+        await loc.check({ force: true, timeout: step.timeoutMs || 30000 }).catch(async () => {
+          await loc.evaluate(el => { el.checked = true; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); });
+        });
+        executedSteps.push({ type: 'post_submit_check', selector, label: step.label || null });
+      } else if (step.type === 'capture') {
+        const value = step.attr
+          ? await loc.getAttribute(step.attr)
+          : (await loc.textContent())?.trim() || null;
+        capturedOutputs[step.outputId] = { status: value ? 'captured' : 'empty', value: value || null, selector, required: step.required === true };
+        executedSteps.push({ type: 'post_submit_capture', outputId: step.outputId, captured: !!value });
+      } else {
+        skippedSteps.push({ type: `post_submit_${step.type}`, reason: 'unrecognized post-submit step type' });
+      }
+    } catch (err) {
+      if (step.optional) { skippedSteps.push({ type: `post_submit_${step.type}`, selector, reason: err.message }); continue; }
+      throw new Error(`post-submit step "${step.label || step.type}" failed: ${err.message}`);
+    }
+  }
+}
+

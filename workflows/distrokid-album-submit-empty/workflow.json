@@ -1,0 +1,378 @@
+{
+  "schemaVersion": "browsy.workflow.v1",
+  "id": "distrokid-album-submit-empty",
+  "workflowId": "distrokid-album-submit-empty",
+  "name": "DistroKid Album Submit",
+  "description": "Recorded workflow for app pancake-robot",
+  "generatedBy": "browsy.observation-materializer",
+  "generatedAt": "2026-06-05T14:30:26.114Z",
+  "tabs": [
+    {
+      "id": "distrokidUpload",
+      "title": "DistroKid Upload",
+      "url": "https://distrokid.com/new/",
+      "order": 1,
+      "siteId": "distrokid",
+      "requiresAuth": true,
+      "authCheckUrl": "https://distrokid.com/new/",
+      "source": "recording_setup"
+    }
+  ],
+  "auth": [
+    {
+      "tabId": "distrokidUpload",
+      "siteId": "distrokid",
+      "siteName": "DistroKid Upload",
+      "url": "https://distrokid.com/new/",
+      "authCheckUrl": "https://distrokid.com/new/",
+      "authProfileId": "distrokid",
+      "mode": "human_required_if_not_authenticated"
+    }
+  ],
+  "navigationGraph": {
+    "nodes": [
+      {
+        "id": "distrokidUpload",
+        "url": "https://distrokid.com/new/",
+        "title": "DistroKid Upload"
+      }
+    ]
+  },
+  "bindings": {
+    "variables": {},
+    "files": {},
+    "outputs": {}
+  },
+  "variableBindings": {},
+  "humanApprovalCheckpoints": [
+    {
+      "id": "beforeFinalSubmit",
+      "label": "Stop before final submit"
+    }
+  ],
+  "checkpoints": [
+    {
+      "id": "beforeFinalSubmit",
+      "label": "Stop before final submit"
+    }
+  ],
+  "replaySettings": {
+    "defaultMode": "dry_run",
+    "stopBeforeFinalAction": true,
+    "requireVerifiedSelectorsForLive": true,
+    "retry": {
+      "attempts": 2,
+      "backoffMs": 500
+    },
+    "timing": {
+      "afterNavigationMs": 500,
+      "afterActionMs": 250
+    }
+  },
+  "safetyPolicy": {
+    "requiresLiveApproval": true,
+    "dry_run_default": true,
+    "pause_at_end_default": true,
+    "manual_only_categories": [
+      "final submission",
+      "payment",
+      "legal certification",
+      "destructive action"
+    ],
+    "checkpoints": [
+      "beforeFinalSubmit"
+    ]
+  },
+  "artifactPolicy": {
+    "captureReplayPlan": true
+  },
+  "supportedModes": [
+    "preview",
+    "dry_run",
+    "live"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "required": [
+      "releaseId",
+      "album",
+      "tracks"
+    ],
+    "properties": {
+      "releaseId": {
+        "type": "string"
+      },
+      "albumId": {
+        "type": "string"
+      },
+      "album": {
+        "type": "object",
+        "required": [
+          "title",
+          "artistName",
+          "releaseDate",
+          "coverArtPath"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "releaseId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "artistName": {
+            "type": "string"
+          },
+          "releaseDate": {
+            "type": "string"
+          },
+          "coverArtPath": {
+            "type": "string"
+          }
+        }
+      },
+      "tracks": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "title",
+            "audioPath"
+          ],
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "audioPath": {
+              "type": "string"
+            },
+            "explicit": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  },
+  "sourceMetadata": {
+    "sourceAppId": "pancake-robot",
+    "workflowId": "distrokid-album-submit-empty",
+    "sourcePayloadSchema": {
+      "type": "object",
+      "required": [
+        "releaseId",
+        "album",
+        "tracks"
+      ],
+      "properties": {
+        "releaseId": {
+          "type": "string"
+        },
+        "albumId": {
+          "type": "string"
+        },
+        "album": {
+          "type": "object",
+          "required": [
+            "title",
+            "artistName",
+            "releaseDate",
+            "coverArtPath"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "releaseId": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "artistName": {
+              "type": "string"
+            },
+            "releaseDate": {
+              "type": "string"
+            },
+            "coverArtPath": {
+              "type": "string"
+            }
+          }
+        },
+        "tracks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "title",
+              "audioPath"
+            ],
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "audioPath": {
+                "type": "string"
+              },
+              "explicit": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "sourceFieldMappings": [
+      {
+        "path": "album.releaseDate"
+      },
+      {
+        "path": "album.coverArtPath"
+      },
+      {
+        "path": "tracks.length"
+      },
+      {
+        "path": "tracks[].audioPath"
+      }
+    ],
+    "tabUrlTemplates": [
+      {
+        "id": "distrokidUpload",
+        "urlTemplate": "https://distrokid.com/new/",
+        "siteId": "distrokid",
+        "role": "target"
+      }
+    ],
+    "authProfileRef": "distrokid",
+    "completionPolicy": {
+      "action": "wait_for_human_submission",
+      "notes": "Capture DistroKid draft/public URLs when visible, then stop before final submit.",
+      "closeBrowser": false,
+      "requireApprovalBeforeSubmit": true
+    },
+    "writebackTargets": [
+      {
+        "id": "albumDistrokidDraftUrl",
+        "source": "distrokidDraftUrl",
+        "destination": "album.distrokidDraftUrl",
+        "label": "album.distrokidDraftUrl",
+        "required": false
+      }
+    ]
+  },
+  "sourceAppId": "pancake-robot",
+  "sourceWorkflowId": "distrokid-album-submit-empty",
+  "sourcePayloadSchema": {
+    "type": "object",
+    "required": [
+      "releaseId",
+      "album",
+      "tracks"
+    ],
+    "properties": {
+      "releaseId": {
+        "type": "string"
+      },
+      "albumId": {
+        "type": "string"
+      },
+      "album": {
+        "type": "object",
+        "required": [
+          "title",
+          "artistName",
+          "releaseDate",
+          "coverArtPath"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "releaseId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "artistName": {
+            "type": "string"
+          },
+          "releaseDate": {
+            "type": "string"
+          },
+          "coverArtPath": {
+            "type": "string"
+          }
+        }
+      },
+      "tracks": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "title",
+            "audioPath"
+          ],
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "audioPath": {
+              "type": "string"
+            },
+            "explicit": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  },
+  "sourceFieldMappings": [
+    {
+      "path": "album.releaseDate"
+    },
+    {
+      "path": "album.coverArtPath"
+    },
+    {
+      "path": "tracks.length"
+    },
+    {
+      "path": "tracks[].audioPath"
+    }
+  ],
+  "tabUrlTemplates": [
+    {
+      "id": "distrokidUpload",
+      "urlTemplate": "https://distrokid.com/new/",
+      "siteId": "distrokid",
+      "role": "target"
+    }
+  ],
+  "authProfileRef": "distrokid",
+  "completionPolicy": {
+    "action": "wait_for_human_submission",
+    "notes": "Capture DistroKid draft/public URLs when visible, then stop before final submit.",
+    "closeBrowser": false,
+    "requireApprovalBeforeSubmit": true
+  },
+  "writebackTargets": [
+    {
+      "id": "albumDistrokidDraftUrl",
+      "source": "distrokidDraftUrl",
+      "destination": "album.distrokidDraftUrl",
+      "label": "album.distrokidDraftUrl",
+      "required": false
+    }
+  ],
+  "outputSchema": {
+    "type": "object",
+    "properties": {}
+  }
+}

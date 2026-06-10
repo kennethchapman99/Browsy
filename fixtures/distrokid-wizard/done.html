@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!--
+    Fake DistroKid "done" page.
+    Mirrors https://distrokid.com/new/done/?albumuuid=... The HyperFollow link is
+    exposed in a readable anchor (data-hyperfollow-url + href) so the executor can
+    capture it from the DOM. Clipboard "Copy link" is simulated but NOT relied on
+    for capture (clipboard reads are flaky headless).
+  -->
+  <title>You're done! — DistroKid (Browsy Fixture)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 56px auto; padding: 0 20px; background: #f5f5f5; text-align: center; }
+    h1 { color: #1a7; }
+    .link-box { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 1.2em; margin: 1.5em 0; }
+    .hyperfollow { font-size: 1.05rem; color: #1769ff; word-break: break-all; }
+    .btn { padding: .55em 1.4em; border-radius: 4px; font-size: 1em; cursor: pointer; border: none; background: #1769ff; color: #fff; }
+    #copy-status { margin-top: .6em; font-size: .85rem; color: #2a7; min-height: 1.1em; }
+  </style>
+</head>
+<body>
+  <h1>&#127881; Your release is on its way!</h1>
+  <p style="color:#666">Share your HyperFollow link so fans can pre-save.</p>
+
+  <div class="link-box">
+    <a class="hyperfollow" id="hyperfollow-link"
+      data-hyperfollow-url
+      href="https://distrokid.com/hyperfollow/pancakerobot/fixture-0001"
+      target="_blank">https://distrokid.com/hyperfollow/pancakerobot/fixture-0001</a>
+    <div>
+      <button class="btn" id="copy-link" type="button"
+        data-browsy-action="copy-hyperfollow"
+        onclick="copyLink()">Copy link</button>
+    </div>
+    <div id="copy-status"></div>
+  </div>
+
+  <script>
+    function copyLink() {
+      const url = document.getElementById('hyperfollow-link').getAttribute('href');
+      const done = () => { document.getElementById('copy-status').textContent = 'Copied!'; };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(done).catch(done);
+      } else { done(); }
+    }
+  </script>
+</body>
+</html>

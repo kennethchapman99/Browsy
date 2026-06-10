@@ -1,0 +1,162 @@
+{
+  "workflow_id": "distrokid-album-submit-live-check",
+  "source_system": "observation_compiler",
+  "entity_type": "workflow_observation",
+  "entity_id": "distrokid-album-submit-live-check",
+  "mode": "dry_run",
+  "human_gate": true,
+  "canonical_payload": {
+    "inputs": {},
+    "files": {},
+    "observation": {
+      "schemaVersion": "browsy.observation.v1",
+      "eventCount": 12
+    },
+    "tabs": [
+      {
+        "id": "distrokidUpload",
+        "title": "DistroKid Upload",
+        "url": "https://distrokid.com/new/",
+        "order": 1,
+        "siteId": "distrokid",
+        "requiresAuth": true,
+        "authCheckUrl": "https://distrokid.com/new/",
+        "source": "recording_setup"
+      }
+    ],
+    "replayPlan": {
+      "schemaVersion": "browsy.replay-plan.v1",
+      "workflowId": "distrokid-album-submit-live-check",
+      "generatedAt": "2026-06-02T18:56:18.029Z",
+      "tabs": [
+        {
+          "id": "distrokidUpload",
+          "title": "DistroKid Upload",
+          "url": "https://distrokid.com/new/",
+          "order": 1,
+          "siteId": "distrokid",
+          "requiresAuth": true,
+          "authCheckUrl": "https://distrokid.com/new/",
+          "source": "recording_setup"
+        }
+      ],
+      "navigationGraph": {
+        "nodes": [
+          {
+            "id": "distrokidUpload",
+            "url": "https://distrokid.com/new/",
+            "title": "DistroKid Upload"
+          }
+        ]
+      },
+      "bindings": {
+        "variables": {},
+        "files": {},
+        "outputs": {}
+      },
+      "checkpoints": [
+        {
+          "id": "beforeFinalSubmit",
+          "label": "Stop before final submit"
+        }
+      ],
+      "replaySettings": {
+        "defaultMode": "dry_run",
+        "stopBeforeFinalAction": true,
+        "requireVerifiedSelectorsForLive": true,
+        "retry": {
+          "attempts": 2,
+          "backoffMs": 500
+        },
+        "timing": {
+          "afterNavigationMs": 500,
+          "afterActionMs": 250
+        }
+      }
+    },
+    "bindings": {
+      "variables": {},
+      "files": {},
+      "outputs": {}
+    },
+    "checkpoints": [
+      {
+        "id": "beforeFinalSubmit",
+        "label": "Stop before final submit"
+      }
+    ]
+  },
+  "tabs": [
+    {
+      "id": "distrokidUpload",
+      "title": "DistroKid Upload",
+      "url": "https://distrokid.com/new/",
+      "order": 1,
+      "siteId": "distrokid",
+      "requiresAuth": true,
+      "authCheckUrl": "https://distrokid.com/new/",
+      "source": "recording_setup"
+    }
+  ],
+  "auth": [
+    {
+      "tabId": "distrokidUpload",
+      "siteId": "distrokid",
+      "siteName": "DistroKid Upload",
+      "url": "https://distrokid.com/new/",
+      "authCheckUrl": "https://distrokid.com/new/",
+      "authProfileId": "distrokid",
+      "mode": "human_required_if_not_authenticated"
+    }
+  ],
+  "bindings": {
+    "variables": {},
+    "files": {},
+    "outputs": {}
+  },
+  "variableBindings": {},
+  "humanApprovalCheckpoints": [
+    {
+      "id": "beforeFinalSubmit",
+      "label": "Stop before final submit"
+    }
+  ],
+  "checkpoints": [
+    {
+      "id": "beforeFinalSubmit",
+      "label": "Stop before final submit"
+    }
+  ],
+  "replaySettings": {
+    "defaultMode": "dry_run",
+    "stopBeforeFinalAction": true,
+    "requireVerifiedSelectorsForLive": true,
+    "retry": {
+      "attempts": 2,
+      "backoffMs": 500
+    },
+    "timing": {
+      "afterNavigationMs": 500,
+      "afterActionMs": 250
+    }
+  },
+  "safetyPolicy": {
+    "requiresLiveApproval": true,
+    "dry_run_default": true,
+    "pause_at_end_default": true,
+    "manual_only_categories": [
+      "final submission",
+      "payment",
+      "legal certification",
+      "destructive action"
+    ],
+    "checkpoints": [
+      "beforeFinalSubmit"
+    ]
+  },
+  "artifactPolicy": {
+    "captureReplayPlan": true
+  },
+  "on_failure": "stop_and_return_blocked_result",
+  "return_contract_version": "automation-result-v1"
+}

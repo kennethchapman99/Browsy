@@ -34,6 +34,8 @@ export function compileObservationToWorkflowPackage(observation = {}) {
   const artifactRules = inferArtifactRules(events, context, tabs);
   const bindings = buildBindings(fields, uploads, outputs);
   const replaySettings = buildReplaySettings(raw);
+  const inputSchema = raw.workflowContext?.inputSchema || raw.inputSchema || buildManifestSchema(fields, uploads);
+  const sourceMetadata = buildSourceMetadata(raw);
   const steps = buildSteps({ tabs, fields, uploads, actions, checkpoints, outputs, artifactRules });
   const safetyPolicy = buildSafetyPolicy(raw, actions, checkpoints);
 
@@ -60,7 +62,8 @@ export function compileObservationToWorkflowPackage(observation = {}) {
       fallbackSelectors: u.fallbackSelectors,
       selectorConfidence: u.selectorConfidence,
       tabId: u.tabId,
-      source: `payload.${u.id}`,
+      source: `payload.${u.binding || u.id}`,
+      binding: u.binding || null,
       required: u.required !== false,
     })),
     expectedOutputs: outputs,
@@ -75,7 +78,16 @@ export function compileObservationToWorkflowPackage(observation = {}) {
     },
     requiredFiles: uploads.map(u => u.id),
     supportedModes: ['preview', 'dry_run', 'live'],
-    inputSchema: buildManifestSchema(fields, uploads),
+    inputSchema,
+    sourceMetadata,
+    sourceAppId: sourceMetadata.sourceAppId,
+    sourceWorkflowId: sourceMetadata.workflowId,
+    sourcePayloadSchema: sourceMetadata.sourcePayloadSchema,
+    sourceFieldMappings: sourceMetadata.sourceFieldMappings,
+    tabUrlTemplates: sourceMetadata.tabUrlTemplates,
+    authProfileRef: sourceMetadata.authProfileRef,
+    completionPolicy: sourceMetadata.completionPolicy,
+    writebackTargets: sourceMetadata.writebackTargets,
     outputSchema: buildOutputSchema(outputs),
   });
 
@@ -132,6 +144,15 @@ export function compileObservationToWorkflowPackage(observation = {}) {
     replaySettings,
     safetyPolicy,
     artifactPolicy: workflowJson.artifactPolicy,
+    sourceMetadata,
+    sourceAppId: sourceMetadata.sourceAppId,
+    sourceWorkflowId: sourceMetadata.workflowId,
+    sourcePayloadSchema: sourceMetadata.sourcePayloadSchema,
+    sourceFieldMappings: sourceMetadata.sourceFieldMappings,
+    tabUrlTemplates: sourceMetadata.tabUrlTemplates,
+    authProfileRef: sourceMetadata.authProfileRef,
+    completionPolicy: sourceMetadata.completionPolicy,
+    writebackTargets: sourceMetadata.writebackTargets,
     on_failure: 'stop_and_return_blocked_result',
     return_contract_version: RETURN_CONTRACT_VERSION,
   });
@@ -160,10 +181,42 @@ export function compileObservationToWorkflowPackage(observation = {}) {
   };
 }
 
+function buildSourceMetadata(raw = {}) {
+  const ctx = raw.workflowContext || {};
+  const setup = raw.recordingSetup || ctx.recordingSetup || {};
+  const tabs = asArray(setup.tabs);
+  return clean({
+    sourceAppId: ctx.appId || raw.appId || raw.sourceApp || null,
+    workflowId: ctx.workflowId || raw.workflowId || null,
+    sourcePayloadSchema: ctx.sourcePayloadSchema || ctx.inputSchema || raw.inputSchema || null,
+    sourceFieldMappings: ctx.sourceFieldMappings || ctx.bindingHints || raw.availableBindings || raw.bindingHints || [],
+    tabUrlTemplates: ctx.tabUrlTemplates || tabs.map(t => clean({ id: t.id, urlTemplate: t.urlTemplate || t.url, siteId: t.siteId, role: t.role })),
+    authProfileRef: ctx.authProfileRef || setup.authProfileId || setup.authGroupId || setup.ssoProfileId || null,
+    completionPolicy: ctx.completionPolicy || raw.completionPolicy || null,
+    writebackTargets: ctx.writebackTargets || raw.writebackTargets || [],
+  });
+}
+
+// A field-map is "hand-authored" if it declares repeat groups or was explicitly
+// stamped by the repeat-group authoring tooling. Such maps must survive generic
+// observation re-materialization (which cannot reconstruct repeat groups).
+function isHandAuthoredFieldMap(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) return false;
+    const existing = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (Array.isArray(existing?.repeatGroups) && existing.repeatGroups.length > 0) return true;
+    if (existing?.updatedBy === 'repeat-group-authoring') return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function materializeWorkflowPackageFromObservation({
   observation,
   repoRoot = path.resolve(WORKFLOWS_DIR, '..'),
   overwrite = false,
+  forceFieldMap = false,
   packageKind = 'example',
   appId = null,
   appName = null,
@@ -202,7 +255,16 @@ export function materializeWorkflowPackageFromObservation({
   writeJson(files.workflowPackage, compiled.workflowPackage);
   writeJson(files.replayPlan, compiled.replayPlan);
   writeJson(files.bindings, compiled.bindings);
-  writeJson(files.fieldMap, compiled.fieldMap);
+  // Preserve a hand-authored field-map. Repeat-group configs and curated
+  // selectors (e.g. the DistroKid album upload) are authored by hand and cannot
+  // be reconstructed from a generic observation — re-materializing must not clobber
+  // them. We skip the write when the existing field-map declares repeatGroups or is
+  // explicitly marked as hand-authored, unless the caller passes forceFieldMap=true.
+  if (!forceFieldMap && isHandAuthoredFieldMap(files.fieldMap)) {
+    console.warn(`[materializer] preserving hand-authored field-map for "${compiled.workflowId}" (has repeatGroups / repeat-group-authoring); pass forceFieldMap=true to regenerate.`);
+  } else {
+    writeJson(files.fieldMap, compiled.fieldMap);
+  }
   writeJson(files.safetyPolicy, compiled.safetyPolicy);
   writeText(files.runPlan, compiled.runPlanMd);
   writeJson(files.observation, parseInput(observation));
@@ -327,7 +389,7 @@ function inferOutputs(obs, events, context) {
   for (const ev of events || []) {
     if (ev.type !== 'output_captured') continue;
     const raw = ev.rawEvidence || {};
-    if (isEphemeralUrl(ev.pageUrl)) continue;
+    if (ev.pageUrl && isEphemeralUrl(ev.pageUrl)) continue;
     outs.push(output({ id: raw.outputId || raw.label || ev.selector, label: raw.label || raw.outputId || 'Captured output', selector: ev.selector || firstSelector(raw), selectorCandidates: raw.selectorCandidates, selectorConfidence: raw.selectorConfidence, example: raw.text || raw.textPreview, captureAfter: raw.triggeredBySelector, tabId: tabIdForEvent(ev, context), sourceEventId: ev.id }));
   }
   return dedupe(outs);
@@ -338,13 +400,14 @@ function inferArtifactRules(events, context) {
 }
 
 function buildSteps({ tabs, fields, uploads, actions, checkpoints, outputs, artifactRules }) {
+  if (!fields.length && !uploads.length && !actions.length && !outputs.length && !artifactRules.length) return [];
   const steps = [];
   let order = 0;
   const tabId = tabs[0]?.id || 'tab1';
   const lastActionTabId = [...actions].reverse().find(a => a.tabId)?.tabId || tabs.find(t => !t.requiresAuth)?.id || tabId;
   for (const t of tabs) steps.push(clean({ id: `navigate_${safe(t.id)}`, type: 'navigate', order: ++order, tabId: t.id, url: t.url, waitUntil: 'domcontentloaded', retry: { attempts: 2, backoffMs: 500 } }));
-  for (const f of fields) steps.push(clean({ id: `fill_${f.id}`, type: f.inputType === 'select' ? 'select' : 'fill', order: ++order, tabId: f.tabId || tabId, selector: f.selector, fallbackSelectors: f.fallbackSelectors, selectorConfidence: f.selectorConfidence, binding: f.id, value: `{{inputs.${f.id}}}`, required: f.required !== false, sourceEventId: f.sourceEventId }));
-  for (const u of uploads) steps.push(clean({ id: `upload_${u.id}`, type: 'uploadFile', order: ++order, tabId: u.tabId || tabId, selector: u.selector, fallbackSelectors: u.fallbackSelectors, selectorConfidence: u.selectorConfidence, binding: u.id, file: `{{files.${u.id}}}`, required: u.required !== false, sourceEventId: u.sourceEventId }));
+  for (const f of fields) steps.push(clean({ id: `fill_${f.id}`, type: f.inputType === 'select' ? 'select' : 'fill', order: ++order, tabId: f.tabId || tabId, selector: f.selector, fallbackSelectors: f.fallbackSelectors, selectorConfidence: f.selectorConfidence, binding: f.binding || f.id, value: f.binding ? `{{payload.${f.binding}}}` : `{{inputs.${f.id}}}`, required: f.required !== false, sourceEventId: f.sourceEventId }));
+  for (const u of uploads) steps.push(clean({ id: `upload_${u.id}`, type: 'uploadFile', order: ++order, tabId: u.tabId || tabId, selector: u.selector, fallbackSelectors: u.fallbackSelectors, selectorConfidence: u.selectorConfidence, binding: u.binding || u.id, file: u.binding ? `{{payload.${u.binding}}}` : `{{files.${u.id}}}`, required: u.required !== false, sourceEventId: u.sourceEventId }));
   for (const a of actions) {
     const cp = checkpoints.find(c => c.beforeAction === a.id);
     if (cp) steps.push(clean({ id: `approve_${cp.id}`, type: 'approve', order: ++order, checkpointId: cp.id, beforeAction: a.id, reason: cp.reason }));
@@ -357,8 +420,8 @@ function buildSteps({ tabs, fields, uploads, actions, checkpoints, outputs, arti
 
 function buildBindings(fields, uploads, outputs) {
   return {
-    variables: Object.fromEntries(fields.map(f => [f.id, clean({ source: `payload.${f.id}`, selector: f.selector, selectorCandidates: f.selectorCandidates, required: f.required !== false })])),
-    files: Object.fromEntries(uploads.map(u => [u.id, clean({ source: `payload.${u.id}`, selector: u.selector, selectorCandidates: u.selectorCandidates, required: u.required !== false })])),
+    variables: Object.fromEntries(fields.map(f => [f.id, clean({ source: `payload.${f.binding || f.id}`, binding: f.binding || null, selector: f.selector, selectorCandidates: f.selectorCandidates, required: f.required !== false })])),
+    files: Object.fromEntries(uploads.map(u => [u.id, clean({ source: `payload.${u.binding || u.id}`, binding: u.binding || null, selector: u.selector, selectorCandidates: u.selectorCandidates, required: u.required !== false })])),
     outputs: Object.fromEntries(outputs.map(o => [o.id, clean({ selector: o.selector, source: o.source, attribute: o.attribute, required: o.required !== false, storesTo: o.storesTo })])),
   };
 }
@@ -410,7 +473,7 @@ function role(input, kind) {
   const id = safe(toCamel(input.id || input.name || input.label || input.field || input.selectorHint || input.selector || kind));
   const selectorCandidates = asArray(input.selectorCandidates);
   const selector = input.selector || input.selectorHint || firstSelector(input);
-  return clean({ id, label: input.label || input.name || human(id), kind, inputType: normType(input.inputType || input.type || input.kind), scope: kind === 'asset' ? 'asset' : input.scope || 'global', selector, fallbackSelectors: selectorCandidates.map(c => c.selector).filter(s => s && s !== selector).slice(0, 4), selectorCandidates, selectorConfidence: input.selectorConfidence || selectorCandidates[0]?.confidence || (selector ? 'medium' : 'low'), exampleValue: input.exampleValue ?? input.example ?? input.value, required: input.required !== false, tabId: input.tabId || input.pageId, sourceEventId: input.sourceEventId, accept: input.accept, multiple: !!input.multiple, source: input.source, attribute: input.attribute, storesTo: input.storesTo, captureAfter: input.captureAfter });
+  return clean({ id, label: input.label || input.name || human(id), kind, inputType: normType(input.inputType || input.type || input.kind), scope: kind === 'asset' ? 'asset' : input.scope || 'global', selector, fallbackSelectors: selectorCandidates.map(c => c.selector).filter(s => s && s !== selector).slice(0, 4), selectorCandidates, selectorConfidence: input.selectorConfidence || selectorCandidates[0]?.confidence || (selector ? 'medium' : 'low'), exampleValue: input.exampleValue ?? input.example ?? input.value, required: input.required !== false, tabId: input.tabId || input.pageId, sourceEventId: input.sourceEventId, accept: input.accept, multiple: !!input.multiple, source: input.source, binding: input.binding || null, attribute: input.attribute, storesTo: input.storesTo, captureAfter: input.captureAfter });
 }
 
 function action(input) {

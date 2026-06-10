@@ -1,0 +1,163 @@
+{
+  "appId": "pancake-robot",
+  "appName": "Pancake Robot",
+  "sourceApp": "pancake-robot",
+  "workflowId": "distrokid-album-submit",
+  "workflowName": "DistroKid Album Submit",
+  "targetUrl": "https://distrokid.com/new/",
+  "releaseId": "ALBUM_MPK9H71S_RTCM",
+  "packageId": "pancake-distrokid-album-submit-defaults",
+  "recordingSetup": {
+    "authProfileId": "distrokid",
+    "tabs": [
+      {
+        "id": "pancakeRelease",
+        "title": "Pancake Robot Release",
+        "url": "http://localhost:3737/releases/album/{album.id}",
+        "siteId": "pancake-robot",
+        "requiresAuth": false,
+        "role": "source"
+      },
+      {
+        "id": "distrokidUpload",
+        "title": "DistroKid Upload",
+        "url": "https://distrokid.com/new/",
+        "siteId": "distrokid",
+        "requiresAuth": true,
+        "role": "target"
+      }
+    ]
+  },
+  "callbackUrl": "http://localhost:3737/releases/album/{album.id}/magic-release/ingest-result",
+  "inputSchema": {
+    "type": "object",
+    "required": ["releaseId", "album", "tracks"],
+    "properties": {
+      "releaseId": { "type": "string", "title": "Pancake Robot release ID" },
+      "albumId": { "type": "string", "title": "Alias for releaseId" },
+      "album": {
+        "type": "object",
+        "required": ["title", "artistName", "releaseDate", "coverArtPath"],
+        "properties": {
+          "id": { "type": "string", "title": "Alias for releaseId" },
+          "releaseId": { "type": "string", "title": "Alias for releaseId" },
+          "title": { "type": "string", "title": "Album title" },
+          "artistName": { "type": "string", "title": "Primary artist" },
+          "releaseDate": { "type": "string", "title": "Release date" },
+          "language": { "type": "string", "title": "Language" },
+          "primaryGenre": { "type": "string", "title": "Primary genre" },
+          "secondaryGenre": { "type": "string", "title": "Secondary genre" },
+          "labelName": { "type": "string", "title": "Label name" },
+          "coverArtPath": { "type": "string", "title": "Cover art file path" }
+        }
+      },
+      "tracks": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["index", "title", "audioPath"],
+          "properties": {
+            "index": { "type": "number", "title": "Track number" },
+            "title": { "type": "string", "title": "Track title" },
+            "artistName": { "type": "string", "title": "Track artist" },
+            "audioPath": { "type": "string", "title": "Audio file path" },
+            "explicit": { "type": "boolean", "title": "Explicit" },
+            "instrumental": { "type": "boolean", "title": "Instrumental" },
+            "isrc": { "type": "string", "title": "ISRC" },
+            "lyrics": { "type": "string", "title": "Lyrics" },
+            "songwriterCredits": { "type": "object", "title": "Songwriter credits" },
+            "aiDisclosure": { "type": "object", "title": "AI disclosure" }
+          }
+        }
+      },
+      "derived": {
+        "type": "object",
+        "properties": {
+          "numberOfSongs": { "type": "number", "title": "Number of songs" }
+        }
+      }
+    }
+  },
+  "samplePayload": {
+    "releaseId": "ALBUM_MPK9H71S_RTCM",
+    "albumId": "ALBUM_MPK9H71S_RTCM",
+    "album": {
+      "id": "ALBUM_MPK9H71S_RTCM",
+      "releaseId": "ALBUM_MPK9H71S_RTCM",
+      "title": "Context Album",
+      "artistName": "Context Artist",
+      "releaseDate": "2026-09-01",
+      "language": "English",
+      "primaryGenre": "Hip Hop/Rap",
+      "secondaryGenre": "",
+      "labelName": "",
+      "coverArtPath": "/tmp/context-cover.png"
+    },
+    "tracks": [
+      {
+        "index": 1,
+        "title": "Track One",
+        "artistName": "Context Artist",
+        "audioPath": "/tmp/track-one.wav",
+        "explicit": false,
+        "instrumental": false,
+        "isrc": "",
+        "lyrics": "",
+        "songwriterCredits": {},
+        "aiDisclosure": {}
+      }
+    ],
+    "derived": { "numberOfSongs": 1 }
+  },
+  "requiredAssets": [
+    { "path": "album.coverArtPath", "type": "file", "required": true },
+    { "path": "tracks[].audioPath", "type": "file", "required": true }
+  ],
+  "derivedVariables": {
+    "numberOfSongs": "tracks.length",
+    "derived.numberOfSongs": "tracks.length"
+  },
+  "bindingHints": [
+    { "path": "releaseId", "source": "source_url", "group": "release" },
+    { "path": "albumId", "source": "releaseId_alias", "group": "release" },
+    { "path": "album.id", "source": "releaseId_alias", "group": "release" },
+    { "path": "album.releaseId", "source": "releaseId_alias", "group": "release" },
+    { "path": "album.title" },
+    { "path": "album.artistName" },
+    { "path": "album.releaseDate" },
+    { "path": "album.language" },
+    { "path": "album.primaryGenre" },
+    { "path": "album.secondaryGenre" },
+    { "path": "album.labelName" },
+    { "path": "album.coverArtPath" },
+    { "path": "tracks.length" },
+    { "path": "tracks[].index" },
+    { "path": "tracks[].title" },
+    { "path": "tracks[].artistName" },
+    { "path": "tracks[].audioPath" },
+    { "path": "tracks[].explicit" },
+    { "path": "tracks[].instrumental" },
+    { "path": "tracks[].isrc" },
+    { "path": "tracks[].lyrics" },
+    { "path": "tracks[].songwriterCredits" },
+    { "path": "tracks[].aiDisclosure" }
+  ],
+  "fileBindings": [
+    { "id": "coverArtPath", "label": "Cover art", "source": "payload.album.coverArtPath", "binding": "album.coverArtPath", "required": true },
+    { "id": "trackAudioFiles", "label": "Track audio files", "source": "payload.tracks[].audioPath", "binding": "tracks[].audioPath", "required": true }
+  ],
+  "expectedOutputs": [
+    { "id": "distrokidDraftUrl", "label": "DistroKid draft URL", "required": false },
+    { "id": "hyperfollowUrl", "label": "HyperFollow URL", "required": false }
+  ],
+  "humanCheckpoints": [
+    { "id": "beforeFinalSubmit", "label": "Stop before final submit", "beforeAction": "finalSubmit", "reason": "Final submission and publishing stay manual." }
+  ],
+  "fieldContractIntent": "Use Pancake Robot as the source of truth. releaseId is the canonical release identifier and resolves the source release tab URL. Global album fields come from album.*, cover art is album.coverArtPath, repeated track fields come from tracks[], and track audio files are tracks[].audioPath.",
+  "completionPolicy": {
+    "action": "wait_for_human_submission",
+    "notes": "Capture DistroKid draft/public URLs when visible, then stop before final submit.",
+    "closeBrowser": false,
+    "requireApprovalBeforeSubmit": true
+  }
+}

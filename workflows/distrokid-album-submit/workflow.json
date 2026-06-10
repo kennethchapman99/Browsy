@@ -1,0 +1,3537 @@
+{
+  "schemaVersion": "browsy.workflow.v1",
+  "id": "distrokid-album-submit",
+  "workflowId": "distrokid-album-submit",
+  "name": "DistroKid Album Submit",
+  "description": "Recorded workflow for app pancake-robot",
+  "generatedBy": "browsy.observation-materializer",
+  "generatedAt": "2026-06-05T19:51:10.542Z",
+  "tabs": [
+    {
+      "id": "pancakeRelease",
+      "title": "Pancake Robot Release",
+      "url": "http://localhost:3737/releases/album/ALBUM_MPVNLDVI_JCEF",
+      "order": 1,
+      "siteId": "pancake-robot",
+      "requiresAuth": false,
+      "authCheckUrl": "http://localhost:3737/releases/album/ALBUM_MPVNLDVI_JCEF",
+      "source": "recording_setup"
+    },
+    {
+      "id": "distrokidUpload",
+      "title": "DistroKid Upload",
+      "url": "https://distrokid.com/new/",
+      "order": 2,
+      "siteId": "distrokid",
+      "requiresAuth": true,
+      "authCheckUrl": "https://distrokid.com/new/",
+      "source": "recording_setup"
+    }
+  ],
+  "auth": [
+    {
+      "tabId": "pancakeRelease",
+      "siteId": "pancake-robot",
+      "siteName": "Pancake Robot Release",
+      "url": "http://localhost:3737/releases/album/ALBUM_MPVNLDVI_JCEF",
+      "authCheckUrl": "http://localhost:3737/releases/album/ALBUM_MPVNLDVI_JCEF",
+      "authProfileId": "distrokid",
+      "mode": "optional"
+    },
+    {
+      "tabId": "distrokidUpload",
+      "siteId": "distrokid",
+      "siteName": "DistroKid Upload",
+      "url": "https://distrokid.com/new/",
+      "authCheckUrl": "https://distrokid.com/new/",
+      "authProfileId": "distrokid",
+      "mode": "human_required_if_not_authenticated"
+    }
+  ],
+  "navigationGraph": {
+    "nodes": [
+      {
+        "id": "pancakeRelease",
+        "url": "http://localhost:3737/releases/album/ALBUM_MPVNLDVI_JCEF",
+        "title": "Pancake Robot Release"
+      },
+      {
+        "id": "distrokidUpload",
+        "url": "https://distrokid.com/new/",
+        "title": "DistroKid Upload"
+      }
+    ],
+    "edges": [
+      {
+        "from": "pancakeRelease",
+        "to": "distrokidUpload",
+        "event": "page_opened",
+        "eventId": "page_opened-1780688190594-78qk89"
+      },
+      {
+        "from": "distrokidUpload",
+        "to": "pancakeRelease",
+        "event": "page_navigated",
+        "eventId": "page_navigated-1780688255218-comaa1"
+      }
+    ]
+  },
+  "recordedSteps": [
+    {
+      "id": "navigate_pancakeRelease",
+      "type": "navigate",
+      "order": 1,
+      "tabId": "pancakeRelease",
+      "url": "http://localhost:3737/releases/album/ALBUM_MPVNLDVI_JCEF",
+      "waitUntil": "domcontentloaded",
+      "retry": {
+        "attempts": 2,
+        "backoffMs": 500
+      }
+    },
+    {
+      "id": "navigate_distrokidUpload",
+      "type": "navigate",
+      "order": 2,
+      "tabId": "distrokidUpload",
+      "url": "https://distrokid.com/new/",
+      "waitUntil": "domcontentloaded",
+      "retry": {
+        "attempts": 2,
+        "backoffMs": 500
+      }
+    },
+    {
+      "id": "fill_howmanysongs",
+      "type": "select",
+      "order": 3,
+      "tabId": "distrokidUpload",
+      "selector": "#howManySongsOnThisAlbum",
+      "fallbackSelectors": [
+        "select[name=\"howmanysongs\"]",
+        "select[aria-label=\"\\31 \\ song\\ \\(a\\ single\\)\\a 2\\ songs\\a 3\\ songs\\a 4\\ songs\\a 5\\ songs\\a 6\\ songs\\a 7\\ songs\\a 8\\ songs\\a 9\\ songs\\a 10\\ songs\\a 11\\ songs\\a 12\\ songs\\a 13\\ songs\\a 14\\ songs\\a 15\\ songs\\a 16\\ songs\\a 17\\ songs\\a 18\\ songs\\a 19\\ songs\\a 20\\ songs\\a 21\\ songs\\a 22\\ songs\\a 23\\ songs\\a 24\\ songs\\a 25\\ songs\\a 26\\ songs\\a 27\\ so\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-number-of-.ong:nth-of-type(2) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect"
+      ],
+      "selectorConfidence": "high",
+      "binding": "howmanysongs",
+      "value": "{{inputs.howmanysongs}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688217121-1prkwo"
+    },
+    {
+      "id": "fill_releaseDate",
+      "type": "fill",
+      "order": 4,
+      "tabId": "distrokidUpload",
+      "selector": "#release-date-dp",
+      "fallbackSelectors": [
+        "input[name=\"releaseDate\"]",
+        "input[aria-label=\"\\32 026-06-07\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-relea.e-date\\ relea:nth-of-type(11) > div > input.coolInput\\ cool-input-date"
+      ],
+      "selectorConfidence": "high",
+      "binding": "releaseDate",
+      "value": "{{inputs.releaseDate}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688230310-i4w5i6"
+    },
+    {
+      "id": "fill_genre1",
+      "type": "select",
+      "order": 5,
+      "tabId": "distrokidUpload",
+      "selector": "#genrePrimary",
+      "fallbackSelectors": [
+        "select[name=\"genre1\"]",
+        "select[aria-label=\"Select\\ a\\ genre\\a Afrobeat\\a Afropop\\a Alternative\\a Big\\ Band\\a Blues\\a Children\\'s\\ Music\\a Christian\\/Gospel\\a Classical\\a Comedy\\a Contemporary\\ Latin\\a Country\\a Dance\\a Electronic\\a Fitness\\ \\&\\ Workout\\a Folk\\a French\\ Pop\\a German\\ Folk\\a German\\ Pop\\a Hip\\ Hop\\/Rap\\a Holiday\\a J-Pop\\a Jaz\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-primary-genre\\ dkRequiredForSpotify:nth-of-type(20) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect"
+      ],
+      "selectorConfidence": "high",
+      "binding": "genre1",
+      "value": "{{inputs.genre1}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688242411-id9fqd"
+    },
+    {
+      "id": "fill_albumtitle",
+      "type": "fill",
+      "order": 6,
+      "tabId": "distrokidUpload",
+      "selector": "#albumTitleInput",
+      "fallbackSelectors": [
+        "input[name=\"albumtitle\"]",
+        "input[aria-label=\"Soundhead\"]",
+        "div.upload-mobile > div.upload-mobile-album-title:nth-of-type(23) > div > div.upload-mobile-album-title\\ alert-container > input.coolInput\\ cool-input-text\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "binding": "albumtitle",
+      "value": "{{inputs.albumtitle}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688284012-z928r7"
+    },
+    {
+      "id": "fill_title4eac64dbF891Ced8825f232d558966ec",
+      "type": "fill",
+      "order": 7,
+      "tabId": "distrokidUpload",
+      "selector": "#title_4eac64db-f891-ced8-825f-232d558966ec",
+      "fallbackSelectors": [
+        "input[name=\"title_4eac64db-f891-ced8-825f-232d558966ec\"]",
+        "input[aria-label=\"Track\\ 1\\ title\"]",
+        "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(2) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_1\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "binding": "title4eac64dbF891Ced8825f232d558966ec",
+      "value": "{{inputs.title4eac64dbF891Ced8825f232d558966ec}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688311762-7xw1dn"
+    },
+    {
+      "id": "fill_songwriterRealNameFirst1",
+      "type": "fill",
+      "order": 8,
+      "tabId": "distrokidUpload",
+      "selector": "input[name=\"songwriter_real_name_first1\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"First\\ name\"]",
+        "div.ongwriter_row:nth-of-type(1) > div.margin-bottom-18\\ border-bottom-gray:nth-of-type(2) > div.ongwriter_full_name > div.mobileBreak\\ flex-input-new:nth-of-type(1) > input.coolInput\\ cool-input-text\\ .ongwriter_real_name_fir"
+      ],
+      "selectorConfidence": "medium",
+      "binding": "songwriterRealNameFirst1",
+      "value": "{{inputs.songwriterRealNameFirst1}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688314329-lsnvxy"
+    },
+    {
+      "id": "fill_songwriterRealNameLast1",
+      "type": "fill",
+      "order": 9,
+      "tabId": "distrokidUpload",
+      "selector": "input[name=\"songwriter_real_name_last1\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"Last\\ name\"]",
+        "div.ongwriter_row:nth-of-type(1) > div.margin-bottom-18\\ border-bottom-gray:nth-of-type(2) > div.ongwriter_full_name > div.mobileBreak\\ flex-input-new:nth-of-type(3) > input.coolInput\\ cool-input-text\\ .ongwriter_real_name_la"
+      ],
+      "selectorConfidence": "medium",
+      "binding": "songwriterRealNameLast1",
+      "value": "{{inputs.songwriterRealNameLast1}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688316538-na1ozr"
+    },
+    {
+      "id": "fill_aiGate4eac64dbF891Ced8825f232d558966ec",
+      "type": "fill",
+      "order": 10,
+      "tabId": "distrokidUpload",
+      "selector": "input[name=\"ai_gate_4eac64db-f891-ced8-825f-232d558966ec\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"\\31 \"]",
+        "div.ai-credit.\\-:nth-of-type(14) > label:nth-of-type(2) > div.flex-input\\ ai-credit.-gate-row > div.padding-right-6:nth-of-type(1) > input.di.troAiGate"
+      ],
+      "selectorConfidence": "medium",
+      "binding": "aiGate4eac64dbF891Ced8825f232d558966ec",
+      "value": "{{inputs.aiGate4eac64dbF891Ced8825f232d558966ec}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688321306-og7mf6"
+    },
+    {
+      "id": "fill_divAiCreditDetailLabelNthOfType3DivFlexInputAiCreditItemRowDivPaddingRight6NthOfType1InputDiTroAiRecordingScope",
+      "type": "fill",
+      "order": 11,
+      "tabId": "distrokidUpload",
+      "selector": "div.ai-credit.-detail > label:nth-of-type(3) > div.flex-input\\ ai-credit.-item-row > div.padding-right-6:nth-of-type(1) > input.di.troAiRecordingScope",
+      "fallbackSelectors": [
+        "input[aria-label=\"full\"]"
+      ],
+      "selectorConfidence": "medium",
+      "binding": "divAiCreditDetailLabelNthOfType3DivFlexInputAiCreditItemRowDivPaddingRight6NthOfType1InputDiTroAiRecordingScope",
+      "value": "{{inputs.divAiCreditDetailLabelNthOfType3DivFlexInputAiCreditItemRowDivPaddingRight6NthOfType1InputDiTroAiRecordingScope}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688322395-jpzx05"
+    },
+    {
+      "id": "fill_title488d45ef37b184350f459f27c05fc33a",
+      "type": "fill",
+      "order": 12,
+      "tabId": "distrokidUpload",
+      "selector": "#title_488d45ef-37b1-8435-0f45-9f27c05fc33a",
+      "fallbackSelectors": [
+        "input[name=\"title_488d45ef-37b1-8435-0f45-9f27c05fc33a\"]",
+        "input[aria-label=\"Track\\ 2\\ title\"]",
+        "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(3) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_2\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "binding": "title488d45ef37b184350f459f27c05fc33a",
+      "value": "{{inputs.title488d45ef37b184350f459f27c05fc33a}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688358454-c4fu2d"
+    },
+    {
+      "id": "fill_titleC34d2c4d2132D9b1Dd9cC4b5339c55e4",
+      "type": "fill",
+      "order": 13,
+      "tabId": "distrokidUpload",
+      "selector": "#title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4",
+      "fallbackSelectors": [
+        "input[name=\"title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4\"]",
+        "input[aria-label=\"Track\\ 3\\ title\"]",
+        "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(4) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_3\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "binding": "titleC34d2c4d2132D9b1Dd9cC4b5339c55e4",
+      "value": "{{inputs.titleC34d2c4d2132D9b1Dd9cC4b5339c55e4}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688373848-0pgtyw"
+    },
+    {
+      "id": "fill_track1Performer1Role",
+      "type": "select",
+      "order": 14,
+      "tabId": "distrokidUpload",
+      "selector": "#track-1-performer-1-role",
+      "fallbackSelectors": [
+        "select[aria-label=\"Select\\ a\\ role\\a Audio\\a Background\\ vocals\\a Banjo\\a Bass\\a Bass\\ drum\\ \\(concert\\)\\a Bass\\ drum\\ \\(kick\\)\\a Bass\\ guitar\\ \\(all\\ types\\)\\a Bass\\ guitar\\ \\(electric\\)\\a Basset\\ horn\\a Bassoon\\a Bell\\ tree\\a Bongos\\a Brass\\ instrument\\a Cello\\a Clarinet\\a Claves\\a Clavinet\\a Congas\\a Contrabass\\a Cowb\"]",
+        "div.requirement.-performer-:nth-of-type(1) > div.requirement.-performer:nth-of-type(2) > div.requirement.-performer > div.alert-container:nth-of-type(1) > select.performer-role\\ coolInput\\ coolInputSmall\\ dk-.earchable-"
+      ],
+      "selectorConfidence": "high",
+      "binding": "track1Performer1Role",
+      "value": "{{inputs.track1Performer1Role}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688379240-0wgamb"
+    },
+    {
+      "id": "fill_performerName",
+      "type": "fill",
+      "order": 15,
+      "tabId": "distrokidUpload",
+      "selector": "#track-1-performer-1-name",
+      "fallbackSelectors": [
+        "input[name=\"performer-name\"]",
+        "input[aria-label=\"Name\"]",
+        "div.requirement.-performer > div.alert-container:nth-of-type(1) > div.credit-name-row:nth-of-type(3) > div.credit-input-container > input.performer-name\\ no-emoji\\ no-url\\ coolInput\\ cool-input-text"
+      ],
+      "selectorConfidence": "high",
+      "binding": "performerName",
+      "value": "{{inputs.performerName}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688381429-0w595u"
+    },
+    {
+      "id": "fill_track1Producer1Role",
+      "type": "select",
+      "order": 16,
+      "tabId": "distrokidUpload",
+      "selector": "#track-1-producer-1-role",
+      "fallbackSelectors": [
+        "select[aria-label=\"Select\\ a\\ role\\a Additional\\ engineer\\a Artist\\ background\\ vocal\\ engineer\\a Artist\\ vocal\\ second\\ engineer\\a Assistant\\ producer\\a Beat\\ maker\\a Co-executive\\ producer\\a Co-producer\\a Digital\\ audio\\ workstation\\ engineer\\a Digital\\ editing\\ engineer\\a Digital\\ editing\\ seco\"]",
+        "div.requirement.-producer-:nth-of-type(2) > div.requirement.-producer:nth-of-type(2) > div.requirement.-producer > div.alert-container:nth-of-type(1) > select.producer-role\\ coolInput\\ coolInputSmall\\ dk-.earchable-"
+      ],
+      "selectorConfidence": "high",
+      "binding": "track1Producer1Role",
+      "value": "{{inputs.track1Producer1Role}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688385281-2ydd5h"
+    },
+    {
+      "id": "fill_producerName",
+      "type": "fill",
+      "order": 17,
+      "tabId": "distrokidUpload",
+      "selector": "#track-1-producer-1-name",
+      "fallbackSelectors": [
+        "input[name=\"producer-name\"]",
+        "input[aria-label=\"Name\"]",
+        "div.requirement.-producer > div.alert-container:nth-of-type(1) > div.credit-name-row:nth-of-type(3) > div.credit-input-container > input.producer-name\\ no-emoji\\ no-url\\ coolInput\\ cool-input-text"
+      ],
+      "selectorConfidence": "high",
+      "binding": "producerName",
+      "value": "{{inputs.producerName}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688386967-o6f64z"
+    },
+    {
+      "id": "fill_areyousureyoutube",
+      "type": "fill",
+      "order": 18,
+      "tabId": "distrokidUpload",
+      "selector": "#areyousureyoutube",
+      "fallbackSelectors": [
+        "input[aria-label=\"I\\ selected\\ \\\"YouTube\\ Music\\\"\\.\\ So\\ I\\ won\\'t\\ email\\ DistroKid\\ later\\ asking\\,\\ \\\"why\\'d\\ you\\ upload\\ my\\ music\\ to\\ YouTube\\?\\!\\\"\\ \\.\\.\\.mkay\\?\"]",
+        "div.checkbox-grid-col.\\ margin-0:nth-of-type(1) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure"
+      ],
+      "selectorConfidence": "high",
+      "binding": "areyousureyoutube",
+      "value": "{{inputs.areyousureyoutube}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688393299-g9oles"
+    },
+    {
+      "id": "fill_areyousurepromoservices",
+      "type": "fill",
+      "order": 19,
+      "tabId": "distrokidUpload",
+      "selector": "#areyousurepromoservices",
+      "fallbackSelectors": [
+        "input[aria-label=\"I\\ won\\'t\\ use\\ \\\"promo\\ services\\\"\\ that\\ guarantee\\ streams\\ or\\ playlisting—even\\ if\\ they\\ claim\\ \\\"organic\\ and\\ real\\\"\\ streams\\.\\ These\\ services\\ typically\\ use\\ fake\\ stream-bots\\ easily\\ detectable\\ by\\ streaming\\ services\\.\\ Read\\ this\\ message\\ from\\ Spotify\\ to\\ learn\"]",
+        "div.checkbox-grid-col.\\ margin-0:nth-of-type(3) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure"
+      ],
+      "selectorConfidence": "high",
+      "binding": "areyousurepromoservices",
+      "value": "{{inputs.areyousurepromoservices}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688394084-za824l"
+    },
+    {
+      "id": "fill_areyousurerecorded",
+      "type": "fill",
+      "order": 20,
+      "tabId": "distrokidUpload",
+      "selector": "#areyousurerecorded",
+      "fallbackSelectors": [
+        "input[aria-label=\"I\\ recorded\\ this\\ music\\,\\ and\\ am\\ authorized\\ to\\ sell\\ it\\ in\\ stores\\ worldwide\\ \\&\\ collect\\ all\\ royalties\\.\"]",
+        "div.checkbox-grid-col.\\ margin-0:nth-of-type(6) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure"
+      ],
+      "selectorConfidence": "high",
+      "binding": "areyousurerecorded",
+      "value": "{{inputs.areyousurerecorded}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688394986-5hnlca"
+    },
+    {
+      "id": "fill_areyousureotherartist",
+      "type": "fill",
+      "order": 21,
+      "tabId": "distrokidUpload",
+      "selector": "#areyousureotherartist",
+      "fallbackSelectors": [
+        "input[aria-label=\"I\\'m\\ not\\ using\\ any\\ other\\ artist\\'s\\ name\\ in\\ my\\ name\\,\\ song\\ titles\\,\\ or\\ album\\ title\\,\\ without\\ their\\ approval\\.\"]",
+        "div.checkbox-grid-col.\\ margin-0:nth-of-type(7) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure"
+      ],
+      "selectorConfidence": "high",
+      "binding": "areyousureotherartist",
+      "value": "{{inputs.areyousureotherartist}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688395760-i4j7hp"
+    },
+    {
+      "id": "fill_areyousuretandc",
+      "type": "fill",
+      "order": 22,
+      "tabId": "distrokidUpload",
+      "selector": "#areyousuretandc",
+      "fallbackSelectors": [
+        "input[aria-label=\"I\\ have\\ read\\ and\\ agree\\ to\\ the\\ terms\\ of\\ the\\ DistroKid\\ Distribution\\ Agreement\"]",
+        "div.checkbox-grid-col.\\ margin-0:nth-of-type(8) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure"
+      ],
+      "selectorConfidence": "high",
+      "binding": "areyousuretandc",
+      "value": "{{inputs.areyousuretandc}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688396530-lklny1"
+    },
+    {
+      "id": "upload_artwork",
+      "type": "uploadFile",
+      "order": 23,
+      "tabId": "distrokidUpload",
+      "selector": "#artwork",
+      "fallbackSelectors": [
+        "input[name=\"artwork\"]",
+        "input[aria-label=\"C\\:\\\\fakepath\\\\default-image\\.png\"]",
+        "div:nth-of-type(2) > div.artworkWrapped\\ margin-right-24:nth-of-type(1) > div.artworkInputBoxVi.ibleContainer\\ re:nth-of-type(1) > div.artworkInputBoxInvi.ible\\ re:nth-of-type(3) > input.large\\ di.troFileInput\\ re"
+      ],
+      "selectorConfidence": "high",
+      "binding": "artwork",
+      "file": "{{files.artwork}}",
+      "required": true,
+      "sourceEventId": "file_selected-1780688271912-n6pqc5"
+    },
+    {
+      "id": "upload_file",
+      "type": "uploadFile",
+      "order": 24,
+      "tabId": "distrokidUpload",
+      "selector": "#js-track-upload-3",
+      "fallbackSelectors": [
+        "input[name=\"file\"]",
+        "input[aria-label=\"C\\:\\\\fakepath\\\\still-here-still-dark\\.mp3\"]",
+        "div:nth-of-type(2) > form.uploadForm > div.audioFileInputBoxVi.ibleContainer:nth-of-type(1) > div.audioFileInputBoxInvi.ible:nth-of-type(2) > input.di.troFileInput\\ di"
+      ],
+      "selectorConfidence": "high",
+      "binding": "file",
+      "file": "{{files.file}}",
+      "required": true,
+      "sourceEventId": "file_selected-1780688361592-q26xzi"
+    },
+    {
+      "id": "click_20260607",
+      "type": "click",
+      "order": 25,
+      "tabId": "pancakeRelease",
+      "selector": "input[name=\"release_date\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"\\32 026-06-07\"]",
+        "div.flex\\ item.\\-:nth-of-type(1) > div:nth-of-type(2) > form.mt-4\\ flex\\ flex-col\\ gap-2\\ .m\\:flex-row\\  > label.text-.m\\ font- > input.mt-1\\ w-full\\ rounded-xl\\ border\\ border-zinc-200\\ px-3\\ py-2\\ text-.m\\ text-zinc-900"
+      ],
+      "selectorConfidence": "medium",
+      "label": "2026-06-07",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688226674-8c6ud2"
+    },
+    {
+      "id": "click_1SongASingle2Songs3Songs4Songs5Songs6Songs7Songs8Songs9Songs10Songs11Songs12Songs13Songs14Songs15Songs16Songs17Songs18Songs19Songs20Songs21Songs22Songs23Songs24Songs25Songs26Songs27So",
+      "type": "click",
+      "order": 26,
+      "tabId": "distrokidUpload",
+      "selector": "#howManySongsOnThisAlbum",
+      "fallbackSelectors": [
+        "select[name=\"howmanysongs\"]",
+        "select[aria-label=\"\\31 \\ song\\ \\(a\\ single\\)\\a 2\\ songs\\a 3\\ songs\\a 4\\ songs\\a 5\\ songs\\a 6\\ songs\\a 7\\ songs\\a 8\\ songs\\a 9\\ songs\\a 10\\ songs\\a 11\\ songs\\a 12\\ songs\\a 13\\ songs\\a 14\\ songs\\a 15\\ songs\\a 16\\ songs\\a 17\\ songs\\a 18\\ songs\\a 19\\ songs\\a 20\\ songs\\a 21\\ songs\\a 22\\ songs\\a 23\\ songs\\a 24\\ songs\\a 25\\ songs\\a 26\\ songs\\a 27\\ so\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-number-of-.ong:nth-of-type(2) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect"
+      ],
+      "selectorConfidence": "high",
+      "label": "1 song (a single)\n2 songs\n3 songs\n4 songs\n5 songs\n6 songs\n7 songs\n8 songs\n9 songs\n10 songs\n11 songs\n12 songs\n13 songs\n14 songs\n15 songs\n16 songs\n17 songs\n18 songs\n19 songs\n20 songs\n21 songs\n22 songs\n23 songs\n24 songs\n25 songs\n26 songs\n27 so",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688217194-jb0ngr"
+    },
+    {
+      "id": "approve_releaseDateDpApproval",
+      "type": "approve",
+      "order": 27,
+      "checkpointId": "releaseDateDpApproval",
+      "beforeAction": "releaseDateDp",
+      "reason": "manual-only"
+    },
+    {
+      "id": "click_releaseDateDp",
+      "type": "click",
+      "order": 28,
+      "tabId": "distrokidUpload",
+      "selector": "#release-date-dp",
+      "fallbackSelectors": [
+        "input[name=\"releaseDate\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-relea.e-date\\ relea:nth-of-type(11) > div > input.coolInput\\ cool-input-date"
+      ],
+      "selectorConfidence": "high",
+      "label": "#release-date-dp",
+      "requiresApproval": true,
+      "safetyCategory": "manual-only",
+      "sourceEventId": "action_detected-1780688228954-7ck49r"
+    },
+    {
+      "id": "click_selectAGenreAfrobeatAfropopAlternativeBigBandBluesChildrenSMusicChristianGospelClassicalComedyContemporaryLatinCountryDanceElectronicFitnessWorkoutFolkFrenchPopGermanFolkGermanPopHipHopRapHolidayJPopJaz",
+      "type": "click",
+      "order": 29,
+      "tabId": "distrokidUpload",
+      "selector": "#genrePrimary",
+      "fallbackSelectors": [
+        "select[name=\"genre1\"]",
+        "select[aria-label=\"Select\\ a\\ genre\\a Afrobeat\\a Afropop\\a Alternative\\a Big\\ Band\\a Blues\\a Children\\'s\\ Music\\a Christian\\/Gospel\\a Classical\\a Comedy\\a Contemporary\\ Latin\\a Country\\a Dance\\a Electronic\\a Fitness\\ \\&\\ Workout\\a Folk\\a French\\ Pop\\a German\\ Folk\\a German\\ Pop\\a Hip\\ Hop\\/Rap\\a Holiday\\a J-Pop\\a Jaz\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-primary-genre\\ dkRequiredForSpotify:nth-of-type(20) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect"
+      ],
+      "selectorConfidence": "high",
+      "label": "Select a genre\nAfrobeat\nAfropop\nAlternative\nBig Band\nBlues\nChildren's Music\nChristian/Gospel\nClassical\nComedy\nContemporary Latin\nCountry\nDance\nElectronic\nFitness & Workout\nFolk\nFrench Pop\nGerman Folk\nGerman Pop\nHip Hop/Rap\nHoliday\nJ-Pop\nJaz",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688242429-bsnw7q"
+    },
+    {
+      "id": "click_prepareOpenUploadFolder",
+      "type": "click",
+      "order": 30,
+      "tabId": "pancakeRelease",
+      "selector": "div:nth-of-type(2) > div.mt-3\\ rounded-2xl\\ border\\ border-zinc-200\\ bg-white\\ p-4:nth-of-type(5) > div.flex\\ flex-wrap\\ item.-center\\ ju:nth-of-type(1) > form > button.rounded-xl\\ border\\ border-.ky-300\\ bg-",
+      "fallbackSelectors": [
+        "button[aria-label=\"Prepare\\ \\&\\ open\\ upload\\ folder\"]"
+      ],
+      "selectorConfidence": "medium",
+      "label": "Prepare & open upload folder",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688253478-hk033z"
+    },
+    {
+      "id": "click_buttonAriaLabelCopyPath",
+      "type": "click",
+      "order": 31,
+      "tabId": "pancakeRelease",
+      "selector": "button[aria-label=\"Copy\\ path\"]",
+      "fallbackSelectors": [
+        "tbody.divide-y\\ divide-zinc-100 > tr:nth-of-type(4) > td.px-3\\ py-2\\ font-mono\\ text-\\[11px\\]\\ text-zinc-500:nth-of-type(3) > span.inline-flex\\ item.-center\\ gap-1\\.5 > button.copy-path-btn\\ .hrink-0\\ rounded-md\\ border\\ border-zinc-200\\ bg-white\\ p-1\\ text-zinc-400\\ hover\\:bg-zinc-50\\ hover\\:text-zinc-700"
+      ],
+      "selectorConfidence": "medium",
+      "label": "button[aria-label=\"Copy\\ path\"]",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688356490-i9k4qc"
+    },
+    {
+      "id": "click_artwork",
+      "type": "click",
+      "order": 32,
+      "tabId": "distrokidUpload",
+      "selector": "#artwork",
+      "fallbackSelectors": [
+        "input[name=\"artwork\"]",
+        "div:nth-of-type(2) > div.artworkWrapped\\ margin-right-24:nth-of-type(1) > div.artworkInputBoxVi.ibleContainer\\ re:nth-of-type(1) > div.artworkInputBoxInvi.ible\\ re:nth-of-type(3) > input.large\\ di.troFileInput\\ re"
+      ],
+      "selectorConfidence": "high",
+      "label": "#artwork",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688265779-298frq"
+    },
+    {
+      "id": "click_albumTitleInput",
+      "type": "click",
+      "order": 33,
+      "tabId": "distrokidUpload",
+      "selector": "#albumTitleInput",
+      "fallbackSelectors": [
+        "input[name=\"albumtitle\"]",
+        "div.upload-mobile > div.upload-mobile-album-title:nth-of-type(23) > div > div.upload-mobile-album-title\\ alert-container > input.coolInput\\ cool-input-text\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "label": "#albumTitleInput",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688275113-zddza8"
+    },
+    {
+      "id": "click_jsTrackUpload1",
+      "type": "click",
+      "order": 34,
+      "tabId": "distrokidUpload",
+      "selector": "#js-track-upload-1",
+      "fallbackSelectors": [
+        "input[name=\"file\"]",
+        "div:nth-of-type(2) > form.uploadForm > div.audioFileInputBoxVi.ibleContainer:nth-of-type(1) > div.audioFileInputBoxInvi.ible:nth-of-type(2) > input.di.troFileInput\\ di"
+      ],
+      "selectorConfidence": "high",
+      "label": "#js-track-upload-1",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688295795-hnouzi"
+    },
+    {
+      "id": "click_title4eac64dbF891Ced8825f232d558966ec",
+      "type": "click",
+      "order": 35,
+      "tabId": "distrokidUpload",
+      "selector": "#title_4eac64db-f891-ced8-825f-232d558966ec",
+      "fallbackSelectors": [
+        "input[name=\"title_4eac64db-f891-ced8-825f-232d558966ec\"]",
+        "input[aria-label=\"Track\\ 1\\ title\"]",
+        "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(2) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_1\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "label": "#title_4eac64db-f891-ced8-825f-232d558966ec",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688303231-3ldaac"
+    },
+    {
+      "id": "click_inputNameSongwriterRealNameFirst1",
+      "type": "click",
+      "order": 36,
+      "tabId": "distrokidUpload",
+      "selector": "input[name=\"songwriter_real_name_first1\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"First\\ name\"]",
+        "div.ongwriter_row:nth-of-type(1) > div.margin-bottom-18\\ border-bottom-gray:nth-of-type(2) > div.ongwriter_full_name > div.mobileBreak\\ flex-input-new:nth-of-type(1) > input.coolInput\\ cool-input-text\\ .ongwriter_real_name_fir"
+      ],
+      "selectorConfidence": "medium",
+      "label": "input[name=\"songwriter_real_name_first1\"]",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688311853-4023fy"
+    },
+    {
+      "id": "click_inputNameSongwriterRealNameLast1",
+      "type": "click",
+      "order": 37,
+      "tabId": "distrokidUpload",
+      "selector": "input[name=\"songwriter_real_name_last1\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"Last\\ name\"]",
+        "div.ongwriter_row:nth-of-type(1) > div.margin-bottom-18\\ border-bottom-gray:nth-of-type(2) > div.ongwriter_full_name > div.mobileBreak\\ flex-input-new:nth-of-type(3) > input.coolInput\\ cool-input-text\\ .ongwriter_real_name_la"
+      ],
+      "selectorConfidence": "medium",
+      "label": "input[name=\"songwriter_real_name_last1\"]",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688314404-jlb8az"
+    },
+    {
+      "id": "click_doIt",
+      "type": "click",
+      "order": 38,
+      "tabId": "distrokidUpload",
+      "selector": "button[aria-label=\"Confirm\"]",
+      "fallbackSelectors": [
+        "body.wal2-.hown\\  > div.wal2-container\\ .wal2-center\\ :nth-of-type(12) > div.wal2-popup\\ .wal2-modal\\  > div.wal2-action:nth-of-type(3) > button.wal2-confirm\\ .wal2-:nth-of-type(2)"
+      ],
+      "selectorConfidence": "medium",
+      "label": "Do it",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688388696-3i6nhw"
+    },
+    {
+      "id": "click_ok",
+      "type": "click",
+      "order": 39,
+      "tabId": "distrokidUpload",
+      "selector": "body.wal2-.hown\\  > div.wal2-container\\ .wal2-center\\ :nth-of-type(12) > div.wal2-popup\\ .wal2-modal\\  > div.wal2-action:nth-of-type(3) > button.wal2-confirm\\ .wal2-:nth-of-type(1)",
+      "fallbackSelectors": [
+        "button[aria-label=\"OK\"]"
+      ],
+      "selectorConfidence": "medium",
+      "label": "OK",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688389239-0ns1t5"
+    },
+    {
+      "id": "click_1",
+      "type": "click",
+      "order": 40,
+      "tabId": "distrokidUpload",
+      "selector": "input[name=\"ai_gate_4eac64db-f891-ced8-825f-232d558966ec\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"\\31 \"]",
+        "div.ai-credit.\\-:nth-of-type(14) > label:nth-of-type(2) > div.flex-input\\ ai-credit.-gate-row > div.padding-right-6:nth-of-type(1) > input.di.troAiGate"
+      ],
+      "selectorConfidence": "medium",
+      "label": "1",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688321304-jnn8y9"
+    },
+    {
+      "id": "click_full",
+      "type": "click",
+      "order": 41,
+      "tabId": "distrokidUpload",
+      "selector": "div.ai-credit.-detail > label:nth-of-type(3) > div.flex-input\\ ai-credit.-item-row > div.padding-right-6:nth-of-type(1) > input.di.troAiRecordingScope",
+      "fallbackSelectors": [
+        "input[aria-label=\"full\"]"
+      ],
+      "selectorConfidence": "medium",
+      "label": "full",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688322393-9b50c1"
+    },
+    {
+      "id": "click_save",
+      "type": "click",
+      "order": 42,
+      "tabId": "distrokidUpload",
+      "selector": "body.wal2-.hown\\  > div.wal2-container\\ .wal2-center\\ :nth-of-type(12) > div.wal2-popup\\ .wal2-modal\\ ai-credit > div.wal2-action:nth-of-type(3) > button.wal2-confirm\\ ai-modal-btn\\ ai-modal-btn-.ave\\ :nth-of-type(2)",
+      "fallbackSelectors": [
+        "button[aria-label=\"Save\"]"
+      ],
+      "selectorConfidence": "medium",
+      "label": "Save",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688323666-5yyb6o"
+    },
+    {
+      "id": "click_jsTrackUpload2",
+      "type": "click",
+      "order": 43,
+      "tabId": "distrokidUpload",
+      "selector": "#js-track-upload-2",
+      "fallbackSelectors": [
+        "input[name=\"file\"]",
+        "div:nth-of-type(2) > form.uploadForm > div.audioFileInputBoxVi.ibleContainer:nth-of-type(1) > div.audioFileInputBoxInvi.ible:nth-of-type(2) > input.di.troFileInput\\ di"
+      ],
+      "selectorConfidence": "high",
+      "label": "#js-track-upload-2",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688332868-hf32wv"
+    },
+    {
+      "id": "click_title488d45ef37b184350f459f27c05fc33a",
+      "type": "click",
+      "order": 44,
+      "tabId": "distrokidUpload",
+      "selector": "#title_488d45ef-37b1-8435-0f45-9f27c05fc33a",
+      "fallbackSelectors": [
+        "input[name=\"title_488d45ef-37b1-8435-0f45-9f27c05fc33a\"]",
+        "input[aria-label=\"Track\\ 2\\ title\"]",
+        "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(3) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_2\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "label": "#title_488d45ef-37b1-8435-0f45-9f27c05fc33a",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688339401-0w7mhu"
+    },
+    {
+      "id": "click_jsTrackUpload3",
+      "type": "click",
+      "order": 45,
+      "tabId": "distrokidUpload",
+      "selector": "#js-track-upload-3",
+      "fallbackSelectors": [
+        "input[name=\"file\"]",
+        "div:nth-of-type(2) > form.uploadForm > div.audioFileInputBoxVi.ibleContainer:nth-of-type(1) > div.audioFileInputBoxInvi.ible:nth-of-type(2) > input.di.troFileInput\\ di"
+      ],
+      "selectorConfidence": "high",
+      "label": "#js-track-upload-3",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688358530-ae5m0w"
+    },
+    {
+      "id": "click_titleC34d2c4d2132D9b1Dd9cC4b5339c55e4",
+      "type": "click",
+      "order": 46,
+      "tabId": "distrokidUpload",
+      "selector": "#title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4",
+      "fallbackSelectors": [
+        "input[name=\"title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4\"]",
+        "input[aria-label=\"Track\\ 3\\ title\"]",
+        "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(4) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_3\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "label": "#title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688364600-bc9dg0"
+    },
+    {
+      "id": "click_inputAriaLabelSelectARole",
+      "type": "click",
+      "order": 47,
+      "tabId": "distrokidUpload",
+      "selector": "input[aria-label=\"Select\\ a\\ role\"]",
+      "fallbackSelectors": [
+        "[role=\"combobox\"]",
+        "div.requirement.-producer:nth-of-type(2) > div.requirement.-producer > div.alert-container:nth-of-type(1) > div.dk-.earchable-:nth-of-type(1) > input.dk-.earchable-"
+      ],
+      "selectorConfidence": "medium",
+      "label": "input[aria-label=\"Select\\ a\\ role\"]",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688382248-g3ym1a"
+    },
+    {
+      "id": "click_track1Performer1Name",
+      "type": "click",
+      "order": 48,
+      "tabId": "distrokidUpload",
+      "selector": "#track-1-performer-1-name",
+      "fallbackSelectors": [
+        "input[name=\"performer-name\"]",
+        "input[aria-label=\"Name\"]",
+        "div.requirement.-performer > div.alert-container:nth-of-type(1) > div.credit-name-row:nth-of-type(3) > div.credit-input-container > input.performer-name\\ no-emoji\\ no-url\\ coolInput\\ cool-input-text"
+      ],
+      "selectorConfidence": "high",
+      "label": "#track-1-performer-1-name",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688379952-ade1y8"
+    },
+    {
+      "id": "click_track1Producer1Name",
+      "type": "click",
+      "order": 49,
+      "tabId": "distrokidUpload",
+      "selector": "#track-1-producer-1-name",
+      "fallbackSelectors": [
+        "input[name=\"producer-name\"]",
+        "input[aria-label=\"Name\"]",
+        "div.requirement.-producer > div.alert-container:nth-of-type(1) > div.credit-name-row:nth-of-type(3) > div.credit-input-container > input.producer-name\\ no-emoji\\ no-url\\ coolInput\\ cool-input-text"
+      ],
+      "selectorConfidence": "high",
+      "label": "#track-1-producer-1-name",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688386029-fdxf98"
+    },
+    {
+      "id": "click_on",
+      "type": "click",
+      "order": 50,
+      "tabId": "distrokidUpload",
+      "selector": "#areyousuretandc",
+      "fallbackSelectors": [
+        "input[aria-label=\"I\\ have\\ read\\ and\\ agree\\ to\\ the\\ terms\\ of\\ the\\ DistroKid\\ Distribution\\ Agreement\"]",
+        "div.checkbox-grid-col.\\ margin-0:nth-of-type(8) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure"
+      ],
+      "selectorConfidence": "high",
+      "label": "on",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688396526-t997ji"
+    },
+    {
+      "id": "extract_distrokidReviewState",
+      "type": "extractText",
+      "order": 51,
+      "tabId": "distrokidUpload",
+      "selectorConfidence": "low",
+      "output": "distrokidReviewState",
+      "storesTo": "captured.distrokidReviewState",
+      "required": true
+    },
+    {
+      "id": "extract_distrokidReleaseUrl",
+      "type": "extractText",
+      "order": 52,
+      "tabId": "distrokidUpload",
+      "selectorConfidence": "low",
+      "output": "distrokidReleaseUrl",
+      "storesTo": "captured.distrokidReleaseUrl",
+      "required": false
+    }
+  ],
+  "steps": [
+    {
+      "id": "navigate_pancakeRelease",
+      "type": "navigate",
+      "order": 1,
+      "tabId": "pancakeRelease",
+      "url": "http://localhost:3737/releases/album/ALBUM_MPVNLDVI_JCEF",
+      "waitUntil": "domcontentloaded",
+      "retry": {
+        "attempts": 2,
+        "backoffMs": 500
+      }
+    },
+    {
+      "id": "navigate_distrokidUpload",
+      "type": "navigate",
+      "order": 2,
+      "tabId": "distrokidUpload",
+      "url": "https://distrokid.com/new/",
+      "waitUntil": "domcontentloaded",
+      "retry": {
+        "attempts": 2,
+        "backoffMs": 500
+      }
+    },
+    {
+      "id": "fill_howmanysongs",
+      "type": "select",
+      "order": 3,
+      "tabId": "distrokidUpload",
+      "selector": "#howManySongsOnThisAlbum",
+      "fallbackSelectors": [
+        "select[name=\"howmanysongs\"]",
+        "select[aria-label=\"\\31 \\ song\\ \\(a\\ single\\)\\a 2\\ songs\\a 3\\ songs\\a 4\\ songs\\a 5\\ songs\\a 6\\ songs\\a 7\\ songs\\a 8\\ songs\\a 9\\ songs\\a 10\\ songs\\a 11\\ songs\\a 12\\ songs\\a 13\\ songs\\a 14\\ songs\\a 15\\ songs\\a 16\\ songs\\a 17\\ songs\\a 18\\ songs\\a 19\\ songs\\a 20\\ songs\\a 21\\ songs\\a 22\\ songs\\a 23\\ songs\\a 24\\ songs\\a 25\\ songs\\a 26\\ songs\\a 27\\ so\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-number-of-.ong:nth-of-type(2) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect"
+      ],
+      "selectorConfidence": "high",
+      "binding": "howmanysongs",
+      "value": "{{inputs.howmanysongs}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688217121-1prkwo"
+    },
+    {
+      "id": "fill_releaseDate",
+      "type": "fill",
+      "order": 4,
+      "tabId": "distrokidUpload",
+      "selector": "#release-date-dp",
+      "fallbackSelectors": [
+        "input[name=\"releaseDate\"]",
+        "input[aria-label=\"\\32 026-06-07\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-relea.e-date\\ relea:nth-of-type(11) > div > input.coolInput\\ cool-input-date"
+      ],
+      "selectorConfidence": "high",
+      "binding": "releaseDate",
+      "value": "{{inputs.releaseDate}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688230310-i4w5i6"
+    },
+    {
+      "id": "fill_genre1",
+      "type": "select",
+      "order": 5,
+      "tabId": "distrokidUpload",
+      "selector": "#genrePrimary",
+      "fallbackSelectors": [
+        "select[name=\"genre1\"]",
+        "select[aria-label=\"Select\\ a\\ genre\\a Afrobeat\\a Afropop\\a Alternative\\a Big\\ Band\\a Blues\\a Children\\'s\\ Music\\a Christian\\/Gospel\\a Classical\\a Comedy\\a Contemporary\\ Latin\\a Country\\a Dance\\a Electronic\\a Fitness\\ \\&\\ Workout\\a Folk\\a French\\ Pop\\a German\\ Folk\\a German\\ Pop\\a Hip\\ Hop\\/Rap\\a Holiday\\a J-Pop\\a Jaz\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-primary-genre\\ dkRequiredForSpotify:nth-of-type(20) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect"
+      ],
+      "selectorConfidence": "high",
+      "binding": "genre1",
+      "value": "{{inputs.genre1}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688242411-id9fqd"
+    },
+    {
+      "id": "fill_albumtitle",
+      "type": "fill",
+      "order": 6,
+      "tabId": "distrokidUpload",
+      "selector": "#albumTitleInput",
+      "fallbackSelectors": [
+        "input[name=\"albumtitle\"]",
+        "input[aria-label=\"Soundhead\"]",
+        "div.upload-mobile > div.upload-mobile-album-title:nth-of-type(23) > div > div.upload-mobile-album-title\\ alert-container > input.coolInput\\ cool-input-text\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "binding": "albumtitle",
+      "value": "{{inputs.albumtitle}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688284012-z928r7"
+    },
+    {
+      "id": "fill_title4eac64dbF891Ced8825f232d558966ec",
+      "type": "fill",
+      "order": 7,
+      "tabId": "distrokidUpload",
+      "selector": "#title_4eac64db-f891-ced8-825f-232d558966ec",
+      "fallbackSelectors": [
+        "input[name=\"title_4eac64db-f891-ced8-825f-232d558966ec\"]",
+        "input[aria-label=\"Track\\ 1\\ title\"]",
+        "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(2) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_1\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "binding": "title4eac64dbF891Ced8825f232d558966ec",
+      "value": "{{inputs.title4eac64dbF891Ced8825f232d558966ec}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688311762-7xw1dn"
+    },
+    {
+      "id": "fill_songwriterRealNameFirst1",
+      "type": "fill",
+      "order": 8,
+      "tabId": "distrokidUpload",
+      "selector": "input[name=\"songwriter_real_name_first1\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"First\\ name\"]",
+        "div.ongwriter_row:nth-of-type(1) > div.margin-bottom-18\\ border-bottom-gray:nth-of-type(2) > div.ongwriter_full_name > div.mobileBreak\\ flex-input-new:nth-of-type(1) > input.coolInput\\ cool-input-text\\ .ongwriter_real_name_fir"
+      ],
+      "selectorConfidence": "medium",
+      "binding": "songwriterRealNameFirst1",
+      "value": "{{inputs.songwriterRealNameFirst1}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688314329-lsnvxy"
+    },
+    {
+      "id": "fill_songwriterRealNameLast1",
+      "type": "fill",
+      "order": 9,
+      "tabId": "distrokidUpload",
+      "selector": "input[name=\"songwriter_real_name_last1\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"Last\\ name\"]",
+        "div.ongwriter_row:nth-of-type(1) > div.margin-bottom-18\\ border-bottom-gray:nth-of-type(2) > div.ongwriter_full_name > div.mobileBreak\\ flex-input-new:nth-of-type(3) > input.coolInput\\ cool-input-text\\ .ongwriter_real_name_la"
+      ],
+      "selectorConfidence": "medium",
+      "binding": "songwriterRealNameLast1",
+      "value": "{{inputs.songwriterRealNameLast1}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688316538-na1ozr"
+    },
+    {
+      "id": "fill_aiGate4eac64dbF891Ced8825f232d558966ec",
+      "type": "fill",
+      "order": 10,
+      "tabId": "distrokidUpload",
+      "selector": "input[name=\"ai_gate_4eac64db-f891-ced8-825f-232d558966ec\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"\\31 \"]",
+        "div.ai-credit.\\-:nth-of-type(14) > label:nth-of-type(2) > div.flex-input\\ ai-credit.-gate-row > div.padding-right-6:nth-of-type(1) > input.di.troAiGate"
+      ],
+      "selectorConfidence": "medium",
+      "binding": "aiGate4eac64dbF891Ced8825f232d558966ec",
+      "value": "{{inputs.aiGate4eac64dbF891Ced8825f232d558966ec}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688321306-og7mf6"
+    },
+    {
+      "id": "fill_divAiCreditDetailLabelNthOfType3DivFlexInputAiCreditItemRowDivPaddingRight6NthOfType1InputDiTroAiRecordingScope",
+      "type": "fill",
+      "order": 11,
+      "tabId": "distrokidUpload",
+      "selector": "div.ai-credit.-detail > label:nth-of-type(3) > div.flex-input\\ ai-credit.-item-row > div.padding-right-6:nth-of-type(1) > input.di.troAiRecordingScope",
+      "fallbackSelectors": [
+        "input[aria-label=\"full\"]"
+      ],
+      "selectorConfidence": "medium",
+      "binding": "divAiCreditDetailLabelNthOfType3DivFlexInputAiCreditItemRowDivPaddingRight6NthOfType1InputDiTroAiRecordingScope",
+      "value": "{{inputs.divAiCreditDetailLabelNthOfType3DivFlexInputAiCreditItemRowDivPaddingRight6NthOfType1InputDiTroAiRecordingScope}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688322395-jpzx05"
+    },
+    {
+      "id": "fill_title488d45ef37b184350f459f27c05fc33a",
+      "type": "fill",
+      "order": 12,
+      "tabId": "distrokidUpload",
+      "selector": "#title_488d45ef-37b1-8435-0f45-9f27c05fc33a",
+      "fallbackSelectors": [
+        "input[name=\"title_488d45ef-37b1-8435-0f45-9f27c05fc33a\"]",
+        "input[aria-label=\"Track\\ 2\\ title\"]",
+        "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(3) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_2\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "binding": "title488d45ef37b184350f459f27c05fc33a",
+      "value": "{{inputs.title488d45ef37b184350f459f27c05fc33a}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688358454-c4fu2d"
+    },
+    {
+      "id": "fill_titleC34d2c4d2132D9b1Dd9cC4b5339c55e4",
+      "type": "fill",
+      "order": 13,
+      "tabId": "distrokidUpload",
+      "selector": "#title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4",
+      "fallbackSelectors": [
+        "input[name=\"title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4\"]",
+        "input[aria-label=\"Track\\ 3\\ title\"]",
+        "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(4) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_3\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "binding": "titleC34d2c4d2132D9b1Dd9cC4b5339c55e4",
+      "value": "{{inputs.titleC34d2c4d2132D9b1Dd9cC4b5339c55e4}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688373848-0pgtyw"
+    },
+    {
+      "id": "fill_track1Performer1Role",
+      "type": "select",
+      "order": 14,
+      "tabId": "distrokidUpload",
+      "selector": "#track-1-performer-1-role",
+      "fallbackSelectors": [
+        "select[aria-label=\"Select\\ a\\ role\\a Audio\\a Background\\ vocals\\a Banjo\\a Bass\\a Bass\\ drum\\ \\(concert\\)\\a Bass\\ drum\\ \\(kick\\)\\a Bass\\ guitar\\ \\(all\\ types\\)\\a Bass\\ guitar\\ \\(electric\\)\\a Basset\\ horn\\a Bassoon\\a Bell\\ tree\\a Bongos\\a Brass\\ instrument\\a Cello\\a Clarinet\\a Claves\\a Clavinet\\a Congas\\a Contrabass\\a Cowb\"]",
+        "div.requirement.-performer-:nth-of-type(1) > div.requirement.-performer:nth-of-type(2) > div.requirement.-performer > div.alert-container:nth-of-type(1) > select.performer-role\\ coolInput\\ coolInputSmall\\ dk-.earchable-"
+      ],
+      "selectorConfidence": "high",
+      "binding": "track1Performer1Role",
+      "value": "{{inputs.track1Performer1Role}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688379240-0wgamb"
+    },
+    {
+      "id": "fill_performerName",
+      "type": "fill",
+      "order": 15,
+      "tabId": "distrokidUpload",
+      "selector": "#track-1-performer-1-name",
+      "fallbackSelectors": [
+        "input[name=\"performer-name\"]",
+        "input[aria-label=\"Name\"]",
+        "div.requirement.-performer > div.alert-container:nth-of-type(1) > div.credit-name-row:nth-of-type(3) > div.credit-input-container > input.performer-name\\ no-emoji\\ no-url\\ coolInput\\ cool-input-text"
+      ],
+      "selectorConfidence": "high",
+      "binding": "performerName",
+      "value": "{{inputs.performerName}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688381429-0w595u"
+    },
+    {
+      "id": "fill_track1Producer1Role",
+      "type": "select",
+      "order": 16,
+      "tabId": "distrokidUpload",
+      "selector": "#track-1-producer-1-role",
+      "fallbackSelectors": [
+        "select[aria-label=\"Select\\ a\\ role\\a Additional\\ engineer\\a Artist\\ background\\ vocal\\ engineer\\a Artist\\ vocal\\ second\\ engineer\\a Assistant\\ producer\\a Beat\\ maker\\a Co-executive\\ producer\\a Co-producer\\a Digital\\ audio\\ workstation\\ engineer\\a Digital\\ editing\\ engineer\\a Digital\\ editing\\ seco\"]",
+        "div.requirement.-producer-:nth-of-type(2) > div.requirement.-producer:nth-of-type(2) > div.requirement.-producer > div.alert-container:nth-of-type(1) > select.producer-role\\ coolInput\\ coolInputSmall\\ dk-.earchable-"
+      ],
+      "selectorConfidence": "high",
+      "binding": "track1Producer1Role",
+      "value": "{{inputs.track1Producer1Role}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688385281-2ydd5h"
+    },
+    {
+      "id": "fill_producerName",
+      "type": "fill",
+      "order": 17,
+      "tabId": "distrokidUpload",
+      "selector": "#track-1-producer-1-name",
+      "fallbackSelectors": [
+        "input[name=\"producer-name\"]",
+        "input[aria-label=\"Name\"]",
+        "div.requirement.-producer > div.alert-container:nth-of-type(1) > div.credit-name-row:nth-of-type(3) > div.credit-input-container > input.producer-name\\ no-emoji\\ no-url\\ coolInput\\ cool-input-text"
+      ],
+      "selectorConfidence": "high",
+      "binding": "producerName",
+      "value": "{{inputs.producerName}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688386967-o6f64z"
+    },
+    {
+      "id": "fill_areyousureyoutube",
+      "type": "fill",
+      "order": 18,
+      "tabId": "distrokidUpload",
+      "selector": "#areyousureyoutube",
+      "fallbackSelectors": [
+        "input[aria-label=\"I\\ selected\\ \\\"YouTube\\ Music\\\"\\.\\ So\\ I\\ won\\'t\\ email\\ DistroKid\\ later\\ asking\\,\\ \\\"why\\'d\\ you\\ upload\\ my\\ music\\ to\\ YouTube\\?\\!\\\"\\ \\.\\.\\.mkay\\?\"]",
+        "div.checkbox-grid-col.\\ margin-0:nth-of-type(1) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure"
+      ],
+      "selectorConfidence": "high",
+      "binding": "areyousureyoutube",
+      "value": "{{inputs.areyousureyoutube}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688393299-g9oles"
+    },
+    {
+      "id": "fill_areyousurepromoservices",
+      "type": "fill",
+      "order": 19,
+      "tabId": "distrokidUpload",
+      "selector": "#areyousurepromoservices",
+      "fallbackSelectors": [
+        "input[aria-label=\"I\\ won\\'t\\ use\\ \\\"promo\\ services\\\"\\ that\\ guarantee\\ streams\\ or\\ playlisting—even\\ if\\ they\\ claim\\ \\\"organic\\ and\\ real\\\"\\ streams\\.\\ These\\ services\\ typically\\ use\\ fake\\ stream-bots\\ easily\\ detectable\\ by\\ streaming\\ services\\.\\ Read\\ this\\ message\\ from\\ Spotify\\ to\\ learn\"]",
+        "div.checkbox-grid-col.\\ margin-0:nth-of-type(3) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure"
+      ],
+      "selectorConfidence": "high",
+      "binding": "areyousurepromoservices",
+      "value": "{{inputs.areyousurepromoservices}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688394084-za824l"
+    },
+    {
+      "id": "fill_areyousurerecorded",
+      "type": "fill",
+      "order": 20,
+      "tabId": "distrokidUpload",
+      "selector": "#areyousurerecorded",
+      "fallbackSelectors": [
+        "input[aria-label=\"I\\ recorded\\ this\\ music\\,\\ and\\ am\\ authorized\\ to\\ sell\\ it\\ in\\ stores\\ worldwide\\ \\&\\ collect\\ all\\ royalties\\.\"]",
+        "div.checkbox-grid-col.\\ margin-0:nth-of-type(6) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure"
+      ],
+      "selectorConfidence": "high",
+      "binding": "areyousurerecorded",
+      "value": "{{inputs.areyousurerecorded}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688394986-5hnlca"
+    },
+    {
+      "id": "fill_areyousureotherartist",
+      "type": "fill",
+      "order": 21,
+      "tabId": "distrokidUpload",
+      "selector": "#areyousureotherartist",
+      "fallbackSelectors": [
+        "input[aria-label=\"I\\'m\\ not\\ using\\ any\\ other\\ artist\\'s\\ name\\ in\\ my\\ name\\,\\ song\\ titles\\,\\ or\\ album\\ title\\,\\ without\\ their\\ approval\\.\"]",
+        "div.checkbox-grid-col.\\ margin-0:nth-of-type(7) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure"
+      ],
+      "selectorConfidence": "high",
+      "binding": "areyousureotherartist",
+      "value": "{{inputs.areyousureotherartist}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688395760-i4j7hp"
+    },
+    {
+      "id": "fill_areyousuretandc",
+      "type": "fill",
+      "order": 22,
+      "tabId": "distrokidUpload",
+      "selector": "#areyousuretandc",
+      "fallbackSelectors": [
+        "input[aria-label=\"I\\ have\\ read\\ and\\ agree\\ to\\ the\\ terms\\ of\\ the\\ DistroKid\\ Distribution\\ Agreement\"]",
+        "div.checkbox-grid-col.\\ margin-0:nth-of-type(8) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure"
+      ],
+      "selectorConfidence": "high",
+      "binding": "areyousuretandc",
+      "value": "{{inputs.areyousuretandc}}",
+      "required": true,
+      "sourceEventId": "field_detected-1780688396530-lklny1"
+    },
+    {
+      "id": "upload_artwork",
+      "type": "uploadFile",
+      "order": 23,
+      "tabId": "distrokidUpload",
+      "selector": "#artwork",
+      "fallbackSelectors": [
+        "input[name=\"artwork\"]",
+        "input[aria-label=\"C\\:\\\\fakepath\\\\default-image\\.png\"]",
+        "div:nth-of-type(2) > div.artworkWrapped\\ margin-right-24:nth-of-type(1) > div.artworkInputBoxVi.ibleContainer\\ re:nth-of-type(1) > div.artworkInputBoxInvi.ible\\ re:nth-of-type(3) > input.large\\ di.troFileInput\\ re"
+      ],
+      "selectorConfidence": "high",
+      "binding": "artwork",
+      "file": "{{files.artwork}}",
+      "required": true,
+      "sourceEventId": "file_selected-1780688271912-n6pqc5"
+    },
+    {
+      "id": "upload_file",
+      "type": "uploadFile",
+      "order": 24,
+      "tabId": "distrokidUpload",
+      "selector": "#js-track-upload-3",
+      "fallbackSelectors": [
+        "input[name=\"file\"]",
+        "input[aria-label=\"C\\:\\\\fakepath\\\\still-here-still-dark\\.mp3\"]",
+        "div:nth-of-type(2) > form.uploadForm > div.audioFileInputBoxVi.ibleContainer:nth-of-type(1) > div.audioFileInputBoxInvi.ible:nth-of-type(2) > input.di.troFileInput\\ di"
+      ],
+      "selectorConfidence": "high",
+      "binding": "file",
+      "file": "{{files.file}}",
+      "required": true,
+      "sourceEventId": "file_selected-1780688361592-q26xzi"
+    },
+    {
+      "id": "click_20260607",
+      "type": "click",
+      "order": 25,
+      "tabId": "pancakeRelease",
+      "selector": "input[name=\"release_date\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"\\32 026-06-07\"]",
+        "div.flex\\ item.\\-:nth-of-type(1) > div:nth-of-type(2) > form.mt-4\\ flex\\ flex-col\\ gap-2\\ .m\\:flex-row\\  > label.text-.m\\ font- > input.mt-1\\ w-full\\ rounded-xl\\ border\\ border-zinc-200\\ px-3\\ py-2\\ text-.m\\ text-zinc-900"
+      ],
+      "selectorConfidence": "medium",
+      "label": "2026-06-07",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688226674-8c6ud2"
+    },
+    {
+      "id": "click_1SongASingle2Songs3Songs4Songs5Songs6Songs7Songs8Songs9Songs10Songs11Songs12Songs13Songs14Songs15Songs16Songs17Songs18Songs19Songs20Songs21Songs22Songs23Songs24Songs25Songs26Songs27So",
+      "type": "click",
+      "order": 26,
+      "tabId": "distrokidUpload",
+      "selector": "#howManySongsOnThisAlbum",
+      "fallbackSelectors": [
+        "select[name=\"howmanysongs\"]",
+        "select[aria-label=\"\\31 \\ song\\ \\(a\\ single\\)\\a 2\\ songs\\a 3\\ songs\\a 4\\ songs\\a 5\\ songs\\a 6\\ songs\\a 7\\ songs\\a 8\\ songs\\a 9\\ songs\\a 10\\ songs\\a 11\\ songs\\a 12\\ songs\\a 13\\ songs\\a 14\\ songs\\a 15\\ songs\\a 16\\ songs\\a 17\\ songs\\a 18\\ songs\\a 19\\ songs\\a 20\\ songs\\a 21\\ songs\\a 22\\ songs\\a 23\\ songs\\a 24\\ songs\\a 25\\ songs\\a 26\\ songs\\a 27\\ so\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-number-of-.ong:nth-of-type(2) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect"
+      ],
+      "selectorConfidence": "high",
+      "label": "1 song (a single)\n2 songs\n3 songs\n4 songs\n5 songs\n6 songs\n7 songs\n8 songs\n9 songs\n10 songs\n11 songs\n12 songs\n13 songs\n14 songs\n15 songs\n16 songs\n17 songs\n18 songs\n19 songs\n20 songs\n21 songs\n22 songs\n23 songs\n24 songs\n25 songs\n26 songs\n27 so",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688217194-jb0ngr"
+    },
+    {
+      "id": "approve_releaseDateDpApproval",
+      "type": "approve",
+      "order": 27,
+      "checkpointId": "releaseDateDpApproval",
+      "beforeAction": "releaseDateDp",
+      "reason": "manual-only"
+    },
+    {
+      "id": "click_releaseDateDp",
+      "type": "click",
+      "order": 28,
+      "tabId": "distrokidUpload",
+      "selector": "#release-date-dp",
+      "fallbackSelectors": [
+        "input[name=\"releaseDate\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-relea.e-date\\ relea:nth-of-type(11) > div > input.coolInput\\ cool-input-date"
+      ],
+      "selectorConfidence": "high",
+      "label": "#release-date-dp",
+      "requiresApproval": true,
+      "safetyCategory": "manual-only",
+      "sourceEventId": "action_detected-1780688228954-7ck49r"
+    },
+    {
+      "id": "click_selectAGenreAfrobeatAfropopAlternativeBigBandBluesChildrenSMusicChristianGospelClassicalComedyContemporaryLatinCountryDanceElectronicFitnessWorkoutFolkFrenchPopGermanFolkGermanPopHipHopRapHolidayJPopJaz",
+      "type": "click",
+      "order": 29,
+      "tabId": "distrokidUpload",
+      "selector": "#genrePrimary",
+      "fallbackSelectors": [
+        "select[name=\"genre1\"]",
+        "select[aria-label=\"Select\\ a\\ genre\\a Afrobeat\\a Afropop\\a Alternative\\a Big\\ Band\\a Blues\\a Children\\'s\\ Music\\a Christian\\/Gospel\\a Classical\\a Comedy\\a Contemporary\\ Latin\\a Country\\a Dance\\a Electronic\\a Fitness\\ \\&\\ Workout\\a Folk\\a French\\ Pop\\a German\\ Folk\\a German\\ Pop\\a Hip\\ Hop\\/Rap\\a Holiday\\a J-Pop\\a Jaz\"]",
+        "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-primary-genre\\ dkRequiredForSpotify:nth-of-type(20) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect"
+      ],
+      "selectorConfidence": "high",
+      "label": "Select a genre\nAfrobeat\nAfropop\nAlternative\nBig Band\nBlues\nChildren's Music\nChristian/Gospel\nClassical\nComedy\nContemporary Latin\nCountry\nDance\nElectronic\nFitness & Workout\nFolk\nFrench Pop\nGerman Folk\nGerman Pop\nHip Hop/Rap\nHoliday\nJ-Pop\nJaz",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688242429-bsnw7q"
+    },
+    {
+      "id": "click_prepareOpenUploadFolder",
+      "type": "click",
+      "order": 30,
+      "tabId": "pancakeRelease",
+      "selector": "div:nth-of-type(2) > div.mt-3\\ rounded-2xl\\ border\\ border-zinc-200\\ bg-white\\ p-4:nth-of-type(5) > div.flex\\ flex-wrap\\ item.-center\\ ju:nth-of-type(1) > form > button.rounded-xl\\ border\\ border-.ky-300\\ bg-",
+      "fallbackSelectors": [
+        "button[aria-label=\"Prepare\\ \\&\\ open\\ upload\\ folder\"]"
+      ],
+      "selectorConfidence": "medium",
+      "label": "Prepare & open upload folder",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688253478-hk033z"
+    },
+    {
+      "id": "click_buttonAriaLabelCopyPath",
+      "type": "click",
+      "order": 31,
+      "tabId": "pancakeRelease",
+      "selector": "button[aria-label=\"Copy\\ path\"]",
+      "fallbackSelectors": [
+        "tbody.divide-y\\ divide-zinc-100 > tr:nth-of-type(4) > td.px-3\\ py-2\\ font-mono\\ text-\\[11px\\]\\ text-zinc-500:nth-of-type(3) > span.inline-flex\\ item.-center\\ gap-1\\.5 > button.copy-path-btn\\ .hrink-0\\ rounded-md\\ border\\ border-zinc-200\\ bg-white\\ p-1\\ text-zinc-400\\ hover\\:bg-zinc-50\\ hover\\:text-zinc-700"
+      ],
+      "selectorConfidence": "medium",
+      "label": "button[aria-label=\"Copy\\ path\"]",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688356490-i9k4qc"
+    },
+    {
+      "id": "click_artwork",
+      "type": "click",
+      "order": 32,
+      "tabId": "distrokidUpload",
+      "selector": "#artwork",
+      "fallbackSelectors": [
+        "input[name=\"artwork\"]",
+        "div:nth-of-type(2) > div.artworkWrapped\\ margin-right-24:nth-of-type(1) > div.artworkInputBoxVi.ibleContainer\\ re:nth-of-type(1) > div.artworkInputBoxInvi.ible\\ re:nth-of-type(3) > input.large\\ di.troFileInput\\ re"
+      ],
+      "selectorConfidence": "high",
+      "label": "#artwork",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688265779-298frq"
+    },
+    {
+      "id": "click_albumTitleInput",
+      "type": "click",
+      "order": 33,
+      "tabId": "distrokidUpload",
+      "selector": "#albumTitleInput",
+      "fallbackSelectors": [
+        "input[name=\"albumtitle\"]",
+        "div.upload-mobile > div.upload-mobile-album-title:nth-of-type(23) > div > div.upload-mobile-album-title\\ alert-container > input.coolInput\\ cool-input-text\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "label": "#albumTitleInput",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688275113-zddza8"
+    },
+    {
+      "id": "click_jsTrackUpload1",
+      "type": "click",
+      "order": 34,
+      "tabId": "distrokidUpload",
+      "selector": "#js-track-upload-1",
+      "fallbackSelectors": [
+        "input[name=\"file\"]",
+        "div:nth-of-type(2) > form.uploadForm > div.audioFileInputBoxVi.ibleContainer:nth-of-type(1) > div.audioFileInputBoxInvi.ible:nth-of-type(2) > input.di.troFileInput\\ di"
+      ],
+      "selectorConfidence": "high",
+      "label": "#js-track-upload-1",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688295795-hnouzi"
+    },
+    {
+      "id": "click_title4eac64dbF891Ced8825f232d558966ec",
+      "type": "click",
+      "order": 35,
+      "tabId": "distrokidUpload",
+      "selector": "#title_4eac64db-f891-ced8-825f-232d558966ec",
+      "fallbackSelectors": [
+        "input[name=\"title_4eac64db-f891-ced8-825f-232d558966ec\"]",
+        "input[aria-label=\"Track\\ 1\\ title\"]",
+        "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(2) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_1\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "label": "#title_4eac64db-f891-ced8-825f-232d558966ec",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688303231-3ldaac"
+    },
+    {
+      "id": "click_inputNameSongwriterRealNameFirst1",
+      "type": "click",
+      "order": 36,
+      "tabId": "distrokidUpload",
+      "selector": "input[name=\"songwriter_real_name_first1\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"First\\ name\"]",
+        "div.ongwriter_row:nth-of-type(1) > div.margin-bottom-18\\ border-bottom-gray:nth-of-type(2) > div.ongwriter_full_name > div.mobileBreak\\ flex-input-new:nth-of-type(1) > input.coolInput\\ cool-input-text\\ .ongwriter_real_name_fir"
+      ],
+      "selectorConfidence": "medium",
+      "label": "input[name=\"songwriter_real_name_first1\"]",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688311853-4023fy"
+    },
+    {
+      "id": "click_inputNameSongwriterRealNameLast1",
+      "type": "click",
+      "order": 37,
+      "tabId": "distrokidUpload",
+      "selector": "input[name=\"songwriter_real_name_last1\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"Last\\ name\"]",
+        "div.ongwriter_row:nth-of-type(1) > div.margin-bottom-18\\ border-bottom-gray:nth-of-type(2) > div.ongwriter_full_name > div.mobileBreak\\ flex-input-new:nth-of-type(3) > input.coolInput\\ cool-input-text\\ .ongwriter_real_name_la"
+      ],
+      "selectorConfidence": "medium",
+      "label": "input[name=\"songwriter_real_name_last1\"]",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688314404-jlb8az"
+    },
+    {
+      "id": "click_doIt",
+      "type": "click",
+      "order": 38,
+      "tabId": "distrokidUpload",
+      "selector": "button[aria-label=\"Confirm\"]",
+      "fallbackSelectors": [
+        "body.wal2-.hown\\  > div.wal2-container\\ .wal2-center\\ :nth-of-type(12) > div.wal2-popup\\ .wal2-modal\\  > div.wal2-action:nth-of-type(3) > button.wal2-confirm\\ .wal2-:nth-of-type(2)"
+      ],
+      "selectorConfidence": "medium",
+      "label": "Do it",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688388696-3i6nhw"
+    },
+    {
+      "id": "click_ok",
+      "type": "click",
+      "order": 39,
+      "tabId": "distrokidUpload",
+      "selector": "body.wal2-.hown\\  > div.wal2-container\\ .wal2-center\\ :nth-of-type(12) > div.wal2-popup\\ .wal2-modal\\  > div.wal2-action:nth-of-type(3) > button.wal2-confirm\\ .wal2-:nth-of-type(1)",
+      "fallbackSelectors": [
+        "button[aria-label=\"OK\"]"
+      ],
+      "selectorConfidence": "medium",
+      "label": "OK",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688389239-0ns1t5"
+    },
+    {
+      "id": "click_1",
+      "type": "click",
+      "order": 40,
+      "tabId": "distrokidUpload",
+      "selector": "input[name=\"ai_gate_4eac64db-f891-ced8-825f-232d558966ec\"]",
+      "fallbackSelectors": [
+        "input[aria-label=\"\\31 \"]",
+        "div.ai-credit.\\-:nth-of-type(14) > label:nth-of-type(2) > div.flex-input\\ ai-credit.-gate-row > div.padding-right-6:nth-of-type(1) > input.di.troAiGate"
+      ],
+      "selectorConfidence": "medium",
+      "label": "1",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688321304-jnn8y9"
+    },
+    {
+      "id": "click_full",
+      "type": "click",
+      "order": 41,
+      "tabId": "distrokidUpload",
+      "selector": "div.ai-credit.-detail > label:nth-of-type(3) > div.flex-input\\ ai-credit.-item-row > div.padding-right-6:nth-of-type(1) > input.di.troAiRecordingScope",
+      "fallbackSelectors": [
+        "input[aria-label=\"full\"]"
+      ],
+      "selectorConfidence": "medium",
+      "label": "full",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688322393-9b50c1"
+    },
+    {
+      "id": "click_save",
+      "type": "click",
+      "order": 42,
+      "tabId": "distrokidUpload",
+      "selector": "body.wal2-.hown\\  > div.wal2-container\\ .wal2-center\\ :nth-of-type(12) > div.wal2-popup\\ .wal2-modal\\ ai-credit > div.wal2-action:nth-of-type(3) > button.wal2-confirm\\ ai-modal-btn\\ ai-modal-btn-.ave\\ :nth-of-type(2)",
+      "fallbackSelectors": [
+        "button[aria-label=\"Save\"]"
+      ],
+      "selectorConfidence": "medium",
+      "label": "Save",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688323666-5yyb6o"
+    },
+    {
+      "id": "click_jsTrackUpload2",
+      "type": "click",
+      "order": 43,
+      "tabId": "distrokidUpload",
+      "selector": "#js-track-upload-2",
+      "fallbackSelectors": [
+        "input[name=\"file\"]",
+        "div:nth-of-type(2) > form.uploadForm > div.audioFileInputBoxVi.ibleContainer:nth-of-type(1) > div.audioFileInputBoxInvi.ible:nth-of-type(2) > input.di.troFileInput\\ di"
+      ],
+      "selectorConfidence": "high",
+      "label": "#js-track-upload-2",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688332868-hf32wv"
+    },
+    {
+      "id": "click_title488d45ef37b184350f459f27c05fc33a",
+      "type": "click",
+      "order": 44,
+      "tabId": "distrokidUpload",
+      "selector": "#title_488d45ef-37b1-8435-0f45-9f27c05fc33a",
+      "fallbackSelectors": [
+        "input[name=\"title_488d45ef-37b1-8435-0f45-9f27c05fc33a\"]",
+        "input[aria-label=\"Track\\ 2\\ title\"]",
+        "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(3) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_2\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "label": "#title_488d45ef-37b1-8435-0f45-9f27c05fc33a",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688339401-0w7mhu"
+    },
+    {
+      "id": "click_jsTrackUpload3",
+      "type": "click",
+      "order": 45,
+      "tabId": "distrokidUpload",
+      "selector": "#js-track-upload-3",
+      "fallbackSelectors": [
+        "input[name=\"file\"]",
+        "div:nth-of-type(2) > form.uploadForm > div.audioFileInputBoxVi.ibleContainer:nth-of-type(1) > div.audioFileInputBoxInvi.ible:nth-of-type(2) > input.di.troFileInput\\ di"
+      ],
+      "selectorConfidence": "high",
+      "label": "#js-track-upload-3",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688358530-ae5m0w"
+    },
+    {
+      "id": "click_titleC34d2c4d2132D9b1Dd9cC4b5339c55e4",
+      "type": "click",
+      "order": 46,
+      "tabId": "distrokidUpload",
+      "selector": "#title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4",
+      "fallbackSelectors": [
+        "input[name=\"title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4\"]",
+        "input[aria-label=\"Track\\ 3\\ title\"]",
+        "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(4) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_3\\ no-emoji"
+      ],
+      "selectorConfidence": "high",
+      "label": "#title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688364600-bc9dg0"
+    },
+    {
+      "id": "click_inputAriaLabelSelectARole",
+      "type": "click",
+      "order": 47,
+      "tabId": "distrokidUpload",
+      "selector": "input[aria-label=\"Select\\ a\\ role\"]",
+      "fallbackSelectors": [
+        "[role=\"combobox\"]",
+        "div.requirement.-producer:nth-of-type(2) > div.requirement.-producer > div.alert-container:nth-of-type(1) > div.dk-.earchable-:nth-of-type(1) > input.dk-.earchable-"
+      ],
+      "selectorConfidence": "medium",
+      "label": "input[aria-label=\"Select\\ a\\ role\"]",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688382248-g3ym1a"
+    },
+    {
+      "id": "click_track1Performer1Name",
+      "type": "click",
+      "order": 48,
+      "tabId": "distrokidUpload",
+      "selector": "#track-1-performer-1-name",
+      "fallbackSelectors": [
+        "input[name=\"performer-name\"]",
+        "input[aria-label=\"Name\"]",
+        "div.requirement.-performer > div.alert-container:nth-of-type(1) > div.credit-name-row:nth-of-type(3) > div.credit-input-container > input.performer-name\\ no-emoji\\ no-url\\ coolInput\\ cool-input-text"
+      ],
+      "selectorConfidence": "high",
+      "label": "#track-1-performer-1-name",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688379952-ade1y8"
+    },
+    {
+      "id": "click_track1Producer1Name",
+      "type": "click",
+      "order": 49,
+      "tabId": "distrokidUpload",
+      "selector": "#track-1-producer-1-name",
+      "fallbackSelectors": [
+        "input[name=\"producer-name\"]",
+        "input[aria-label=\"Name\"]",
+        "div.requirement.-producer > div.alert-container:nth-of-type(1) > div.credit-name-row:nth-of-type(3) > div.credit-input-container > input.producer-name\\ no-emoji\\ no-url\\ coolInput\\ cool-input-text"
+      ],
+      "selectorConfidence": "high",
+      "label": "#track-1-producer-1-name",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688386029-fdxf98"
+    },
+    {
+      "id": "click_on",
+      "type": "click",
+      "order": 50,
+      "tabId": "distrokidUpload",
+      "selector": "#areyousuretandc",
+      "fallbackSelectors": [
+        "input[aria-label=\"I\\ have\\ read\\ and\\ agree\\ to\\ the\\ terms\\ of\\ the\\ DistroKid\\ Distribution\\ Agreement\"]",
+        "div.checkbox-grid-col.\\ margin-0:nth-of-type(8) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure"
+      ],
+      "selectorConfidence": "high",
+      "label": "on",
+      "requiresApproval": false,
+      "sourceEventId": "action_detected-1780688396526-t997ji"
+    },
+    {
+      "id": "extract_distrokidReviewState",
+      "type": "extractText",
+      "order": 51,
+      "tabId": "distrokidUpload",
+      "selectorConfidence": "low",
+      "output": "distrokidReviewState",
+      "storesTo": "captured.distrokidReviewState",
+      "required": true
+    },
+    {
+      "id": "extract_distrokidReleaseUrl",
+      "type": "extractText",
+      "order": 52,
+      "tabId": "distrokidUpload",
+      "selectorConfidence": "low",
+      "output": "distrokidReleaseUrl",
+      "storesTo": "captured.distrokidReleaseUrl",
+      "required": false
+    }
+  ],
+  "bindings": {
+    "variables": {
+      "howmanysongs": {
+        "source": "payload.howmanysongs",
+        "selector": "#howManySongsOnThisAlbum",
+        "selectorCandidates": [
+          {
+            "selector": "#howManySongsOnThisAlbum",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "select[name=\"howmanysongs\"]",
+            "kind": "name",
+            "confidence": "high",
+            "score": 90
+          },
+          {
+            "selector": "select[aria-label=\"\\31 \\ song\\ \\(a\\ single\\)\\a 2\\ songs\\a 3\\ songs\\a 4\\ songs\\a 5\\ songs\\a 6\\ songs\\a 7\\ songs\\a 8\\ songs\\a 9\\ songs\\a 10\\ songs\\a 11\\ songs\\a 12\\ songs\\a 13\\ songs\\a 14\\ songs\\a 15\\ songs\\a 16\\ songs\\a 17\\ songs\\a 18\\ songs\\a 19\\ songs\\a 20\\ songs\\a 21\\ songs\\a 22\\ songs\\a 23\\ songs\\a 24\\ songs\\a 25\\ songs\\a 26\\ songs\\a 27\\ so\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-number-of-.ong:nth-of-type(2) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "releaseDate": {
+        "source": "payload.releaseDate",
+        "selector": "#release-date-dp",
+        "selectorCandidates": [
+          {
+            "selector": "#release-date-dp",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "input[name=\"releaseDate\"]",
+            "kind": "name",
+            "confidence": "high",
+            "score": 90
+          },
+          {
+            "selector": "input[aria-label=\"\\32 026-06-07\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-relea.e-date\\ relea:nth-of-type(11) > div > input.coolInput\\ cool-input-date",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "genre1": {
+        "source": "payload.genre1",
+        "selector": "#genrePrimary",
+        "selectorCandidates": [
+          {
+            "selector": "#genrePrimary",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "select[name=\"genre1\"]",
+            "kind": "name",
+            "confidence": "high",
+            "score": 90
+          },
+          {
+            "selector": "select[aria-label=\"Select\\ a\\ genre\\a Afrobeat\\a Afropop\\a Alternative\\a Big\\ Band\\a Blues\\a Children\\'s\\ Music\\a Christian\\/Gospel\\a Classical\\a Comedy\\a Contemporary\\ Latin\\a Country\\a Dance\\a Electronic\\a Fitness\\ \\&\\ Workout\\a Folk\\a French\\ Pop\\a German\\ Folk\\a German\\ Pop\\a Hip\\ Hop\\/Rap\\a Holiday\\a J-Pop\\a Jaz\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-primary-genre\\ dkRequiredForSpotify:nth-of-type(20) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "albumtitle": {
+        "source": "payload.albumtitle",
+        "selector": "#albumTitleInput",
+        "selectorCandidates": [
+          {
+            "selector": "#albumTitleInput",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "input[name=\"albumtitle\"]",
+            "kind": "name",
+            "confidence": "high",
+            "score": 90
+          },
+          {
+            "selector": "input[aria-label=\"Soundhead\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div.upload-mobile > div.upload-mobile-album-title:nth-of-type(23) > div > div.upload-mobile-album-title\\ alert-container > input.coolInput\\ cool-input-text\\ no-emoji",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "title4eac64dbF891Ced8825f232d558966ec": {
+        "source": "payload.title4eac64dbF891Ced8825f232d558966ec",
+        "selector": "#title_4eac64db-f891-ced8-825f-232d558966ec",
+        "selectorCandidates": [
+          {
+            "selector": "#title_4eac64db-f891-ced8-825f-232d558966ec",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "input[name=\"title_4eac64db-f891-ced8-825f-232d558966ec\"]",
+            "kind": "name",
+            "confidence": "high",
+            "score": 90
+          },
+          {
+            "selector": "input[aria-label=\"Track\\ 1\\ title\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(2) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_1\\ no-emoji",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "songwriterRealNameFirst1": {
+        "source": "payload.songwriterRealNameFirst1",
+        "selector": "input[name=\"songwriter_real_name_first1\"]",
+        "selectorCandidates": [
+          {
+            "selector": "input[name=\"songwriter_real_name_first1\"]",
+            "kind": "name",
+            "confidence": "high",
+            "score": 90
+          },
+          {
+            "selector": "input[aria-label=\"First\\ name\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div.ongwriter_row:nth-of-type(1) > div.margin-bottom-18\\ border-bottom-gray:nth-of-type(2) > div.ongwriter_full_name > div.mobileBreak\\ flex-input-new:nth-of-type(1) > input.coolInput\\ cool-input-text\\ .ongwriter_real_name_fir",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "songwriterRealNameLast1": {
+        "source": "payload.songwriterRealNameLast1",
+        "selector": "input[name=\"songwriter_real_name_last1\"]",
+        "selectorCandidates": [
+          {
+            "selector": "input[name=\"songwriter_real_name_last1\"]",
+            "kind": "name",
+            "confidence": "high",
+            "score": 90
+          },
+          {
+            "selector": "input[aria-label=\"Last\\ name\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div.ongwriter_row:nth-of-type(1) > div.margin-bottom-18\\ border-bottom-gray:nth-of-type(2) > div.ongwriter_full_name > div.mobileBreak\\ flex-input-new:nth-of-type(3) > input.coolInput\\ cool-input-text\\ .ongwriter_real_name_la",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "aiGate4eac64dbF891Ced8825f232d558966ec": {
+        "source": "payload.aiGate4eac64dbF891Ced8825f232d558966ec",
+        "selector": "input[name=\"ai_gate_4eac64db-f891-ced8-825f-232d558966ec\"]",
+        "selectorCandidates": [
+          {
+            "selector": "input[name=\"ai_gate_4eac64db-f891-ced8-825f-232d558966ec\"]",
+            "kind": "name",
+            "confidence": "high",
+            "score": 90
+          },
+          {
+            "selector": "input[aria-label=\"\\31 \"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div.ai-credit.\\-:nth-of-type(14) > label:nth-of-type(2) > div.flex-input\\ ai-credit.-gate-row > div.padding-right-6:nth-of-type(1) > input.di.troAiGate",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "divAiCreditDetailLabelNthOfType3DivFlexInputAiCreditItemRowDivPaddingRight6NthOfType1InputDiTroAiRecordingScope": {
+        "source": "payload.divAiCreditDetailLabelNthOfType3DivFlexInputAiCreditItemRowDivPaddingRight6NthOfType1InputDiTroAiRecordingScope",
+        "selector": "div.ai-credit.-detail > label:nth-of-type(3) > div.flex-input\\ ai-credit.-item-row > div.padding-right-6:nth-of-type(1) > input.di.troAiRecordingScope",
+        "selectorCandidates": [
+          {
+            "selector": "input[aria-label=\"full\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div.ai-credit.-detail > label:nth-of-type(3) > div.flex-input\\ ai-credit.-item-row > div.padding-right-6:nth-of-type(1) > input.di.troAiRecordingScope",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "title488d45ef37b184350f459f27c05fc33a": {
+        "source": "payload.title488d45ef37b184350f459f27c05fc33a",
+        "selector": "#title_488d45ef-37b1-8435-0f45-9f27c05fc33a",
+        "selectorCandidates": [
+          {
+            "selector": "#title_488d45ef-37b1-8435-0f45-9f27c05fc33a",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "input[name=\"title_488d45ef-37b1-8435-0f45-9f27c05fc33a\"]",
+            "kind": "name",
+            "confidence": "high",
+            "score": 90
+          },
+          {
+            "selector": "input[aria-label=\"Track\\ 2\\ title\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(3) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_2\\ no-emoji",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "titleC34d2c4d2132D9b1Dd9cC4b5339c55e4": {
+        "source": "payload.titleC34d2c4d2132D9b1Dd9cC4b5339c55e4",
+        "selector": "#title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4",
+        "selectorCandidates": [
+          {
+            "selector": "#title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "input[name=\"title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4\"]",
+            "kind": "name",
+            "confidence": "high",
+            "score": 90
+          },
+          {
+            "selector": "input[aria-label=\"Track\\ 3\\ title\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(4) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_3\\ no-emoji",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "track1Performer1Role": {
+        "source": "payload.track1Performer1Role",
+        "selector": "#track-1-performer-1-role",
+        "selectorCandidates": [
+          {
+            "selector": "#track-1-performer-1-role",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "select[aria-label=\"Select\\ a\\ role\\a Audio\\a Background\\ vocals\\a Banjo\\a Bass\\a Bass\\ drum\\ \\(concert\\)\\a Bass\\ drum\\ \\(kick\\)\\a Bass\\ guitar\\ \\(all\\ types\\)\\a Bass\\ guitar\\ \\(electric\\)\\a Basset\\ horn\\a Bassoon\\a Bell\\ tree\\a Bongos\\a Brass\\ instrument\\a Cello\\a Clarinet\\a Claves\\a Clavinet\\a Congas\\a Contrabass\\a Cowb\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div.requirement.-performer-:nth-of-type(1) > div.requirement.-performer:nth-of-type(2) > div.requirement.-performer > div.alert-container:nth-of-type(1) > select.performer-role\\ coolInput\\ coolInputSmall\\ dk-.earchable-",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "performerName": {
+        "source": "payload.performerName",
+        "selector": "#track-1-performer-1-name",
+        "selectorCandidates": [
+          {
+            "selector": "#track-1-performer-1-name",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "input[name=\"performer-name\"]",
+            "kind": "name",
+            "confidence": "high",
+            "score": 90
+          },
+          {
+            "selector": "input[aria-label=\"Name\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div.requirement.-performer > div.alert-container:nth-of-type(1) > div.credit-name-row:nth-of-type(3) > div.credit-input-container > input.performer-name\\ no-emoji\\ no-url\\ coolInput\\ cool-input-text",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "track1Producer1Role": {
+        "source": "payload.track1Producer1Role",
+        "selector": "#track-1-producer-1-role",
+        "selectorCandidates": [
+          {
+            "selector": "#track-1-producer-1-role",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "select[aria-label=\"Select\\ a\\ role\\a Additional\\ engineer\\a Artist\\ background\\ vocal\\ engineer\\a Artist\\ vocal\\ second\\ engineer\\a Assistant\\ producer\\a Beat\\ maker\\a Co-executive\\ producer\\a Co-producer\\a Digital\\ audio\\ workstation\\ engineer\\a Digital\\ editing\\ engineer\\a Digital\\ editing\\ seco\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div.requirement.-producer-:nth-of-type(2) > div.requirement.-producer:nth-of-type(2) > div.requirement.-producer > div.alert-container:nth-of-type(1) > select.producer-role\\ coolInput\\ coolInputSmall\\ dk-.earchable-",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "producerName": {
+        "source": "payload.producerName",
+        "selector": "#track-1-producer-1-name",
+        "selectorCandidates": [
+          {
+            "selector": "#track-1-producer-1-name",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "input[name=\"producer-name\"]",
+            "kind": "name",
+            "confidence": "high",
+            "score": 90
+          },
+          {
+            "selector": "input[aria-label=\"Name\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div.requirement.-producer > div.alert-container:nth-of-type(1) > div.credit-name-row:nth-of-type(3) > div.credit-input-container > input.producer-name\\ no-emoji\\ no-url\\ coolInput\\ cool-input-text",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "areyousureyoutube": {
+        "source": "payload.areyousureyoutube",
+        "selector": "#areyousureyoutube",
+        "selectorCandidates": [
+          {
+            "selector": "#areyousureyoutube",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "input[aria-label=\"I\\ selected\\ \\\"YouTube\\ Music\\\"\\.\\ So\\ I\\ won\\'t\\ email\\ DistroKid\\ later\\ asking\\,\\ \\\"why\\'d\\ you\\ upload\\ my\\ music\\ to\\ YouTube\\?\\!\\\"\\ \\.\\.\\.mkay\\?\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div.checkbox-grid-col.\\ margin-0:nth-of-type(1) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "areyousurepromoservices": {
+        "source": "payload.areyousurepromoservices",
+        "selector": "#areyousurepromoservices",
+        "selectorCandidates": [
+          {
+            "selector": "#areyousurepromoservices",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "input[aria-label=\"I\\ won\\'t\\ use\\ \\\"promo\\ services\\\"\\ that\\ guarantee\\ streams\\ or\\ playlisting—even\\ if\\ they\\ claim\\ \\\"organic\\ and\\ real\\\"\\ streams\\.\\ These\\ services\\ typically\\ use\\ fake\\ stream-bots\\ easily\\ detectable\\ by\\ streaming\\ services\\.\\ Read\\ this\\ message\\ from\\ Spotify\\ to\\ learn\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div.checkbox-grid-col.\\ margin-0:nth-of-type(3) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "areyousurerecorded": {
+        "source": "payload.areyousurerecorded",
+        "selector": "#areyousurerecorded",
+        "selectorCandidates": [
+          {
+            "selector": "#areyousurerecorded",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "input[aria-label=\"I\\ recorded\\ this\\ music\\,\\ and\\ am\\ authorized\\ to\\ sell\\ it\\ in\\ stores\\ worldwide\\ \\&\\ collect\\ all\\ royalties\\.\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div.checkbox-grid-col.\\ margin-0:nth-of-type(6) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "areyousureotherartist": {
+        "source": "payload.areyousureotherartist",
+        "selector": "#areyousureotherartist",
+        "selectorCandidates": [
+          {
+            "selector": "#areyousureotherartist",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "input[aria-label=\"I\\'m\\ not\\ using\\ any\\ other\\ artist\\'s\\ name\\ in\\ my\\ name\\,\\ song\\ titles\\,\\ or\\ album\\ title\\,\\ without\\ their\\ approval\\.\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div.checkbox-grid-col.\\ margin-0:nth-of-type(7) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "areyousuretandc": {
+        "source": "payload.areyousuretandc",
+        "selector": "#areyousuretandc",
+        "selectorCandidates": [
+          {
+            "selector": "#areyousuretandc",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "input[aria-label=\"I\\ have\\ read\\ and\\ agree\\ to\\ the\\ terms\\ of\\ the\\ DistroKid\\ Distribution\\ Agreement\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div.checkbox-grid-col.\\ margin-0:nth-of-type(8) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      }
+    },
+    "files": {
+      "artwork": {
+        "source": "payload.artwork",
+        "selector": "#artwork",
+        "selectorCandidates": [
+          {
+            "selector": "#artwork",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "input[name=\"artwork\"]",
+            "kind": "name",
+            "confidence": "high",
+            "score": 90
+          },
+          {
+            "selector": "input[aria-label=\"C\\:\\\\fakepath\\\\default-image\\.png\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div:nth-of-type(2) > div.artworkWrapped\\ margin-right-24:nth-of-type(1) > div.artworkInputBoxVi.ibleContainer\\ re:nth-of-type(1) > div.artworkInputBoxInvi.ible\\ re:nth-of-type(3) > input.large\\ di.troFileInput\\ re",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      },
+      "file": {
+        "source": "payload.file",
+        "selector": "#js-track-upload-3",
+        "selectorCandidates": [
+          {
+            "selector": "#js-track-upload-3",
+            "kind": "id",
+            "confidence": "high",
+            "score": 100
+          },
+          {
+            "selector": "input[name=\"file\"]",
+            "kind": "name",
+            "confidence": "high",
+            "score": 90
+          },
+          {
+            "selector": "input[aria-label=\"C\\:\\\\fakepath\\\\still-here-still-dark\\.mp3\"]",
+            "kind": "aria-or-label",
+            "confidence": "medium",
+            "score": 70
+          },
+          {
+            "selector": "div:nth-of-type(2) > form.uploadForm > div.audioFileInputBoxVi.ibleContainer:nth-of-type(1) > div.audioFileInputBoxInvi.ible:nth-of-type(2) > input.di.troFileInput\\ di",
+            "kind": "css-path",
+            "confidence": "medium",
+            "score": 50
+          }
+        ],
+        "required": true
+      }
+    },
+    "outputs": {
+      "distrokidReviewState": {
+        "source": "captured_from_page",
+        "required": true,
+        "storesTo": "captured.distrokidReviewState"
+      },
+      "distrokidReleaseUrl": {
+        "source": "captured_from_page",
+        "required": false,
+        "storesTo": "captured.distrokidReleaseUrl"
+      }
+    }
+  },
+  "variableBindings": {
+    "howmanysongs": {
+      "source": "payload.howmanysongs",
+      "selector": "#howManySongsOnThisAlbum",
+      "selectorCandidates": [
+        {
+          "selector": "#howManySongsOnThisAlbum",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "select[name=\"howmanysongs\"]",
+          "kind": "name",
+          "confidence": "high",
+          "score": 90
+        },
+        {
+          "selector": "select[aria-label=\"\\31 \\ song\\ \\(a\\ single\\)\\a 2\\ songs\\a 3\\ songs\\a 4\\ songs\\a 5\\ songs\\a 6\\ songs\\a 7\\ songs\\a 8\\ songs\\a 9\\ songs\\a 10\\ songs\\a 11\\ songs\\a 12\\ songs\\a 13\\ songs\\a 14\\ songs\\a 15\\ songs\\a 16\\ songs\\a 17\\ songs\\a 18\\ songs\\a 19\\ songs\\a 20\\ songs\\a 21\\ songs\\a 22\\ songs\\a 23\\ songs\\a 24\\ songs\\a 25\\ songs\\a 26\\ songs\\a 27\\ so\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-number-of-.ong:nth-of-type(2) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "releaseDate": {
+      "source": "payload.releaseDate",
+      "selector": "#release-date-dp",
+      "selectorCandidates": [
+        {
+          "selector": "#release-date-dp",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "input[name=\"releaseDate\"]",
+          "kind": "name",
+          "confidence": "high",
+          "score": 90
+        },
+        {
+          "selector": "input[aria-label=\"\\32 026-06-07\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-relea.e-date\\ relea:nth-of-type(11) > div > input.coolInput\\ cool-input-date",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "genre1": {
+      "source": "payload.genre1",
+      "selector": "#genrePrimary",
+      "selectorCandidates": [
+        {
+          "selector": "#genrePrimary",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "select[name=\"genre1\"]",
+          "kind": "name",
+          "confidence": "high",
+          "score": 90
+        },
+        {
+          "selector": "select[aria-label=\"Select\\ a\\ genre\\a Afrobeat\\a Afropop\\a Alternative\\a Big\\ Band\\a Blues\\a Children\\'s\\ Music\\a Christian\\/Gospel\\a Classical\\a Comedy\\a Contemporary\\ Latin\\a Country\\a Dance\\a Electronic\\a Fitness\\ \\&\\ Workout\\a Folk\\a French\\ Pop\\a German\\ Folk\\a German\\ Pop\\a Hip\\ Hop\\/Rap\\a Holiday\\a J-Pop\\a Jaz\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div:nth-of-type(1) > div.upload-mobile > div.upload-mobile-primary-genre\\ dkRequiredForSpotify:nth-of-type(20) > div:nth-of-type(2) > select.coolInput\\ cool-input-.elect",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "albumtitle": {
+      "source": "payload.albumtitle",
+      "selector": "#albumTitleInput",
+      "selectorCandidates": [
+        {
+          "selector": "#albumTitleInput",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "input[name=\"albumtitle\"]",
+          "kind": "name",
+          "confidence": "high",
+          "score": 90
+        },
+        {
+          "selector": "input[aria-label=\"Soundhead\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div.upload-mobile > div.upload-mobile-album-title:nth-of-type(23) > div > div.upload-mobile-album-title\\ alert-container > input.coolInput\\ cool-input-text\\ no-emoji",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "title4eac64dbF891Ced8825f232d558966ec": {
+      "source": "payload.title4eac64dbF891Ced8825f232d558966ec",
+      "selector": "#title_4eac64db-f891-ced8-825f-232d558966ec",
+      "selectorCandidates": [
+        {
+          "selector": "#title_4eac64db-f891-ced8-825f-232d558966ec",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "input[name=\"title_4eac64db-f891-ced8-825f-232d558966ec\"]",
+          "kind": "name",
+          "confidence": "high",
+          "score": 90
+        },
+        {
+          "selector": "input[aria-label=\"Track\\ 1\\ title\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(2) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_1\\ no-emoji",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "songwriterRealNameFirst1": {
+      "source": "payload.songwriterRealNameFirst1",
+      "selector": "input[name=\"songwriter_real_name_first1\"]",
+      "selectorCandidates": [
+        {
+          "selector": "input[name=\"songwriter_real_name_first1\"]",
+          "kind": "name",
+          "confidence": "high",
+          "score": 90
+        },
+        {
+          "selector": "input[aria-label=\"First\\ name\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div.ongwriter_row:nth-of-type(1) > div.margin-bottom-18\\ border-bottom-gray:nth-of-type(2) > div.ongwriter_full_name > div.mobileBreak\\ flex-input-new:nth-of-type(1) > input.coolInput\\ cool-input-text\\ .ongwriter_real_name_fir",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "songwriterRealNameLast1": {
+      "source": "payload.songwriterRealNameLast1",
+      "selector": "input[name=\"songwriter_real_name_last1\"]",
+      "selectorCandidates": [
+        {
+          "selector": "input[name=\"songwriter_real_name_last1\"]",
+          "kind": "name",
+          "confidence": "high",
+          "score": 90
+        },
+        {
+          "selector": "input[aria-label=\"Last\\ name\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div.ongwriter_row:nth-of-type(1) > div.margin-bottom-18\\ border-bottom-gray:nth-of-type(2) > div.ongwriter_full_name > div.mobileBreak\\ flex-input-new:nth-of-type(3) > input.coolInput\\ cool-input-text\\ .ongwriter_real_name_la",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "aiGate4eac64dbF891Ced8825f232d558966ec": {
+      "source": "payload.aiGate4eac64dbF891Ced8825f232d558966ec",
+      "selector": "input[name=\"ai_gate_4eac64db-f891-ced8-825f-232d558966ec\"]",
+      "selectorCandidates": [
+        {
+          "selector": "input[name=\"ai_gate_4eac64db-f891-ced8-825f-232d558966ec\"]",
+          "kind": "name",
+          "confidence": "high",
+          "score": 90
+        },
+        {
+          "selector": "input[aria-label=\"\\31 \"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div.ai-credit.\\-:nth-of-type(14) > label:nth-of-type(2) > div.flex-input\\ ai-credit.-gate-row > div.padding-right-6:nth-of-type(1) > input.di.troAiGate",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "divAiCreditDetailLabelNthOfType3DivFlexInputAiCreditItemRowDivPaddingRight6NthOfType1InputDiTroAiRecordingScope": {
+      "source": "payload.divAiCreditDetailLabelNthOfType3DivFlexInputAiCreditItemRowDivPaddingRight6NthOfType1InputDiTroAiRecordingScope",
+      "selector": "div.ai-credit.-detail > label:nth-of-type(3) > div.flex-input\\ ai-credit.-item-row > div.padding-right-6:nth-of-type(1) > input.di.troAiRecordingScope",
+      "selectorCandidates": [
+        {
+          "selector": "input[aria-label=\"full\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div.ai-credit.-detail > label:nth-of-type(3) > div.flex-input\\ ai-credit.-item-row > div.padding-right-6:nth-of-type(1) > input.di.troAiRecordingScope",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "title488d45ef37b184350f459f27c05fc33a": {
+      "source": "payload.title488d45ef37b184350f459f27c05fc33a",
+      "selector": "#title_488d45ef-37b1-8435-0f45-9f27c05fc33a",
+      "selectorCandidates": [
+        {
+          "selector": "#title_488d45ef-37b1-8435-0f45-9f27c05fc33a",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "input[name=\"title_488d45ef-37b1-8435-0f45-9f27c05fc33a\"]",
+          "kind": "name",
+          "confidence": "high",
+          "score": 90
+        },
+        {
+          "selector": "input[aria-label=\"Track\\ 2\\ title\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(3) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_2\\ no-emoji",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "titleC34d2c4d2132D9b1Dd9cC4b5339c55e4": {
+      "source": "payload.titleC34d2c4d2132D9b1Dd9cC4b5339c55e4",
+      "selector": "#title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4",
+      "selectorCandidates": [
+        {
+          "selector": "#title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "input[name=\"title_c34d2c4d-2132-d9b1-dd9c-c4b5339c55e4\"]",
+          "kind": "name",
+          "confidence": "high",
+          "score": 90
+        },
+        {
+          "selector": "input[aria-label=\"Track\\ 3\\ title\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div > div.upload-mobile-track-item\\ trackTableBody:nth-of-type(4) > div > div.alert-container:nth-of-type(2) > input.coolInput\\ cool-input-text\\ uploadFileTitle\\ track_3\\ no-emoji",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "track1Performer1Role": {
+      "source": "payload.track1Performer1Role",
+      "selector": "#track-1-performer-1-role",
+      "selectorCandidates": [
+        {
+          "selector": "#track-1-performer-1-role",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "select[aria-label=\"Select\\ a\\ role\\a Audio\\a Background\\ vocals\\a Banjo\\a Bass\\a Bass\\ drum\\ \\(concert\\)\\a Bass\\ drum\\ \\(kick\\)\\a Bass\\ guitar\\ \\(all\\ types\\)\\a Bass\\ guitar\\ \\(electric\\)\\a Basset\\ horn\\a Bassoon\\a Bell\\ tree\\a Bongos\\a Brass\\ instrument\\a Cello\\a Clarinet\\a Claves\\a Clavinet\\a Congas\\a Contrabass\\a Cowb\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div.requirement.-performer-:nth-of-type(1) > div.requirement.-performer:nth-of-type(2) > div.requirement.-performer > div.alert-container:nth-of-type(1) > select.performer-role\\ coolInput\\ coolInputSmall\\ dk-.earchable-",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "performerName": {
+      "source": "payload.performerName",
+      "selector": "#track-1-performer-1-name",
+      "selectorCandidates": [
+        {
+          "selector": "#track-1-performer-1-name",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "input[name=\"performer-name\"]",
+          "kind": "name",
+          "confidence": "high",
+          "score": 90
+        },
+        {
+          "selector": "input[aria-label=\"Name\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div.requirement.-performer > div.alert-container:nth-of-type(1) > div.credit-name-row:nth-of-type(3) > div.credit-input-container > input.performer-name\\ no-emoji\\ no-url\\ coolInput\\ cool-input-text",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "track1Producer1Role": {
+      "source": "payload.track1Producer1Role",
+      "selector": "#track-1-producer-1-role",
+      "selectorCandidates": [
+        {
+          "selector": "#track-1-producer-1-role",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "select[aria-label=\"Select\\ a\\ role\\a Additional\\ engineer\\a Artist\\ background\\ vocal\\ engineer\\a Artist\\ vocal\\ second\\ engineer\\a Assistant\\ producer\\a Beat\\ maker\\a Co-executive\\ producer\\a Co-producer\\a Digital\\ audio\\ workstation\\ engineer\\a Digital\\ editing\\ engineer\\a Digital\\ editing\\ seco\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div.requirement.-producer-:nth-of-type(2) > div.requirement.-producer:nth-of-type(2) > div.requirement.-producer > div.alert-container:nth-of-type(1) > select.producer-role\\ coolInput\\ coolInputSmall\\ dk-.earchable-",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "producerName": {
+      "source": "payload.producerName",
+      "selector": "#track-1-producer-1-name",
+      "selectorCandidates": [
+        {
+          "selector": "#track-1-producer-1-name",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "input[name=\"producer-name\"]",
+          "kind": "name",
+          "confidence": "high",
+          "score": 90
+        },
+        {
+          "selector": "input[aria-label=\"Name\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div.requirement.-producer > div.alert-container:nth-of-type(1) > div.credit-name-row:nth-of-type(3) > div.credit-input-container > input.producer-name\\ no-emoji\\ no-url\\ coolInput\\ cool-input-text",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "areyousureyoutube": {
+      "source": "payload.areyousureyoutube",
+      "selector": "#areyousureyoutube",
+      "selectorCandidates": [
+        {
+          "selector": "#areyousureyoutube",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "input[aria-label=\"I\\ selected\\ \\\"YouTube\\ Music\\\"\\.\\ So\\ I\\ won\\'t\\ email\\ DistroKid\\ later\\ asking\\,\\ \\\"why\\'d\\ you\\ upload\\ my\\ music\\ to\\ YouTube\\?\\!\\\"\\ \\.\\.\\.mkay\\?\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div.checkbox-grid-col.\\ margin-0:nth-of-type(1) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "areyousurepromoservices": {
+      "source": "payload.areyousurepromoservices",
+      "selector": "#areyousurepromoservices",
+      "selectorCandidates": [
+        {
+          "selector": "#areyousurepromoservices",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "input[aria-label=\"I\\ won\\'t\\ use\\ \\\"promo\\ services\\\"\\ that\\ guarantee\\ streams\\ or\\ playlisting—even\\ if\\ they\\ claim\\ \\\"organic\\ and\\ real\\\"\\ streams\\.\\ These\\ services\\ typically\\ use\\ fake\\ stream-bots\\ easily\\ detectable\\ by\\ streaming\\ services\\.\\ Read\\ this\\ message\\ from\\ Spotify\\ to\\ learn\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div.checkbox-grid-col.\\ margin-0:nth-of-type(3) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "areyousurerecorded": {
+      "source": "payload.areyousurerecorded",
+      "selector": "#areyousurerecorded",
+      "selectorCandidates": [
+        {
+          "selector": "#areyousurerecorded",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "input[aria-label=\"I\\ recorded\\ this\\ music\\,\\ and\\ am\\ authorized\\ to\\ sell\\ it\\ in\\ stores\\ worldwide\\ \\&\\ collect\\ all\\ royalties\\.\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div.checkbox-grid-col.\\ margin-0:nth-of-type(6) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "areyousureotherartist": {
+      "source": "payload.areyousureotherartist",
+      "selector": "#areyousureotherartist",
+      "selectorCandidates": [
+        {
+          "selector": "#areyousureotherartist",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "input[aria-label=\"I\\'m\\ not\\ using\\ any\\ other\\ artist\\'s\\ name\\ in\\ my\\ name\\,\\ song\\ titles\\,\\ or\\ album\\ title\\,\\ without\\ their\\ approval\\.\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div.checkbox-grid-col.\\ margin-0:nth-of-type(7) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    },
+    "areyousuretandc": {
+      "source": "payload.areyousuretandc",
+      "selector": "#areyousuretandc",
+      "selectorCandidates": [
+        {
+          "selector": "#areyousuretandc",
+          "kind": "id",
+          "confidence": "high",
+          "score": 100
+        },
+        {
+          "selector": "input[aria-label=\"I\\ have\\ read\\ and\\ agree\\ to\\ the\\ terms\\ of\\ the\\ DistroKid\\ Distribution\\ Agreement\"]",
+          "kind": "aria-or-label",
+          "confidence": "medium",
+          "score": 70
+        },
+        {
+          "selector": "div.checkbox-grid-col.\\ margin-0:nth-of-type(8) > label > div.label-flex-container > div.radio-flex:nth-of-type(1) > input.areyou.ure",
+          "kind": "css-path",
+          "confidence": "medium",
+          "score": 50
+        }
+      ],
+      "required": true
+    }
+  },
+  "fileUploadBindings": [
+    {
+      "id": "artwork",
+      "role": "artwork",
+      "label": "artwork",
+      "selector": "#artwork",
+      "fallbackSelectors": [
+        "input[name=\"artwork\"]",
+        "input[aria-label=\"C\\:\\\\fakepath\\\\default-image\\.png\"]",
+        "div:nth-of-type(2) > div.artworkWrapped\\ margin-right-24:nth-of-type(1) > div.artworkInputBoxVi.ibleContainer\\ re:nth-of-type(1) > div.artworkInputBoxInvi.ible\\ re:nth-of-type(3) > input.large\\ di.troFileInput\\ re"
+      ],
+      "selectorConfidence": "high",
+      "tabId": "distrokidUpload",
+      "source": "payload.artwork",
+      "required": true
+    },
+    {
+      "id": "file",
+      "role": "file",
+      "label": "file",
+      "selector": "#js-track-upload-3",
+      "fallbackSelectors": [
+        "input[name=\"file\"]",
+        "input[aria-label=\"C\\:\\\\fakepath\\\\still-here-still-dark\\.mp3\"]",
+        "div:nth-of-type(2) > form.uploadForm > div.audioFileInputBoxVi.ibleContainer:nth-of-type(1) > div.audioFileInputBoxInvi.ible:nth-of-type(2) > input.di.troFileInput\\ di"
+      ],
+      "selectorConfidence": "high",
+      "tabId": "distrokidUpload",
+      "source": "payload.file",
+      "required": true
+    }
+  ],
+  "expectedOutputs": [
+    {
+      "id": "distrokidReviewState",
+      "label": "DistroKid review state",
+      "kind": "output",
+      "inputType": "text",
+      "scope": "captured",
+      "selectorConfidence": "low",
+      "required": true,
+      "multiple": false,
+      "source": "captured_from_page",
+      "storesTo": "captured.distrokidReviewState"
+    },
+    {
+      "id": "distrokidReleaseUrl",
+      "label": "DistroKid release URL",
+      "kind": "output",
+      "inputType": "text",
+      "scope": "external_link",
+      "selectorConfidence": "low",
+      "required": false,
+      "multiple": false,
+      "source": "captured_from_page",
+      "storesTo": "captured.distrokidReleaseUrl"
+    }
+  ],
+  "humanApprovalCheckpoints": [
+    {
+      "id": "beforeFinalSubmit",
+      "label": "Stop before final submit",
+      "beforeAction": "final_submit",
+      "reason": "Ken approval required before external release submission"
+    },
+    {
+      "id": "releaseDateDpApproval",
+      "label": "Review before #release-date-dp",
+      "beforeAction": "releaseDateDp",
+      "reason": "manual-only",
+      "sourceEventId": "action_detected-1780688228954-7ck49r"
+    }
+  ],
+  "checkpoints": [
+    {
+      "id": "beforeFinalSubmit",
+      "label": "Stop before final submit",
+      "beforeAction": "final_submit",
+      "reason": "Ken approval required before external release submission"
+    },
+    {
+      "id": "releaseDateDpApproval",
+      "label": "Review before #release-date-dp",
+      "beforeAction": "releaseDateDp",
+      "reason": "manual-only",
+      "sourceEventId": "action_detected-1780688228954-7ck49r"
+    }
+  ],
+  "replaySettings": {
+    "defaultMode": "dry_run",
+    "stopBeforeFinalAction": true,
+    "requireVerifiedSelectorsForLive": true,
+    "retry": {
+      "attempts": 2,
+      "backoffMs": 500
+    },
+    "timing": {
+      "afterNavigationMs": 500,
+      "afterActionMs": 250
+    }
+  },
+  "safetyPolicy": {
+    "requiresLiveApproval": true,
+    "dry_run_default": true,
+    "pause_at_end_default": true,
+    "never_click_text": [
+      "#release-date-dp"
+    ],
+    "never_click_selectors": [
+      "#release-date-dp"
+    ],
+    "manual_only_categories": [
+      "final submission",
+      "payment",
+      "legal certification",
+      "destructive action"
+    ],
+    "checkpoints": [
+      "beforeFinalSubmit",
+      "releaseDateDpApproval"
+    ]
+  },
+  "artifactPolicy": {
+    "captureReplayPlan": true,
+    "captureOutputs": [
+      "distrokidReviewState",
+      "distrokidReleaseUrl"
+    ]
+  },
+  "requiredFiles": [
+    "artwork",
+    "file"
+  ],
+  "supportedModes": [
+    "preview",
+    "dry_run",
+    "live"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "required": [
+      "releaseId",
+      "album",
+      "tracks"
+    ],
+    "properties": {
+      "releaseId": {
+        "type": "string"
+      },
+      "albumId": {
+        "type": "string"
+      },
+      "album": {
+        "type": "object",
+        "required": [
+          "title",
+          "artistName",
+          "releaseDate",
+          "language",
+          "primaryGenre",
+          "coverArtPath"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "releaseId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "artistName": {
+            "type": "string"
+          },
+          "releaseDate": {
+            "type": [
+              "string"
+            ],
+            "format": "date"
+          },
+          "language": {
+            "type": "string"
+          },
+          "primaryGenre": {
+            "type": "string"
+          },
+          "secondaryGenre": {
+            "type": "string"
+          },
+          "coverArtPath": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "x-pancake-kind": "file"
+          }
+        }
+      },
+      "tracks": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": [
+            "index",
+            "title",
+            "audioPath",
+            "explicit"
+          ],
+          "properties": {
+            "index": {
+              "type": "number"
+            },
+            "title": {
+              "type": "string"
+            },
+            "audioPath": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream",
+              "x-pancake-kind": "file"
+            },
+            "explicit": {
+              "type": "boolean"
+            },
+            "isrc": {
+              "type": "string"
+            },
+            "lyrics": {
+              "type": "string"
+            },
+            "songwriterCredits": {
+              "type": "object"
+            },
+            "aiDisclosure": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "derived": {
+        "type": "object",
+        "properties": {
+          "numberOfSongs": {
+            "const": "tracks.length",
+            "description": "Derived from tracks.length"
+          }
+        }
+      }
+    }
+  },
+  "sourceMetadata": {
+    "sourceAppId": "pancake-robot",
+    "workflowId": "distrokid-album-submit",
+    "sourcePayloadSchema": {
+      "type": "object",
+      "required": [
+        "releaseId",
+        "album",
+        "tracks"
+      ],
+      "properties": {
+        "releaseId": {
+          "type": "string"
+        },
+        "albumId": {
+          "type": "string"
+        },
+        "album": {
+          "type": "object",
+          "required": [
+            "title",
+            "artistName",
+            "releaseDate",
+            "language",
+            "primaryGenre",
+            "coverArtPath"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "releaseId": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "artistName": {
+              "type": "string"
+            },
+            "releaseDate": {
+              "type": [
+                "string"
+              ],
+              "format": "date"
+            },
+            "language": {
+              "type": "string"
+            },
+            "primaryGenre": {
+              "type": "string"
+            },
+            "secondaryGenre": {
+              "type": "string"
+            },
+            "coverArtPath": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream",
+              "x-pancake-kind": "file"
+            }
+          }
+        },
+        "tracks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "index",
+              "title",
+              "audioPath",
+              "explicit"
+            ],
+            "properties": {
+              "index": {
+                "type": "number"
+              },
+              "title": {
+                "type": "string"
+              },
+              "audioPath": {
+                "type": "string",
+                "contentMediaType": "application/octet-stream",
+                "x-pancake-kind": "file"
+              },
+              "explicit": {
+                "type": "boolean"
+              },
+              "isrc": {
+                "type": "string"
+              },
+              "lyrics": {
+                "type": "string"
+              },
+              "songwriterCredits": {
+                "type": "object"
+              },
+              "aiDisclosure": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "derived": {
+          "type": "object",
+          "properties": {
+            "numberOfSongs": {
+              "const": "tracks.length",
+              "description": "Derived from tracks.length"
+            }
+          }
+        }
+      }
+    },
+    "sourceFieldMappings": [
+      {
+        "path": "releaseId",
+        "label": "releaseId"
+      },
+      {
+        "path": "albumId",
+        "label": "albumId"
+      },
+      {
+        "path": "album.id",
+        "label": "album.id"
+      },
+      {
+        "path": "album.releaseId",
+        "label": "album.releaseId"
+      },
+      {
+        "path": "album.title",
+        "label": "album.title"
+      },
+      {
+        "path": "album.artistName",
+        "label": "album.artistName"
+      },
+      {
+        "path": "album.releaseDate",
+        "label": "album.releaseDate"
+      },
+      {
+        "path": "album.language",
+        "label": "album.language"
+      },
+      {
+        "path": "album.primaryGenre",
+        "label": "album.primaryGenre"
+      },
+      {
+        "path": "album.secondaryGenre",
+        "label": "album.secondaryGenre"
+      },
+      {
+        "path": "album.coverArtPath",
+        "label": "album.coverArtPath"
+      },
+      {
+        "path": "tracks.length",
+        "label": "tracks.length"
+      },
+      {
+        "path": "tracks[].index",
+        "label": "tracks[].index"
+      },
+      {
+        "path": "tracks[].title",
+        "label": "tracks[].title"
+      },
+      {
+        "path": "tracks[].audioPath",
+        "label": "tracks[].audioPath"
+      },
+      {
+        "path": "tracks[].explicit",
+        "label": "tracks[].explicit"
+      },
+      {
+        "path": "tracks[].isrc",
+        "label": "tracks[].isrc"
+      },
+      {
+        "path": "tracks[].lyrics",
+        "label": "tracks[].lyrics"
+      },
+      {
+        "path": "tracks[].songwriterCredits",
+        "label": "tracks[].songwriterCredits"
+      },
+      {
+        "path": "tracks[].aiDisclosure",
+        "label": "tracks[].aiDisclosure"
+      }
+    ],
+    "tabUrlTemplates": [
+      {
+        "id": "pancakeRelease",
+        "urlTemplate": "http://localhost:3737/releases/album/{album.id}",
+        "siteId": "pancake-robot"
+      },
+      {
+        "id": "distrokidUpload",
+        "urlTemplate": "https://distrokid.com/new/",
+        "siteId": "distrokid"
+      }
+    ],
+    "authProfileRef": "distrokid",
+    "completionPolicy": {
+      "action": "wait_for_human_submission",
+      "closeBrowser": false,
+      "requireApprovalBeforeSubmit": true
+    }
+  },
+  "sourceAppId": "pancake-robot",
+  "sourceWorkflowId": "distrokid-album-submit",
+  "sourcePayloadSchema": {
+    "type": "object",
+    "required": [
+      "releaseId",
+      "album",
+      "tracks"
+    ],
+    "properties": {
+      "releaseId": {
+        "type": "string"
+      },
+      "albumId": {
+        "type": "string"
+      },
+      "album": {
+        "type": "object",
+        "required": [
+          "title",
+          "artistName",
+          "releaseDate",
+          "language",
+          "primaryGenre",
+          "coverArtPath"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "releaseId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "artistName": {
+            "type": "string"
+          },
+          "releaseDate": {
+            "type": [
+              "string"
+            ],
+            "format": "date"
+          },
+          "language": {
+            "type": "string"
+          },
+          "primaryGenre": {
+            "type": "string"
+          },
+          "secondaryGenre": {
+            "type": "string"
+          },
+          "coverArtPath": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "x-pancake-kind": "file"
+          }
+        }
+      },
+      "tracks": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": [
+            "index",
+            "title",
+            "audioPath",
+            "explicit"
+          ],
+          "properties": {
+            "index": {
+              "type": "number"
+            },
+            "title": {
+              "type": "string"
+            },
+            "audioPath": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream",
+              "x-pancake-kind": "file"
+            },
+            "explicit": {
+              "type": "boolean"
+            },
+            "isrc": {
+              "type": "string"
+            },
+            "lyrics": {
+              "type": "string"
+            },
+            "songwriterCredits": {
+              "type": "object"
+            },
+            "aiDisclosure": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "derived": {
+        "type": "object",
+        "properties": {
+          "numberOfSongs": {
+            "const": "tracks.length",
+            "description": "Derived from tracks.length"
+          }
+        }
+      }
+    }
+  },
+  "sourceFieldMappings": [
+    {
+      "path": "releaseId",
+      "label": "releaseId"
+    },
+    {
+      "path": "albumId",
+      "label": "albumId"
+    },
+    {
+      "path": "album.id",
+      "label": "album.id"
+    },
+    {
+      "path": "album.releaseId",
+      "label": "album.releaseId"
+    },
+    {
+      "path": "album.title",
+      "label": "album.title"
+    },
+    {
+      "path": "album.artistName",
+      "label": "album.artistName"
+    },
+    {
+      "path": "album.releaseDate",
+      "label": "album.releaseDate"
+    },
+    {
+      "path": "album.language",
+      "label": "album.language"
+    },
+    {
+      "path": "album.primaryGenre",
+      "label": "album.primaryGenre"
+    },
+    {
+      "path": "album.secondaryGenre",
+      "label": "album.secondaryGenre"
+    },
+    {
+      "path": "album.coverArtPath",
+      "label": "album.coverArtPath"
+    },
+    {
+      "path": "tracks.length",
+      "label": "tracks.length"
+    },
+    {
+      "path": "tracks[].index",
+      "label": "tracks[].index"
+    },
+    {
+      "path": "tracks[].title",
+      "label": "tracks[].title"
+    },
+    {
+      "path": "tracks[].audioPath",
+      "label": "tracks[].audioPath"
+    },
+    {
+      "path": "tracks[].explicit",
+      "label": "tracks[].explicit"
+    },
+    {
+      "path": "tracks[].isrc",
+      "label": "tracks[].isrc"
+    },
+    {
+      "path": "tracks[].lyrics",
+      "label": "tracks[].lyrics"
+    },
+    {
+      "path": "tracks[].songwriterCredits",
+      "label": "tracks[].songwriterCredits"
+    },
+    {
+      "path": "tracks[].aiDisclosure",
+      "label": "tracks[].aiDisclosure"
+    }
+  ],
+  "tabUrlTemplates": [
+    {
+      "id": "pancakeRelease",
+      "urlTemplate": "http://localhost:3737/releases/album/{album.id}",
+      "siteId": "pancake-robot"
+    },
+    {
+      "id": "distrokidUpload",
+      "urlTemplate": "https://distrokid.com/new/",
+      "siteId": "distrokid"
+    }
+  ],
+  "authProfileRef": "distrokid",
+  "completionPolicy": {
+    "action": "wait_for_human_submission",
+    "closeBrowser": false,
+    "requireApprovalBeforeSubmit": true
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "distrokidReviewState": {
+        "type": "string",
+        "description": "DistroKid review state"
+      },
+      "distrokidReleaseUrl": {
+        "type": "string",
+        "description": "DistroKid release URL"
+      }
+    }
+  },
+  "targets": {
+    "start_url": "https://distrokid.com/new/",
+    "fixture_url": "fixtures/distrokid-wizard/index.html"
+  }
+}

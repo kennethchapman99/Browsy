@@ -1,0 +1,111 @@
+{
+  "type": "object",
+  "required": [
+    "releaseId",
+    "album",
+    "tracks"
+  ],
+  "properties": {
+    "releaseId": {
+      "type": "string"
+    },
+    "albumId": {
+      "type": "string"
+    },
+    "album": {
+      "type": "object",
+      "required": [
+        "title",
+        "artistName",
+        "releaseDate",
+        "language",
+        "primaryGenre",
+        "coverArtPath"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "releaseId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "artistName": {
+          "type": "string"
+        },
+        "releaseDate": {
+          "type": [
+            "string"
+          ],
+          "format": "date"
+        },
+        "language": {
+          "type": "string"
+        },
+        "primaryGenre": {
+          "type": "string"
+        },
+        "secondaryGenre": {
+          "type": "string"
+        },
+        "coverArtPath": {
+          "type": "string",
+          "contentMediaType": "application/octet-stream",
+          "x-pancake-kind": "file"
+        }
+      }
+    },
+    "tracks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "index",
+          "title",
+          "audioPath",
+          "explicit"
+        ],
+        "properties": {
+          "index": {
+            "type": "number"
+          },
+          "title": {
+            "type": "string"
+          },
+          "audioPath": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "x-pancake-kind": "file"
+          },
+          "explicit": {
+            "type": "boolean"
+          },
+          "isrc": {
+            "type": "string"
+          },
+          "lyrics": {
+            "type": "string"
+          },
+          "songwriterCredits": {
+            "type": "object"
+          },
+          "aiDisclosure": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "derived": {
+      "type": "object",
+      "properties": {
+        "numberOfSongs": {
+          "const": "tracks.length",
+          "description": "Derived from tracks.length"
+        }
+      }
+    }
+  }
+}

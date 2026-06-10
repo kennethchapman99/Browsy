@@ -5,6 +5,7 @@ import { generateRunReview } from './run-review.mjs';
 import { emitDone } from './signals.mjs';
 export { saveRuntimeVars, loadRuntimeVars, resolveTemplate, tryResolveTemplate,
          extractTemplateVars, hasTemplateVars, validateTemplateVars,
+         getRuntimeValue, flattenRuntimeVars,
          captureVariables, computeDerived,
          filterCapturedByTiming, isFatalCaptureTiming } from './runtime-vars.mjs';
 

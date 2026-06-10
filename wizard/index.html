@@ -241,6 +241,36 @@ body {
 }
 
 .field textarea { min-height: 110px; }
+.url-template-editor {
+  width: 100%;
+  min-height: 92px;
+  font-family: 'SF Mono','Fira Code',ui-monospace,monospace;
+  font-size: .9rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.template-preview,
+.payload-browser {
+  font-family: 'SF Mono','Fira Code',ui-monospace,monospace;
+  font-size: .82rem;
+  line-height: 1.5;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+  overflow: auto;
+}
+.payload-browser { max-height: 260px; }
+.payload-var-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(160px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid #f0eee7;
+}
+.payload-var-row:last-child { border-bottom: 0; }
 
 .field-row { display: grid; gap: 14px; }
 .field-row.cols-2 { grid-template-columns: 1fr 1fr; }
@@ -1022,17 +1052,28 @@ body {
     </div>
   </div>
 
-  <!-- Step 2: Pages & Auth -->
+  <!-- Step 2: Payload discovery + tabs -->
   <div class="step" data-step="2">
-    <div class="step-badge">Step 2 of 10 · Target Pages</div>
-    <h1 class="step-title">Where does it happen?</h1>
-    <p class="step-hint">List every page the automation will touch. The agent needs to run discovery on all of them.</p>
+    <div class="step-badge">Step 2 of 10 · Payload Discovery</div>
+    <h1 class="step-title">Browse runtime payload variables</h1>
+    <p class="step-hint">Use source-app payload variables for every value that changes between releases. Search, inspect sample values, and copy nested variable tokens before configuring tab URLs.</p>
+
+    <div class="field">
+      <label>Search variables</label>
+      <input type="text" placeholder="album.id, tracks[].audioPath, releaseDate…" oninput="S.payloadSearch=this.value;renderPayloadBrowser()">
+    </div>
+    <div id="payload-browser" class="payload-browser"></div>
+
+    <div style="margin-top:32px">
+      <div class="section-label">Tab definitions and URL templates</div>
+      <p class="step-hint" style="margin-bottom:16px">Define tabs with full URL templates. Templates support <code>{album.id}</code> and <code>{{album.id}}</code>; recording cannot start until they resolve against the sample payload.</p>
+    </div>
 
     <div class="table-builder" id="pages-list"></div>
     <button class="btn-add" onclick="addPage()">+ Add page</button>
 
     <div style="margin-top:32px">
-      <div class="section-label">Authentication mode</div>
+      <div class="section-label">Auth setup</div>
       <div class="auth-pills" id="auth-pills">
         <button class="auth-pill active" onclick="setAuth(this,'manual-save-state')">Manual login → save state</button>
         <button class="auth-pill" onclick="setAuth(this,'api-key')">API key / token</button>
@@ -1045,9 +1086,9 @@ body {
 
   <!-- Step 3: Data Sources -->
   <div class="step" data-step="3">
-    <div class="step-badge">Step 3 of 10 · Data Sources</div>
-    <h1 class="step-title">What data does it use?</h1>
-    <p class="step-hint">Describe every local folder, file, CSV, JSON, or external system the automation reads from or uploads to. This becomes the source-of-truth for your manifest.</p>
+    <div class="step-badge">Step 3 of 10 · Tab Definitions</div>
+    <h1 class="step-title">What source systems feed the workflow?</h1>
+    <p class="step-hint">Describe the local folders, files, JSON payloads, and external systems that produce the runtime payload or uploaded assets.</p>
 
     <div class="table-builder" id="data-sources-list"></div>
     <button class="btn-add" onclick="addDataSource()">+ Add data source</button>
@@ -1055,9 +1096,9 @@ body {
 
   <!-- Step 4: Capture -->
   <div class="step" data-step="4">
-    <div class="step-badge">Step 4 of 10 · Capture</div>
+    <div class="step-badge">Step 4 of 10 · Recording</div>
     <h1 class="step-title">Browser Observation</h1>
-    <p class="step-hint">Walk through a real website while Browsy records fields, actions, and structure. Choose a capture method, then navigate and annotate.</p>
+    <p class="step-hint">After payload variables, URL templates, and auth validate, walk through the website once while Browsy records fields, uploads, repeat groups, actions, and completion signals.</p>
 
     <div class="capture-tabs">
       <button class="capture-tab active" id="cap-tab-atlas" onclick="showCaptureTab('atlas')">◉ Browser Observation</button>
@@ -1483,6 +1524,12 @@ body {
 const S = {
   step: 1, totalSteps: 10,
   workflowName: '', goal: '', startUrl: '',
+  payloadSample: {
+    album: { id: 'ALBUM_MPK9H71S_RTCM', title: 'Example Release', artistName: 'Example Artist', releaseDate: '2026-09-01', coverArtPath: '/releases/ALBUM_MPK9H71S_RTCM/cover.png' },
+    tracks: [{ index: 1, title: 'Track One', audioPath: '/releases/ALBUM_MPK9H71S_RTCM/01-track-one.wav', explicit: false }],
+    derived: { numberOfSongs: 1 }
+  },
+  payloadSearch: '',
   pages: [], authMode: 'manual-save-state',
   walkthroughSteps: [], obsNotes: '', parameters: [],
   // Runtime variables: input (user-provided), captured (from page), derived (computed)
@@ -1509,7 +1556,7 @@ const S = {
   checkpoints: ['Stop before final release / payment / legal certification'],
 };
 
-const STEP_NAMES  = ['','Mission','Target Pages','Data Sources','Capture','Variables','Run Inputs','Repeat Groups','Data Wiring','Safety','Generate'];
+const STEP_NAMES  = ['','Metadata','Payload Discovery','Tab Definitions','URL Templates','Auth Setup','Recording','Completion','Repeat Groups','Safety','Generate'];
 const STEP_COLORS = ['','var(--teal)','var(--orange)','#5b9bd5','var(--purple)','var(--green)','#7b4fc8','var(--yellow)','var(--coral)','#c0392b','var(--navy)'];
 let recordingSetupState = { setup: null, requiredAuth: [], authSkips: new Set(), lastError: '' };
 
@@ -1767,25 +1814,79 @@ function addPage(d={}) {
   S.pages.push({ purpose: d.purpose||'', url: d.url||'', requiresLogin: d.requiresLogin||false });
   renderPages();
 }
-function hasTemplateVars(s) { return typeof s === 'string' && /\{\{[^}]+\}\}/.test(s); }
+function hasTemplateVars(s) { return typeof s === 'string' && (/\{\{[^{}]+\}\}/.test(s) || /\{[^{}]+\}/.test(s)); }
+function extractTemplateVars(s) {
+  const out = new Set(), re = /\{\{([^{}]+)\}\}|\{([^{}]+)\}/g;
+  let m; while ((m = re.exec(String(s || ''))) !== null) out.add((m[1] || m[2] || '').trim());
+  return [...out].filter(Boolean);
+}
+function payloadValue(path, root = S.payloadSample) {
+  const raw = String(path || '').trim().replace(/^payload\./, '');
+  if (!raw) return undefined;
+  if (raw.endsWith('.length')) {
+    const base = payloadValue(raw.slice(0, -'.length'.length), root);
+    return Array.isArray(base) || typeof base === 'string' ? base.length : undefined;
+  }
+  let cur = root;
+  for (let part of raw.split('.').filter(Boolean)) {
+    if (cur == null) return undefined;
+    if (part.endsWith('[]')) part = part.slice(0, -2);
+    cur = cur[part];
+    if (Array.isArray(cur) && part !== raw.split('.').filter(Boolean).at(-1)) cur = cur[0];
+  }
+  return cur;
+}
+function resolveWizardTemplate(template, root = S.payloadSample) {
+  return String(template || '').replace(/\{\{([^{}]+)\}\}|\{([^{}]+)\}/g, (token, a, b) => {
+    const key = (a || b || '').trim();
+    const value = payloadValue(key, root);
+    return value === undefined || value === null || value === '' ? token : String(value);
+  });
+}
+function validateWizardUrlTemplate(template, root = S.payloadSample) {
+  const vars = extractTemplateVars(template);
+  const missing = vars.filter(name => {
+    const value = payloadValue(name, root);
+    return value === undefined || value === null || value === '';
+  });
+  const resolved = resolveWizardTemplate(template, root);
+  let validUrl = false;
+  try {
+    const u = new URL(resolved);
+    validUrl = ['http:', 'https:'].includes(u.protocol);
+  } catch {}
+  return { ok: missing.length === 0 && validUrl, vars, missing, resolved, validUrl };
+}
+function flattenPayloadVars(value = S.payloadSample, prefix = '', out = []) {
+  if (prefix) out.push({ path: prefix, value });
+  if (!value || typeof value !== 'object') return out;
+  if (Array.isArray(value)) {
+    if (prefix) out.push({ path: `${prefix}.length`, value: value.length });
+    if (value[0] && typeof value[0] === 'object') flattenPayloadVars(value[0], prefix ? `${prefix}[]` : 'items[]', out);
+    return out;
+  }
+  Object.entries(value).forEach(([k, v]) => flattenPayloadVars(v, prefix ? `${prefix}.${k}` : k, out));
+  return out;
+}
+function renderPayloadBrowser() {
+  const el = document.getElementById('payload-browser');
+  if (!el) return;
+  const q = (S.payloadSearch || '').toLowerCase();
+  const rows = flattenPayloadVars().filter(v => !q || v.path.toLowerCase().includes(q) || String(v.value).toLowerCase().includes(q));
+  el.innerHTML = rows.map(v => `<div class="payload-var-row"><code>${esc(v.path)}</code><span>${esc(typeof v.value === 'object' ? JSON.stringify(v.value) : String(v.value))}</span><button type="button" class="btn-session-secondary" onclick="navigator.clipboard?.writeText('{{${esc(v.path)}}}')">Copy</button></div>`).join('') || '<span class="muted">No matching variables.</span>';
+}
 
 function renderPages() {
   document.getElementById('pages-list').innerHTML = S.pages.map((p,i) => `
-    <div class="table-row" style="grid-template-columns:1.6fr 2.2fr auto auto;row-gap:6px">
+    <div class="table-row" style="grid-template-columns:1fr auto auto;row-gap:8px">
       <input type="text" placeholder="Purpose (e.g. Song detail)" value="${esc(p.purpose)}" oninput="S.pages[${i}].purpose=this.value">
-      <input type="url"  placeholder="https://… or http://…/{{varName}}" value="${esc(p.url)}" oninput="S.pages[${i}].url=this.value;renderPages()">
       <label class="toggle-row" style="justify-content:center;gap:5px">
         <input type="checkbox" class="toggle" ${p.requiresLogin?'checked':''} onchange="S.pages[${i}].requiresLogin=this.checked">
         <span style="font-size:.78rem;color:var(--muted)">Login</span>
       </label>
       <button class="btn-remove" onclick="S.pages.splice(${i},1);renderPages()">×</button>
-      ${hasTemplateVars(p.url) ? `
-      <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px;margin-top:2px">
-        <span style="font-size:.78rem;color:var(--orange);white-space:nowrap">📌 Example URL for discovery:</span>
-        <input type="url" style="flex:1;font-size:.85rem;padding:6px 10px;border:1.5px solid var(--orange);border-radius:8px"
-          placeholder="e.g. http://…/SONG_MPHMZMDK_E9UU_T01 (concrete URL for discovery)"
-          value="${esc(p.urlExample||'')}" oninput="S.pages[${i}].urlExample=this.value">
-      </div>` : ''}
+      <textarea class="url-template-editor" style="grid-column:1/-1" placeholder="https://example.com/releases/album/{album.id} or {{album.id}}" oninput="S.pages[${i}].url=this.value;renderPages()">${esc(p.url)}</textarea>
+      ${(() => { const v = validateWizardUrlTemplate(p.url || ''); return `<div class="template-preview" style="grid-column:1/-1;color:${v.ok ? 'var(--green)' : 'var(--coral)'}">${v.ok ? 'Valid' : 'Invalid'} template<br>Variables: ${esc(v.vars.join(', ') || 'none')}<br>${v.missing.length ? 'Missing: ' + esc(v.missing.join(', ')) + '<br>' : ''}Example URL for discovery / resolved preview: ${esc(v.resolved || '')}</div>`; })()}
     </div>`).join('');
 }
 
@@ -1904,23 +2005,25 @@ function renderDerived() {
     </div>`).join('') || '<p style="color:var(--muted);font-size:.85rem;margin:4px 0">No derived variables yet.</p>';
 }
 
-// ── Validate {{varName}} references across pages and derived templates ─────────
+// ── Validate {varName}/{{varName}} references across pages and derived templates ─
 function validateVarRefs() {
   const declared = new Set([
     ...S.parameters.filter(p=>p.key).map(p=>p.key),
     ...S.runtimeVars.captured.filter(c=>c.name).map(c=>c.name),
     ...S.runtimeVars.derived.filter(d=>d.name).map(d=>d.name),
+    ...flattenPayloadVars().map(v=>v.path),
   ]);
-  const re = /\{\{([^}]+)\}\}/g;
   const undeclared = new Set();
-  const checkStr = s => { let m; re.lastIndex=0; while((m=re.exec(s))!==null) if(!declared.has(m[1].trim())) undeclared.add(m[1].trim()); };
+  const checkStr = s => extractTemplateVars(s).forEach(v => {
+    if (!declared.has(v) && !declared.has(v.split('.')[0])) undeclared.add(v);
+  });
   S.pages.forEach(p => checkStr(p.url||''));
   S.runtimeVars.derived.forEach(d => checkStr(d.template||''));
   const el = document.getElementById('var-validation');
   if (!el) return;
   if (undeclared.size) {
     el.style.display='';
-    el.textContent = '⚠ Undeclared variable(s): ' + [...undeclared].map(v=>`{{${v}}}`).join(', ') + ' — add them as input, captured, or derived above.';
+    el.textContent = 'Undeclared variable(s): ' + [...undeclared].map(v=>`{{${v}}}`).join(', ') + ' — add them to the payload contract, captured variables, or derived variables above.';
   } else {
     el.style.display='none';
     el.textContent='';
@@ -3377,6 +3480,7 @@ function showStep(n) {
   document.querySelector(`.step[data-step="${n}"]`).classList.add('active');
   S.step = n;
   updateNav();
+  if (n === 2) { renderPayloadBrowser(); renderPages(); }
   if (n === 7) { renderRepeatGroups(); }
   if (n === 6) { renderRunInputs(); updateManifestPreview(); }
   if (n === 10) {

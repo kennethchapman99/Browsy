@@ -59,6 +59,7 @@ function printHelp() {
   console.log('  browsy auth check --workflow <id> --url <url>');
   console.log('  browsy discover --workflow <id> --url <url> [--candidates]');
   console.log('  browsy discover:map --workflow <id> [--package <path>] [--model <model>]');
+  console.log('  browsy autopilot --workflow <id> [--from-recording <id|path>] [--urls a,b] [--model <m>]');
   console.log('  browsy generate-prompt             Print coding agent prompt');
   console.log('  browsy run --workflow <id> --manifest <path> [--dry-run]');
   console.log('  browsy workflow:run --workflow <id> --package <path> [--dry-run|--live]');
@@ -1239,109 +1240,57 @@ async function discoverAll() {
 
 async function discoverMap() {
   const workflow = safeId(requireArg(args, 'workflow'));
-  const { mapFieldsWithLLM, makeAnthropicCaller, extractPackageFields } = await import('../core/field-map-llm.mjs');
-  const { generateCandidates: gc } = await import('../core/field-map-candidates.mjs');
-
-  // 1. Find latest discovered-fields.json for this workflow
-  const runsBase = join(OUTPUT_DIR, 'runs', workflow);
-  if (!exists(runsBase)) {
-    throw new Error(`No run output found for workflow "${workflow}". Run: browsy discover --workflow ${workflow} --url <url>`);
-  }
-  const runDirs = fs.readdirSync(runsBase)
-    .map(d => ({ name: d, path: join(runsBase, d) }))
-    .filter(d => {
-      try { return fs.statSync(d.path).isDirectory(); } catch { return false; }
-    })
-    .sort((a, b) => {
-      try {
-        return fs.statSync(b.path).mtimeMs - fs.statSync(a.path).mtimeMs;
-      } catch { return 0; }
-    });
-
-  let discoveryData = null;
-  let discoveryRunDir = null;
-  for (const rd of runDirs) {
-    const dfPath = join(rd.path, 'discovered-fields.json');
-    if (exists(dfPath)) {
-      discoveryData = readJson(dfPath);
-      discoveryRunDir = rd.path;
-      break;
-    }
-  }
-  if (!discoveryData) {
-    throw new Error(`No discovered-fields.json found for workflow "${workflow}". Run: browsy discover --workflow ${workflow} --url <url>`);
-  }
-  console.log(`Discovery: ${discoveryRunDir}`);
-
-  // 2. Load package JSON — priority order per spec
-  const pkgFlag = args.package;
-  const pkgPaths = pkgFlag
-    ? [resolve(pkgFlag)]
-    : [
-        join(workflowDir(workflow), 'workflow-package.local.json'),
-        join(workflowDir(workflow), 'workflow-package.example.json'),
-        // Legacy fallback only — do not create these for new workflows
-        join(workflowDir(workflow), 'sample-package.json'),
-        join(workflowDir(workflow), 'package.json'),
-      ];
-  let pkg = null;
-  let pkgUsed = null;
-  for (const p of pkgPaths) {
-    if (exists(p)) { pkg = readJson(p); pkgUsed = p; break; }
-  }
-  if (!pkg) {
-    throw new Error(
-      `No package JSON found for workflow "${workflow}". ` +
-      `Create workflows/${workflow}/workflow-package.example.json or pass --package <path>.`
-    );
-  }
-  console.log(`Package: ${pkgUsed}`);
-
-  // 3. Extract fields and generate candidates
-  const packageFields = extractPackageFields(pkg);
-  if (!packageFields.length) {
-    throw new Error('Package has no fields (globals, assets, defaults, or repeatGroups). Nothing to map.');
-  }
-  console.log(`Package fields: ${packageFields.map(f => f.fieldName).join(', ')}`);
-
-  const candidates = gc(discoveryData).candidates;
-  console.log(`DOM candidates: ${candidates.length} (${candidates.filter(c => !c.isDangerous).length} safe)`);
-
-  // 4. Call LLM
+  const { generateFieldMapForWorkflow } = await import('../core/field-map-llm.mjs');
   const modelArg = args.model || 'claude-haiku-4-5-20251001';
-  const callLLM  = makeAnthropicCaller({ model: modelArg });
-  console.log(`Mapping with LLM (${modelArg})…`);
 
-  const { fieldMap, unmapped, confidence } = await mapFieldsWithLLM({
-    packageFields,
-    candidates,
-    callLLM,
+  console.log(`Mapping with LLM (${modelArg})…`);
+  const result = await generateFieldMapForWorkflow({
+    workflowId: workflow,
+    packagePath: args.package,
+    model: modelArg,
   });
 
-  // 5. Write field-map.local.json
-  const outPath = join(workflowDir(workflow), 'field-map.local.json');
-  const output  = {
-    generatedAt:  new Date().toISOString(),
-    workflowId:   workflow,
-    discoveryRun: discoveryRunDir,
-    model:        modelArg,
-    fields:       fieldMap,
-    unmapped,
-    confidence,
-  };
-  writeJson(outPath, output);
+  console.log(`Discovery: ${result.discoveryRunDir}`);
+  console.log(`Package: ${result.packagePath}`);
+  console.log(`Package fields: ${result.packageFields.map(f => f.fieldName).join(', ')}`);
+  console.log(`DOM candidates: ${result.candidatesCount}`);
 
-  // 6. Report
-  const mapped = Object.keys(fieldMap).length;
-  console.log(`\nMapped:   ${mapped}/${packageFields.length} fields`);
-  if (unmapped.length) {
-    console.log(`Unmapped: ${unmapped.join(', ')}`);
-    console.log(`  (Edit ${outPath} to add selectors manually)`);
+  const mapped = Object.keys(result.fieldMap).length;
+  console.log(`\nMapped:   ${mapped}/${result.packageFields.length} fields`);
+  if (result.unmapped.length) {
+    console.log(`Unmapped: ${result.unmapped.join(', ')}`);
+    console.log(`  (Edit ${result.outPath} to add selectors manually)`);
   }
-  console.log(`Output:   ${outPath}`);
-  if (unmapped.length === 0) {
+  console.log(`Output:   ${result.outPath}`);
+  if (result.unmapped.length === 0) {
     console.log('\n✓ All fields mapped. Ready to run.');
   }
+}
+
+// ---------------------------------------------------------------------------
+// autopilot — chain discover → field-map → dry-run into one pass and emit a
+// single structured report of what is done and what still needs a human.
+// Thin CLI wrapper; the orchestration lives in src/core/autopilot.mjs so it
+// can be reused and tested with injectable LLM + discovery.
+// ---------------------------------------------------------------------------
+
+async function autopilot() {
+  const workflow = safeId(requireArg(args, 'workflow'));
+  const { runAutopilot, renderAutopilotMarkdown } = await import('../core/autopilot.mjs');
+
+  const { report, exitCode, jsonPath } = await runAutopilot({
+    workflowId: workflow,
+    packagePath: args.package,
+    model: args.model || 'claude-haiku-4-5-20251001',
+    urls: args.urls ? String(args.urls).split(',') : [],
+    fromRecording: args['from-recording'] || null,
+    headed: boolArg(args.headed, true),
+    skipDiscovery: boolArg(args['skip-discovery'], false),
+  });
+
+  console.log(renderAutopilotMarkdown(report));
+  console.log(`Report: ${jsonPath}`);
+  process.exit(exitCode);
 }
 
 // ---------------------------------------------------------------------------
@@ -1920,6 +1869,7 @@ try {
   else if (command === 'discover') await discover();
   else if (command === 'discover:all') await discoverAll();
   else if (command === 'discover:map') await discoverMap();
+  else if (command === 'autopilot') await autopilot();
   else if (command === 'generate-prompt') generatePrompt();
   else if (command === 'run') await runWorkflow();
   else if (command === 'workflow:run') await workflowRun();
