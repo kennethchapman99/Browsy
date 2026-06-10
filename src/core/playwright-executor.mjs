@@ -18,6 +18,7 @@ import path from 'path';
 import fs from 'fs';
 import { pathToFileURL } from 'url';
 import { safeClick, defaultSafetyPolicy } from './safety.mjs';
+import { emitNeedsInput, emitDone } from './signals.mjs';
 
 // Legacy testid map — used only as fallback when data-browsy-item-field is absent.
 const ITEM_TESTID = {
@@ -353,6 +354,10 @@ export async function executeRunPlanWithPlaywright({
   fieldMap,
   userDataDir = null,
   downloadsDir = null,
+  workflowId = null,
+  runId = null,
+  callbackUrl = null,
+  signals = true,
   leaveBrowserOpen = false,
   // ── End-to-end auto-submit (opt-in only) ──────────────────────────────────
   // autoSubmit: when true, instead of parking at the human_checkpoint the
@@ -661,6 +666,17 @@ export async function executeRunPlanWithPlaywright({
             capturedOutputs, executedSteps, skippedSteps,
           });
           postSubmitCompleted = true;
+        } else if (signals) {
+          // Handing off to a human: make it unmistakable — paint the live page
+          // and push a "needs input" signal to the terminal / calling app.
+          await emitNeedsInput({
+            reason: step.reason || 'Human review required before the final action.',
+            workflowId,
+            runId,
+            blockedActions: step.blocked || [],
+            suggestedAction: 'Review the browser, complete any manual-only actions, then approve the final action.',
+            page,
+          }, { callbackUrl });
         }
         break;
 
@@ -670,6 +686,23 @@ export async function executeRunPlanWithPlaywright({
     }
 
     finalState = await extractFinalState(page);
+
+    // Signal completion before tearing down. When we stopped at a human
+    // checkpoint the run is "waiting on a human", not done — that case already
+    // emitted a needs_input signal above. Emit done when we ran clean, or when
+    // an opt-in auto-submit ran the full post-submit chain to completion.
+    if (signals && (!checkpoint || postSubmitCompleted)) {
+      await emitDone({
+        status: 'completed',
+        workflowId,
+        runId,
+        filled: executedSteps.length,
+        skipped: skippedSteps.length,
+        errors: 0,
+        capturedOutputs,
+        page,
+      }, { callbackUrl });
+    }
 
     if (trace) {
       const traceDir = path.dirname(fixturePath);
