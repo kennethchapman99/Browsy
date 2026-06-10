@@ -93,22 +93,14 @@ export async function executeRunPlanRun({
   // options.leaveBrowserOpen). Never leave a headless fixture/preview browser open.
   const leaveBrowserOpen = wantsLiveSite && options.leaveBrowserOpen !== false;
 
-  // End-to-end auto-submit is opt-in only (options.autoSubmit). On the live site
-  // we additionally require a human confirmation (confirmBeforeSubmit) before the
-  // executor clicks final submit; the confirm signal is a flag file under the run
-  // dir, written by POST /api/runs/:runId/confirm-submit. Against the fake fixture
-  // we proceed without a human (no real account is touched).
+  // End-to-end auto-submit is opt-in only (options.autoSubmit). On the live site a
+  // human gate (confirmBeforeSubmit) ALWAYS applies, which means the executor
+  // never clicks final submit: it fills the form, parks the browser open, and
+  // returns immediately (non-blocking) so the person can review, submit, and
+  // finish the tail (mixea + HyperFollow) themselves. The post-submit chain runs
+  // inline only against the fake fixture (no real account is touched).
   const autoSubmit = options.autoSubmit === true;
   const confirmBeforeSubmit = autoSubmit && wantsLiveSite && options.confirmBeforeSubmit !== false;
-  const confirmFlagPath = runDir ? join(runDir, 'confirm-submit.flag') : null;
-  const confirmTimeoutMs = Number(options.confirmTimeoutMs) || undefined;
-
-  // When we're going to park for a human confirm, publish the flag path + state
-  // on the run record so POST /api/runs/:runId/confirm-submit can drop the flag
-  // file at exactly the path the executor is polling (no path recomputation).
-  if (confirmBeforeSubmit && confirmFlagPath) {
-    updateRun(runId, { awaitingSubmitConfirm: true, confirmFlagPath });
-  }
 
   const result = await executeRunPlanWithPlaywright({
     runPlan,
@@ -122,10 +114,15 @@ export async function executeRunPlanRun({
     leaveBrowserOpen,
     autoSubmit,
     confirmBeforeSubmit,
-    confirmFlagPath,
-    confirmTimeoutMs,
     isFixture: !wantsLiveSite,
   });
+
+  // Parked at the human checkpoint with the browser left open: flag the run as
+  // awaiting a human's "I finished the manual submit" signal, so POST
+  // /api/runs/:runId/confirm-submit can finalize it (stops the caller spinning).
+  if (result.browserLeftOpen && result.checkpoint && !result.postSubmitCompleted) {
+    updateRun(runId, { awaitingSubmitConfirm: true });
+  }
 
   return {
     ok: result.ok,

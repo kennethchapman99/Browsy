@@ -75,6 +75,9 @@ export async function executeRun(args) {
   const engineResultPath = join(registryRunDir, 'engine-result.json');
   writeJson(engineResultPath, engineResult || {});
   addArtifact({ name: 'engine-result.json', path: engineResultPath, type: 'json' });
+  // Remember where the engine result lives so a later confirm-submit/resume can
+  // rewrite it with the post-submit outcome.
+  updateRun(runId, { engineResultPath });
   const artifacts = [...artifactsByPath.values()];
 
   const blocked = engineResult?.ok === false || engineResult?.status === 'replay_failed' || assertionResults.outcome === 'failed';
@@ -170,4 +173,37 @@ function artifactType(filePath = '') {
 
 function firstError(result = {}) {
   return result.failedSteps?.[0]?.error || result.errors?.[0] || result.error || result.status || null;
+}
+
+// Human-finished-the-manual-submit signal. On a live run the executor fills the
+// form and parks the browser open at the human checkpoint (awaitingSubmitConfirm)
+// — final submit, mixea, and the HyperFollow grab are all done by the person in
+// that open window. This finalizes the parked run as completed once they confirm,
+// so the caller stops waiting/spinning. Called by POST /api/runs/:runId/confirm-submit.
+export function confirmSubmitForRun(runId, { capturedOutputs = {} } = {}) {
+  const now = () => new Date().toISOString();
+  const run = getRun(runId);
+  if (!run) throw new Error(`run "${runId}" not found`);
+  if (!run.awaitingSubmitConfirm) throw new Error('run is not awaiting submit confirmation');
+
+  // Fold the human-confirmed outcome into the parked engine result so the run's
+  // result reflects "filled → human submitted". Any outputs the human reports
+  // (e.g. the HyperFollow URL they grabbed) are merged in.
+  const prior = run.internalRunResult || {};
+  const mergedEngine = {
+    ...prior,
+    captured_outputs: { ...(prior.captured_outputs || {}), ...capturedOutputs },
+    human_checkpoint: null,
+    checkpoint_reached: false,
+    human_submit_confirmed_at: now(),
+  };
+  if (run.engineResultPath) {
+    try { writeJson(run.engineResultPath, mergedEngine); } catch {}
+  }
+
+  return finishRun(runId, {
+    status: 'completed', processStatus: 'completed', workflowOutcome: 'success',
+    completedAt: now(), internalRunResult: mergedEngine, blockingReason: null,
+    awaitingSubmitConfirm: false,
+  });
 }

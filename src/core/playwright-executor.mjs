@@ -359,15 +359,15 @@ export async function executeRunPlanWithPlaywright({
   //   executor runs fieldMap.postSubmitSteps (click final submit → clear the
   //   mixea upsell → land on the done page → capture the HyperFollow link).
   //   Default false → byte-for-byte the old "never automate final submit".
-  // confirmBeforeSubmit: when true, park at the checkpoint and wait for an
-  //   out-of-band confirmation (confirmFlagPath appears) before running the
-  //   post-submit steps. Used for the live "human reviews, then resume" flow.
-  //   If it times out, fall back to the safe leave-browser-open hand-off.
+  // confirmBeforeSubmit: when true (the live site), do NOT run the post-submit
+  //   steps at all. Park the filled browser open at the checkpoint and return a
+  //   waiting status immediately — non-blocking, so it never fights the caller's
+  //   run timeout. The human reviews, clicks final submit, and finishes the tail
+  //   (mixea + HyperFollow) themselves. When false (fake fixture / fully
+  //   automated), the post-submit chain runs inline here.
   // isFixture: pick step.fixtureSelector over step.selector (fake test site).
   autoSubmit = false,
   confirmBeforeSubmit = false,
-  confirmFlagPath = null,
-  confirmTimeoutMs = 30 * 60 * 1000,
   isFixture = false,
 }) {
   const policy          = safetyPolicy ?? defaultSafetyPolicy();
@@ -643,27 +643,24 @@ export async function executeRunPlanWithPlaywright({
         checkpoint = step;
 
         // ── End-to-end auto-submit (opt-in) ───────────────────────────────────
-        // Default path: stop here, hand off to a human (final submit is never
-        // automated). Only when autoSubmit is explicitly set do we run the
-        // post-submit chain (submit → mixea → done → capture HyperFollow).
+        // Default path: stop here and hand the filled browser to a human (final
+        // submit is never automated). Only when autoSubmit is set AND there is no
+        // human gate (fake fixture / fully-automated) do we run the post-submit
+        // chain inline (submit → mixea → done → capture HyperFollow).
+        //
+        // On the live site a human gate (confirmBeforeSubmit) ALWAYS applies, so
+        // we do NOT run post-submit and do NOT block waiting for a confirm here —
+        // an earlier blocking design fought the caller's own run timeout and
+        // stranded runs. We simply fall through to the leave-browser-open hand-off
+        // below; the person reviews, clicks submit, and finishes the tail (mixea +
+        // HyperFollow) themselves in the open window.
         const postSubmitSteps = fieldMap?.postSubmitSteps || [];
-        if (autoSubmit && postSubmitSteps.length) {
-          let proceed = true;
-          if (confirmBeforeSubmit) {
-            // Park on the filled page and wait for an out-of-band human confirm
-            // (the confirmFlagPath file appears). Bounded so a forgotten run
-            // doesn't hang forever; on timeout we fall through to the safe
-            // leave-browser-open hand-off below.
-            proceed = await waitForConfirmFlag(confirmFlagPath, confirmTimeoutMs);
-            executedSteps.push({ type: 'await_submit_confirmation', confirmed: proceed, flagPath: confirmFlagPath });
-          }
-          if (proceed) {
-            await runPostSubmitSteps({
-              page, steps: postSubmitSteps, isFixture,
-              capturedOutputs, executedSteps, skippedSteps,
-            });
-            postSubmitCompleted = true;
-          }
+        if (autoSubmit && postSubmitSteps.length && !confirmBeforeSubmit) {
+          await runPostSubmitSteps({
+            page, steps: postSubmitSteps, isFixture,
+            capturedOutputs, executedSteps, skippedSteps,
+          });
+          postSubmitCompleted = true;
         }
         break;
 
@@ -786,15 +783,3 @@ async function runPostSubmitSteps({ page, steps, isFixture, capturedOutputs, exe
   }
 }
 
-// Poll for the out-of-band confirmation flag file. Returns true once it appears,
-// false if confirmTimeoutMs elapses first. A null path means "no confirmation
-// channel configured" → never auto-proceed (caller falls back to hand-off).
-async function waitForConfirmFlag(flagPath, confirmTimeoutMs) {
-  if (!flagPath) return false;
-  const deadline = Date.now() + (confirmTimeoutMs || 0);
-  while (Date.now() < deadline) {
-    if (fs.existsSync(flagPath)) return true;
-    await new Promise(r => setTimeout(r, 2000));
-  }
-  return fs.existsSync(flagPath);
-}
