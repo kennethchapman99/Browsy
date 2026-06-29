@@ -86,14 +86,14 @@ try {
   await page.waitForSelector('[data-testid="recording-summary"]');
   assert('created setup page is setup-only', (await page.textContent('body')).includes('URL parameters'));
   assert('created page has Start Recording', await page.locator('[data-testid="start-recording-button"]').count() === 1);
-  assert('URL parameter carried into setup page', (await page.textContent('[data-testid="url-params"]')).includes('recordId'));
-  assert('URL template resolves on setup page', (await page.textContent('[data-testid="tabs-table"]')).includes(`${CONTENT}/target/REC-123`));
+  assert('resolved URL is shown on setup page', (await page.textContent('[data-testid="tabs-table"]')).includes(`${CONTENT}/target/REC-123`));
 
   const sessionPath = path.join(REPO_ROOT, 'output', 'recordings', recordingSessionId, 'session.json');
   const session = JSON.parse(fs.readFileSync(sessionPath, 'utf8'));
   assert('session stored general app id', session.appId === APP_ID, session.appId);
   assert('session stored general workflow id', session.workflowId === WORKFLOW_ID, session.workflowId);
   assert('session stored starting tab', session.recordingSetup?.tabs?.[0]?.id === 'target', JSON.stringify(session.recordingSetup?.tabs));
+  assert('session stored resolved starting URL', session.recordingSetup?.tabs?.[0]?.url === `${CONTENT}/target/REC-123`, session.recordingSetup?.tabs?.[0]?.url);
 } finally {
   if (browser) await browser.close();
   if (contentServer) await new Promise(resolve => contentServer.close(resolve));
