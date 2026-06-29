@@ -65,6 +65,7 @@
     "acceptance:auth-preflight": "node scripts/acceptance-auth-preflight.mjs",
     "acceptance:observation-materializer": "node scripts/acceptance-observation-materializer.mjs",
     "acceptance:recording-stack": "node scripts/acceptance-recording-stack.mjs",
+    "acceptance:general-recording-ui": "node scripts/acceptance-general-recording-ui.mjs",
     "acceptance:recording-session-ui": "node scripts/acceptance-recording-session-ui.mjs",
     "acceptance:recording-persistent-profile": "node scripts/acceptance-recording-persistent-profile.mjs",
     "acceptance:pancake-recording-context": "node scripts/acceptance-pancake-recording-context.mjs",
